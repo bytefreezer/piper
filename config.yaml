@@ -1,0 +1,72 @@
+# ByteFreezer-Piper Configuration
+
+app:
+  name: "bytefreezer-piper"
+  version: "1.0.0"
+  instance_id: "piper-dev-001"
+  log_level: "info"
+
+# S3 source configuration (raw data input)
+s3_source:
+  bucket_name: "bytefreezer-raw"
+  region: "us-east-1"
+  prefix: "raw/"
+  poll_interval: "30s"
+  # access_key: ""          # Optional - uses default credential chain if not set
+  # secret_key: ""          # Optional - uses default credential chain if not set
+  # secret_name: ""         # Optional - AWS Secrets Manager secret name
+  # endpoint: ""            # Optional - for MinIO/LocalStack
+  ssl: true
+
+# S3 destination configuration (processed data output)
+s3_destination:
+  bucket_name: "bytefreezer-processed"
+  region: "us-east-1"
+  prefix: "processed/"
+  # access_key: ""          # Optional - uses default credential chain if not set
+  # secret_key: ""          # Optional - uses default credential chain if not set
+  # secret_name: ""         # Optional - AWS Secrets Manager secret name
+  # endpoint: ""            # Optional - for MinIO/LocalStack
+  ssl: true
+
+# DynamoDB configuration for state management
+dynamodb:
+  region: "us-east-1"
+  lock_table: "bytefreezer-file-locks"
+  job_table: "bytefreezer-job-status"
+  config_table: "bytefreezer-pipeline-configs"
+  coordination_table: "bytefreezer-service-coordination"
+  # access_key: ""          # Optional - uses default credential chain if not set
+  # secret_key: ""          # Optional - uses default credential chain if not set
+  # secret_name: ""         # Optional - AWS Secrets Manager secret name
+  # endpoint: ""            # Optional - for DynamoDB Local
+
+# Processing engine configuration
+processing:
+  max_concurrent_jobs: 10
+  job_timeout: "30m"
+  retry_attempts: 3
+  retry_backoff: "exponential"
+  buffer_size: 1000
+
+# Pipeline configuration
+pipeline:
+  controller_endpoint: "http://bytefreezer-controller:8080"
+  config_refresh_interval: "5m"
+  geoip_database_path: "/opt/geoip"
+  geoip_city_database: "GeoLite2-City.mmdb"
+  geoip_country_database: "GeoLite2-Country.mmdb"
+  enable_geoip: false
+
+# Monitoring and observability
+monitoring:
+  metrics_port: 9090
+  health_port: 8080
+  log_level: "info"
+  enable_tracing: false
+  # tracing_endpoint: ""    # Optional - OpenTelemetry endpoint
+
+# Secrets management
+secrets:
+  provider: "aws"         # "aws", "env", "file"
+  region: "us-east-1"
