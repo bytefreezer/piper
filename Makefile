@@ -1,4 +1,4 @@
-.PHONY: build clean test help
+.PHONY: build clean test help ansible-prep
 
 # Go parameters
 GOCMD=go
@@ -31,8 +31,17 @@ test: ## Run tests
 	$(GOTEST) -v ./...
 	@echo "✓ Tests passed"
 
+ansible-prep: build ## Build binary and prepare for Ansible deployment
+	@echo "Preparing for Ansible deployment..."
+	@mkdir -p ansible/playbooks/dist
+	@cp $(BINARY_NAME) ansible/playbooks/dist/
+	@echo "✓ Binary copied to ansible/playbooks/dist/"
+	@echo "Ready for Ansible deployment:"
+	@echo "  cd ansible/playbooks && ansible-playbook -i inventory install.yml"
+
 clean: ## Clean build artifacts
 	@echo "Cleaning..."
 	$(GOCLEAN)
 	@rm -f $(BINARY_NAME)
+	@rm -rf ansible/playbooks/dist
 	@echo "✓ Cleaned"

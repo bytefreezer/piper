@@ -140,19 +140,16 @@
         mode: '0644'
 
     - name: Check PostgreSQL connection
-      ansible.builtin.postgresql_ping:
-        db: "{{ config.postgresql.database }}"
-        login_host: "{{ config.postgresql.host }}"
-        login_port: "{{ config.postgresql.port }}"
-        login_user: "{{ config.postgresql.username }}"
-        login_password: "{{ config.postgresql.password }}"
+      ansible.builtin.shell: |
+        PGPASSWORD="{{ config.postgresql.password }}" psql -h "{{ config.postgresql.host }}" -p "{{ config.postgresql.port }}" -U "{{ config.postgresql.username }}" -d "{{ config.postgresql.database }}" -c "SELECT 1;" > /dev/null 2>&1
       register: postgres_check
       ignore_errors: yes
+      changed_when: false
 
     - name: Display PostgreSQL connection status
       debug:
         msg:
-          - "PostgreSQL connection: {{ 'SUCCESS' if postgres_check is succeeded else 'FAILED' }}"
+          - "PostgreSQL connection: {{ 'SUCCESS' if postgres_check.rc == 0 else 'FAILED' }}"
           - "Host: {{ config.postgresql.host }}:{{ config.postgresql.port }}"
           - "Database: {{ config.postgresql.database }}"
           - "User: {{ config.postgresql.username }}"
