@@ -257,7 +257,7 @@ func (sc *S3Client) GetSourceBucketInfo() (bucket, prefix string) {
 	return sc.sourceBucket, sc.sourcePrefix
 }
 
-// GetDestinationBucketInfo returns information about the destination bucket  
+// GetDestinationBucketInfo returns information about the destination bucket
 func (sc *S3Client) GetDestinationBucketInfo() (bucket, prefix string) {
 	return sc.destBucket, sc.destPrefix
 }
@@ -305,4 +305,92 @@ func GenerateProcessedFileName(rawFileName string) string {
 	}
 
 	return fileName + "-processed"
+}
+
+// GetSourceObject downloads an object from the source bucket
+func (sc *S3Client) GetSourceObject(ctx context.Context, key string) ([]byte, error) {
+	log.Debugf("Downloading object from source bucket: %s", key)
+
+	output, err := sc.sourceClient.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(sc.sourceBucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object %s from source bucket %s: %w", key, sc.sourceBucket, err)
+	}
+	defer output.Body.Close()
+
+	data, err := io.ReadAll(output.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object body: %w", err)
+	}
+
+	log.Debugf("Successfully downloaded %d bytes from %s", len(data), key)
+	return data, nil
+}
+
+// PutDestinationObject uploads data to the destination bucket
+func (sc *S3Client) PutDestinationObject(ctx context.Context, key string, data []byte) error {
+	log.Debugf("Uploading object to destination bucket: %s", key)
+
+	_, err := sc.destClient.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(sc.destBucket),
+		Key:    aws.String(key),
+		Body:   strings.NewReader(string(data)),
+		Metadata: map[string]string{
+			"processed-at":   time.Now().Format(time.RFC3339),
+			"processor-type": "bytefreezer-piper",
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to put object %s to destination bucket %s: %w", key, sc.destBucket, err)
+	}
+
+	log.Debugf("Successfully uploaded %d bytes to %s", len(data), key)
+	return nil
+}
+
+// DeleteSourceObject deletes an object from the source bucket
+func (sc *S3Client) DeleteSourceObject(ctx context.Context, key string) error {
+	log.Debugf("Deleting object from source bucket: %s", key)
+
+	_, err := sc.sourceClient.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(sc.sourceBucket),
+		Key:    aws.String(key),
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to delete object %s from source bucket %s: %w", key, sc.sourceBucket, err)
+	}
+
+	log.Debugf("Successfully deleted object: %s", key)
+	return nil
+}
+
+// ListSourceObjects lists objects in the source bucket with the given prefix
+func (sc *S3Client) ListSourceObjects(ctx context.Context, prefix string) ([]string, error) {
+	log.Debugf("Listing objects in source bucket with prefix: %s", prefix)
+
+	var objects []string
+	paginator := s3.NewListObjectsV2Paginator(sc.sourceClient, &s3.ListObjectsV2Input{
+		Bucket: aws.String(sc.sourceBucket),
+		Prefix: aws.String(prefix),
+	})
+
+	for paginator.HasMorePages() {
+		output, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list objects in source bucket %s: %w", sc.sourceBucket, err)
+		}
+
+		for _, obj := range output.Contents {
+			if obj.Key != nil {
+				objects = append(objects, *obj.Key)
+			}
+		}
+	}
+
+	log.Debugf("Found %d objects in source bucket with prefix %s", len(objects), prefix)
+	return objects, nil
 }

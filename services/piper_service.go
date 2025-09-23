@@ -13,276 +13,270 @@ import (
 	"github.com/n0needt0/bytefreezer-piper/storage"
 )
 
-// PiperService is the main service that orchestrates the data processing pipeline
+// PiperService orchestrates the data processing pipeline
 type PiperService struct {
-	config           *config.Config
-	stateManager     *storage.DynamoDBStateManager
-	s3Client         *storage.S3Client
-	discoveryManager *DiscoveryManager
-	processingEngine *ProcessingEngine
-	
-	// Service lifecycle
-	startTime        time.Time
-	isRunning        bool
-	shutdownCh       chan struct{}
-	wg               sync.WaitGroup
-	mu               sync.RWMutex
+	cfg               *config.Config
+	s3Client          *storage.S3Client
+	stateManager      *storage.PostgreSQLStateManager
+	discoveryManager  *SimpleDiscoveryManager
+	processor         *PipelineProcessor
+	running           bool
+	mutex             sync.RWMutex
+	workers           chan struct{}
+	jobQueue          chan *domain.ProcessingJob
+	stopChan          chan struct{}
+	wg                sync.WaitGroup
 }
 
-// NewPiperService creates a new piper service instance
+// NewPiperService creates a new piper service with pipeline processing
 func NewPiperService(cfg *config.Config) (*PiperService, error) {
-	// Create DynamoDB state manager
-	stateManager, err := storage.NewDynamoDBStateManager(&cfg.DynamoDB)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create state manager: %w", err)
-	}
-
 	// Create S3 client
 	s3Client, err := storage.NewS3Client(&cfg.S3Source, &cfg.S3Dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create S3 client: %w", err)
 	}
 
-	// Create discovery manager
-	discoveryManager := NewDiscoveryManager(cfg, s3Client, stateManager)
-
-	// Create processing engine
-	processingEngine, err := NewProcessingEngine(cfg, s3Client, stateManager)
+	// Create PostgreSQL state manager
+	stateManager, err := storage.NewPostgreSQLStateManager(&cfg.PostgreSQL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create processing engine: %w", err)
+		return nil, fmt.Errorf("failed to create state manager: %w", err)
 	}
 
-	return &PiperService{
-		config:           cfg,
-		stateManager:     stateManager,
+	// Create discovery manager
+	discoveryManager := NewSimpleDiscoveryManager(cfg, s3Client, stateManager)
+
+	// Create pipeline processor
+	processor, err := NewPipelineProcessor(cfg, s3Client, stateManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pipeline processor: %w", err)
+	}
+
+	service := &PiperService{
+		cfg:              cfg,
 		s3Client:         s3Client,
+		stateManager:     stateManager,
 		discoveryManager: discoveryManager,
-		processingEngine: processingEngine,
-		shutdownCh:       make(chan struct{}),
-	}, nil
+		processor:        processor,
+		workers:          make(chan struct{}, cfg.Processing.MaxConcurrentJobs),
+		jobQueue:         make(chan *domain.ProcessingJob, cfg.Processing.BufferSize),
+		stopChan:         make(chan struct{}),
+	}
+
+	return service, nil
 }
 
 // Start starts the piper service
-func (ps *PiperService) Start(ctx context.Context) error {
-	ps.mu.Lock()
-	if ps.isRunning {
-		ps.mu.Unlock()
+func (s *PiperService) Start(ctx context.Context) error {
+	s.mutex.Lock()
+	if s.running {
+		s.mutex.Unlock()
 		return fmt.Errorf("service is already running")
 	}
-	ps.isRunning = true
-	ps.startTime = time.Now()
-	ps.mu.Unlock()
+	s.running = true
+	s.mutex.Unlock()
 
-	log.Infof("Starting bytefreezer-piper service")
+	log.Infof("Starting ByteFreezer Piper service with pipeline processing")
+	log.Infof("Max concurrent jobs: %d", s.cfg.Processing.MaxConcurrentJobs)
 
-	// Test connections
-	if err := ps.testConnections(ctx); err != nil {
-		return fmt.Errorf("connection tests failed: %w", err)
+	// Start discovery goroutine
+	s.wg.Add(1)
+	go s.discoveryLoop(ctx)
+
+	// Start worker goroutines
+	for i := 0; i < s.cfg.Processing.MaxConcurrentJobs; i++ {
+		s.wg.Add(1)
+		go s.workerLoop(ctx, i)
 	}
 
-	// Register this service instance
-	if err := ps.registerServiceInstance(ctx); err != nil {
-		return fmt.Errorf("failed to register service instance: %w", err)
-	}
+	// Start cleanup goroutine
+	s.wg.Add(1)
+	go s.cleanupLoop(ctx)
 
-	// Start discovery manager
-	ps.wg.Add(1)
-	go func() {
-		defer ps.wg.Done()
-		if err := ps.discoveryManager.Start(ctx); err != nil {
-			log.Errorf("Discovery manager error: %v", err)
-		}
-	}()
-
-	// Connect discovery manager to processing engine
-	ps.processingEngine.SetJobQueue(ps.discoveryManager.GetJobQueue())
-
-	// Start processing engine
-	ps.wg.Add(1)
-	go func() {
-		defer ps.wg.Done()
-		if err := ps.processingEngine.Start(ctx); err != nil {
-			log.Errorf("Processing engine error: %v", err)
-		}
-	}()
-
-	// Start heartbeat goroutine
-	ps.wg.Add(1)
-	go func() {
-		defer ps.wg.Done()
-		ps.heartbeatLoop(ctx)
-	}()
-
-	log.Infof("Piper service started successfully")
+	log.Infof("ByteFreezer Piper service started successfully")
 	return nil
 }
 
-// Stop stops the piper service gracefully
-func (ps *PiperService) Stop(ctx context.Context) error {
-	ps.mu.Lock()
-	if !ps.isRunning {
-		ps.mu.Unlock()
+// Stop stops the piper service
+func (s *PiperService) Stop(ctx context.Context) error {
+	s.mutex.Lock()
+	if !s.running {
+		s.mutex.Unlock()
 		return fmt.Errorf("service is not running")
 	}
-	ps.isRunning = false
-	ps.mu.Unlock()
+	s.running = false
+	s.mutex.Unlock()
 
-	log.Infof("Stopping piper service...")
+	log.Infof("Stopping ByteFreezer Piper service...")
 
-	// Signal shutdown
-	close(ps.shutdownCh)
+	// Signal stop to all goroutines
+	close(s.stopChan)
 
-	// Stop components with timeout
-	stopCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-
-	// Stop discovery manager
-	if err := ps.discoveryManager.Stop(stopCtx); err != nil {
-		log.Errorf("Error stopping discovery manager: %v", err)
-	}
-
-	// Stop processing engine
-	if err := ps.processingEngine.Stop(stopCtx); err != nil {
-		log.Errorf("Error stopping processing engine: %v", err)
-	}
-
-	// Wait for all goroutines with timeout
+	// Wait for all goroutines to finish
 	done := make(chan struct{})
 	go func() {
-		ps.wg.Wait()
+		s.wg.Wait()
 		close(done)
 	}()
 
 	select {
 	case <-done:
-		log.Infof("All goroutines stopped")
-	case <-stopCtx.Done():
-		log.Warnf("Timeout waiting for goroutines to stop")
+		log.Infof("All workers stopped gracefully")
+	case <-ctx.Done():
+		log.Warnf("Shutdown timeout reached, some workers may not have stopped gracefully")
 	}
 
+	// Close resources
+	if err := s.stateManager.Close(); err != nil {
+		log.Errorf("Error closing state manager: %v", err)
+	}
+
+	log.Infof("ByteFreezer Piper service stopped")
 	return nil
 }
 
-// GetStatus returns the current service status
-func (ps *PiperService) GetStatus() domain.ServiceStatus {
-	ps.mu.RLock()
-	defer ps.mu.RUnlock()
+// discoveryLoop continuously discovers new files to process
+func (s *PiperService) discoveryLoop(ctx context.Context) {
+	defer s.wg.Done()
 
-	status := domain.ServiceStatus{
-		ServiceType:   "piper",
-		InstanceID:    ps.config.App.InstanceID,
-		Version:       ps.config.App.Version,
-		StartedAt:     ps.startTime,
-		LastHeartbeat: time.Now(),
-	}
-
-	if ps.isRunning {
-		status.Status = "healthy"
-	} else {
-		status.Status = "stopped"
-	}
-
-	// Get metrics from components
-	if ps.processingEngine != nil {
-		metrics := ps.processingEngine.GetMetrics()
-		status.JobsInProgress = metrics.ActiveWorkers
-		status.QueueDepth = metrics.QueueDepth
-		// Add more metrics as needed
-	}
-
-	return status
-}
-
-// GetJobStatus returns the status of a specific job
-func (ps *PiperService) GetJobStatus(jobID string) (*domain.JobRecord, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	return ps.stateManager.GetJobStatus(ctx, jobID)
-}
-
-// GetMetrics returns current service metrics
-func (ps *PiperService) GetMetrics() *domain.MetricsSnapshot {
-	metrics := &domain.MetricsSnapshot{
-		Timestamp: time.Now(),
-	}
-
-	if ps.processingEngine != nil {
-		engineMetrics := ps.processingEngine.GetMetrics()
-		metrics.QueueDepth = engineMetrics.QueueDepth
-		metrics.ActiveWorkers = engineMetrics.ActiveWorkers
-		// Add more metrics as needed
-	}
-
-	return metrics
-}
-
-// testConnections tests all external connections
-func (ps *PiperService) testConnections(ctx context.Context) error {
-	log.Infof("Testing external connections...")
-
-	// Test S3 source connection
-	if err := ps.s3Client.TestSourceConnection(ctx); err != nil {
-		return fmt.Errorf("S3 source connection failed: %w", err)
-	}
-
-	// Test S3 destination connection
-	if err := ps.s3Client.TestDestinationConnection(ctx); err != nil {
-		return fmt.Errorf("S3 destination connection failed: %w", err)
-	}
-
-	log.Infof("All connection tests passed")
-	return nil
-}
-
-// registerServiceInstance registers this service instance in DynamoDB
-func (ps *PiperService) registerServiceInstance(ctx context.Context) error {
-	instance := &domain.ServiceInstance{
-		ServiceType:   "piper",
-		InstanceID:    ps.config.App.InstanceID,
-		Status:        "healthy",
-		Version:       ps.config.App.Version,
-		StartedAt:     ps.startTime,
-		LastHeartbeat: time.Now(),
-		Capabilities:  []string{"pipeline_processing", "file_transformation"},
-		Configuration: map[string]interface{}{
-			"max_concurrent_jobs": ps.config.Processing.MaxConcurrentJobs,
-			"source_bucket":       ps.config.S3Source.BucketName,
-			"dest_bucket":         ps.config.S3Dest.BucketName,
-		},
-	}
-
-	if err := ps.stateManager.RegisterServiceInstance(ctx, instance); err != nil {
-		return fmt.Errorf("failed to register service instance: %w", err)
-	}
-
-	log.Infof("Service instance registered successfully")
-	return nil
-}
-
-// heartbeatLoop maintains the service heartbeat
-func (ps *PiperService) heartbeatLoop(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(s.cfg.S3Source.PollInterval)
 	defer ticker.Stop()
+
+	log.Infof("Starting discovery loop with interval: %v", s.cfg.S3Source.PollInterval)
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-s.stopChan:
+			log.Infof("Discovery loop stopping")
 			return
-		case <-ps.shutdownCh:
+		case <-ctx.Done():
+			log.Infof("Discovery loop stopped due to context cancellation")
 			return
 		case <-ticker.C:
-			if err := ps.updateHeartbeat(ctx); err != nil {
-				log.Errorf("Failed to update heartbeat: %v", err)
+			if err := s.discoverAndQueueJobs(ctx); err != nil {
+				log.Errorf("Error during discovery: %v", err)
 			}
 		}
 	}
 }
 
-// updateHeartbeat updates the service heartbeat in DynamoDB
-func (ps *PiperService) updateHeartbeat(ctx context.Context) error {
-	heartbeatCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+// discoverAndQueueJobs discovers new files and queues them for processing
+func (s *PiperService) discoverAndQueueJobs(ctx context.Context) error {
+	jobs, err := s.discoveryManager.DiscoverJobs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to discover jobs: %w", err)
+	}
+
+	for _, job := range jobs {
+		select {
+		case s.jobQueue <- job:
+			log.Debugf("Queued job %s for file %s", job.JobID, job.SourceFile.Key)
+		case <-s.stopChan:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			log.Warnf("Job queue is full, dropping job %s", job.JobID)
+		}
+	}
+
+	if len(jobs) > 0 {
+		log.Infof("Discovered and queued %d new jobs", len(jobs))
+	}
+
+	return nil
+}
+
+// workerLoop processes jobs from the queue
+func (s *PiperService) workerLoop(ctx context.Context, workerID int) {
+	defer s.wg.Done()
+
+	log.Infof("Starting worker %d", workerID)
+
+	for {
+		select {
+		case <-s.stopChan:
+			log.Infof("Worker %d stopping", workerID)
+			return
+		case <-ctx.Done():
+			log.Infof("Worker %d stopped due to context cancellation", workerID)
+			return
+		case job := <-s.jobQueue:
+			s.processJob(ctx, job, workerID)
+		}
+	}
+}
+
+// processJob processes a single job
+func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob, workerID int) {
+	// Acquire worker slot
+	s.workers <- struct{}{}
+	defer func() { <-s.workers }()
+
+	log.Infof("Worker %d processing job %s (file: %s)", workerID, job.JobID, job.SourceFile.Key)
+
+	// Create a timeout context for this job
+	jobCtx, cancel := context.WithTimeout(ctx, s.cfg.Processing.JobTimeout)
 	defer cancel()
 
-	return ps.stateManager.UpdateHeartbeat(heartbeatCtx, "piper", ps.config.App.InstanceID)
+	// Update job status to processing
+	if err := s.stateManager.UpdateJobStatus(jobCtx, job.JobID, domain.JobStatusProcessing); err != nil {
+		log.Errorf("Failed to update job status to processing: %v", err)
+		return
+	}
+
+	// Process the file using pipeline
+	result, err := s.processor.ProcessFile(jobCtx, job)
+	if err != nil {
+		log.Errorf("Worker %d failed to process job %s: %v", workerID, job.JobID, err)
+
+		// Update job status to failed
+		if updateErr := s.stateManager.UpdateJobStatus(jobCtx, job.JobID, domain.JobStatusFailed); updateErr != nil {
+			log.Errorf("Failed to update job status to failed: %v", updateErr)
+		}
+
+		// Release file lock
+		if releaseErr := s.stateManager.ReleaseFileLock(jobCtx, job.SourceFile.Key, job.ProcessorID); releaseErr != nil {
+			log.Errorf("Failed to release file lock: %v", releaseErr)
+		}
+
+		return
+	}
+
+	// Update job status to completed
+	if err := s.stateManager.UpdateJobStatus(jobCtx, job.JobID, domain.JobStatusCompleted); err != nil {
+		log.Errorf("Failed to update job status to completed: %v", err)
+	}
+
+	// Release file lock
+	if err := s.stateManager.ReleaseFileLock(jobCtx, job.SourceFile.Key, job.ProcessorID); err != nil {
+		log.Errorf("Failed to release file lock: %v", err)
+	}
+
+	log.Infof("Worker %d completed job %s successfully (processed %d records)",
+		workerID, job.JobID, result.Stats.OutputRecords)
+}
+
+// cleanupLoop periodically cleans up expired locks
+func (s *PiperService) cleanupLoop(ctx context.Context) {
+	defer s.wg.Done()
+
+	ticker := time.NewTicker(5 * time.Minute) // Cleanup every 5 minutes
+	defer ticker.Stop()
+
+	log.Infof("Starting cleanup loop")
+
+	for {
+		select {
+		case <-s.stopChan:
+			log.Infof("Cleanup loop stopping")
+			return
+		case <-ctx.Done():
+			log.Infof("Cleanup loop stopped due to context cancellation")
+			return
+		case <-ticker.C:
+			if err := s.stateManager.CleanupExpiredLocks(ctx); err != nil {
+				log.Errorf("Error during cleanup: %v", err)
+			}
+		}
+	}
 }

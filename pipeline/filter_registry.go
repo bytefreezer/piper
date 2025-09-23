@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/n0needt0/bytefreezer-piper/domain"
 )
 
 // DefaultFilterRegistry implements the FilterRegistry interface
 type DefaultFilterRegistry struct {
-	factories map[string]FilterFactory
-	mu        sync.RWMutex
+	factories   map[string]FilterFactory
+	mu          sync.RWMutex
 }
 
 // NewFilterRegistry creates a new filter registry with default filters
@@ -99,6 +101,8 @@ func (r *DefaultFilterRegistry) registerBuiltInFilters() {
 	r.Register("geoip", func(config map[string]interface{}) (Filter, error) {
 		return NewGeoIPFilter(config)
 	})
+
+	// Parse filter will be registered externally to avoid import cycles
 }
 
 // ValidateFilterConfig validates a filter configuration
@@ -132,7 +136,7 @@ func ValidateFilterConfig(registry FilterRegistry, filterConfig FilterConfig) er
 }
 
 // ValidatePipelineConfig validates an entire pipeline configuration
-func ValidatePipelineConfig(registry FilterRegistry, config *PipelineConfiguration) error {
+func ValidatePipelineConfig(registry FilterRegistry, config *domain.PipelineConfiguration) error {
 	if config == nil {
 		return fmt.Errorf("pipeline configuration is nil")
 	}
@@ -147,7 +151,13 @@ func ValidatePipelineConfig(registry FilterRegistry, config *PipelineConfigurati
 
 	// Validate each filter
 	for i, filterConfig := range config.Filters {
-		if err := ValidateFilterConfig(registry, filterConfig); err != nil {
+		pipelineFilterConfig := FilterConfig{
+			Type:      filterConfig.Type,
+			Condition: filterConfig.Condition,
+			Config:    filterConfig.Config,
+			Enabled:   filterConfig.Enabled,
+		}
+		if err := ValidateFilterConfig(registry, pipelineFilterConfig); err != nil {
 			return fmt.Errorf("filter %d validation failed: %w", i, err)
 		}
 	}

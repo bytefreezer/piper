@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,12 +16,21 @@ import (
 )
 
 var (
-	configPath = flag.String("config", "config.yaml", "Path to configuration file")
-	version    = "1.0.0" // Will be set during build
+	configPath  = flag.String("config", "config.yaml", "Path to configuration file")
+	showVersion = flag.Bool("version", false, "Show version and exit")
+	version     = "1.0.0" // Will be set during build
+	buildTime   = "unknown"
+	gitCommit   = "unknown"
 )
 
 func main() {
 	flag.Parse()
+
+	// Handle version flag
+	if *showVersion {
+		fmt.Printf("bytefreezer-piper version %s (built %s, commit %s)\n", version, buildTime, gitCommit)
+		os.Exit(0)
+	}
 
 	// Initialize logger
 	log.Infof("Starting bytefreezer-piper version %s", version)
@@ -36,7 +46,7 @@ func main() {
 	log.Infof("Source bucket: %s (prefix: %s)", cfg.S3Source.BucketName, cfg.S3Source.Prefix)
 	log.Infof("Destination bucket: %s (prefix: %s)", cfg.S3Dest.BucketName, cfg.S3Dest.Prefix)
 
-	// Create main service
+	// Create main service (using pipeline processing)
 	piperService, err := services.NewPiperService(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create piper service: %v", err)

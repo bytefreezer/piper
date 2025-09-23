@@ -37,21 +37,6 @@ type FilterConfig struct {
 	Enabled   bool                   `json:"enabled"`
 }
 
-// PipelineConfiguration represents pipeline settings for a tenant/dataset
-type PipelineConfiguration struct {
-	ConfigKey    string                 `dynamodbav:"config_key"`
-	TenantID     string                 `dynamodbav:"tenant_id"`
-	DatasetID    string                 `dynamodbav:"dataset_id"`
-	Enabled      bool                   `dynamodbav:"enabled"`
-	Version      string                 `dynamodbav:"version"`
-	Filters      []FilterConfig         `dynamodbav:"filters"`
-	CreatedAt    time.Time              `dynamodbav:"created_at"`
-	UpdatedAt    time.Time              `dynamodbav:"updated_at"`
-	UpdatedBy    string                 `dynamodbav:"updated_by"`
-	Checksum     string                 `dynamodbav:"checksum"`
-	Validated    bool                   `dynamodbav:"validated"`
-	Settings     map[string]interface{} `dynamodbav:"settings,omitempty"`
-}
 
 // FilterContext provides context for filter execution
 type FilterContext struct {

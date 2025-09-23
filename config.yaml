@@ -6,40 +6,36 @@ app:
   instance_id: "piper-dev-001"
   log_level: "info"
 
-# S3 source configuration (raw data input)
+# S3 source configuration (raw data input from bytefreezer-receiver)
 s3_source:
-  bucket_name: "bytefreezer-raw"
+  bucket_name: "intake"  # Dedicated intake bucket from bytefreezer-receiver
   region: "us-east-1"
-  prefix: "raw/"
+  prefix: ""
   poll_interval: "30s"
-  # access_key: ""          # Optional - uses default credential chain if not set
-  # secret_key: ""          # Optional - uses default credential chain if not set
-  # secret_name: ""         # Optional - AWS Secrets Manager secret name
-  # endpoint: ""            # Optional - for MinIO/LocalStack
-  ssl: true
+  access_key: "AKIAQNXBAHUKIMJP26P6"
+  secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+  endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
+  ssl: false
 
-# S3 destination configuration (processed data output)
+# S3 destination configuration (processed data output for bytefreezer-packer)
 s3_destination:
-  bucket_name: "bytefreezer-processed"
+  bucket_name: "piper"  # Dedicated piper output bucket for bytefreezer-packer
   region: "us-east-1"
-  prefix: "processed/"
-  # access_key: ""          # Optional - uses default credential chain if not set
-  # secret_key: ""          # Optional - uses default credential chain if not set
-  # secret_name: ""         # Optional - AWS Secrets Manager secret name
-  # endpoint: ""            # Optional - for MinIO/LocalStack
-  ssl: true
+  prefix: ""
+  access_key: "AKIAQNXBAHUKIMJP26P6"
+  secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+  endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
+  ssl: false
 
-# DynamoDB configuration for state management
-dynamodb:
-  region: "us-east-1"
-  lock_table: "bytefreezer-file-locks"
-  job_table: "bytefreezer-job-status"
-  config_table: "bytefreezer-pipeline-configs"
-  coordination_table: "bytefreezer-service-coordination"
-  # access_key: ""          # Optional - uses default credential chain if not set
-  # secret_key: ""          # Optional - uses default credential chain if not set
-  # secret_name: ""         # Optional - AWS Secrets Manager secret name
-  # endpoint: ""            # Optional - for DynamoDB Local
+# PostgreSQL configuration for state management
+postgresql:
+  host: "localhost"
+  port: 5432
+  database: "bytefreezer"
+  username: "bytefreezer"
+  password: "bytefreezer"
+  ssl_mode: "disable"
+  schema: "public"
 
 # Processing engine configuration
 processing:
@@ -57,6 +53,65 @@ pipeline:
   geoip_city_database: "GeoLite2-City.mmdb"
   geoip_country_database: "GeoLite2-Country.mmdb"
   enable_geoip: false
+
+# Parser configuration for log parsing (Logstash-style)
+parsers:
+  # Enable parser system
+  enabled: true
+  
+  # Default parser configurations
+  load_defaults: true
+  
+  # Parser-specific settings
+  settings:
+    # Maximum line length for parsing (0 = unlimited)
+    max_line_length: 65536
+    
+    # Buffer size for streaming parsing
+    buffer_size: 4096
+    
+    # Timeout for parser operations
+    parse_timeout: "30s"
+    
+    # Error handling
+    max_parse_errors: 100
+    
+    # Grok pattern directories (optional)
+    grok_patterns_dir: "/opt/grok-patterns"
+    
+  # Auto-generated tenant-specific parsers
+  auto_tenant_parsers: true
+  
+  # Default parsing pipeline for different formats
+  format_defaults:
+    plaintext:
+      - type: "parse"
+        config:
+          auto_select: true
+          source_field: "message"
+          on_parse_failure: "tag"
+          preserve_raw: false
+    
+    syslog:
+      - type: "parse"
+        config:
+          parser_name: "syslog-rfc3164"
+          source_field: "message"
+          on_parse_failure: "tag"
+    
+    ndjson:
+      - type: "parse"
+        config:
+          parser_name: "json-logs"
+          source_field: "message"
+          on_parse_failure: "pass_through"
+    
+    json:
+      - type: "parse"
+        config:
+          parser_name: "json-logs"
+          source_field: "message"
+          on_parse_failure: "pass_through"
 
 # Monitoring and observability
 monitoring:

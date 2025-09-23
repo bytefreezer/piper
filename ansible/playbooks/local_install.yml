@@ -1,0 +1,136 @@
+---
+- name: Install and configure ByteFreezer Piper service (local binary)
+  hosts: all
+  become: yes
+
+  pre_tasks:
+    - name: Check if service already exists
+      ansible.builtin.stat:
+        path: "{{ paths.service_path }}"
+      register: service_exists
+
+    - name: Fail if service already installed
+      fail:
+        msg: "ByteFreezer Piper service is already installed. Use remove playbook first."
+      when: service_exists.stat.exists
+
+  tasks:
+
+    - name: Copy binary to destination
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/dist/bytefreezer-piper"
+        dest: "{{ paths.binary_path }}"
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure config directory exists
+      ansible.builtin.file:
+        path: "{{ paths.config_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure log directory exists
+      ansible.builtin.file:
+        path: "{{ paths.log_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure cache directory exists
+      ansible.builtin.file:
+        path: "{{ paths.cache_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure spool directory exists
+      ansible.builtin.file:
+        path: "{{ paths.spool_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure grok patterns directory exists
+      ansible.builtin.file:
+        path: "{{ config.parsers.settings.grok_patterns_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Generate configuration file
+      ansible.builtin.template:
+        src: templates/config.yaml.j2
+        dest: "{{ paths.config_path }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Install logrotate configuration
+      ansible.builtin.template:
+        src: templates/logrotate.j2
+        dest: "{{ paths.logrotate_path }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Create systemd service file
+      ansible.builtin.template:
+        src: templates/bytefreezer-piper.service.j2
+        dest: "{{ paths.service_path }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Check PostgreSQL connection
+      ansible.builtin.postgresql_ping:
+        db: "{{ config.postgresql.database }}"
+        login_host: "{{ config.postgresql.host }}"
+        login_port: "{{ config.postgresql.port }}"
+        login_user: "{{ config.postgresql.username }}"
+        login_password: "{{ config.postgresql.password }}"
+      register: postgres_check
+      ignore_errors: yes
+
+    - name: Display PostgreSQL connection status
+      debug:
+        msg:
+          - "PostgreSQL connection: {{ 'SUCCESS' if postgres_check is succeeded else 'FAILED' }}"
+          - "Host: {{ config.postgresql.host }}:{{ config.postgresql.port }}"
+          - "Database: {{ config.postgresql.database }}"
+          - "User: {{ config.postgresql.username }}"
+          - "Note: Service will start even if PostgreSQL is not available, but will fail to process files"
+
+    - name: Enable and start service
+      ansible.builtin.systemd:
+        name: "{{ service.name }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+  post_tasks:
+    - name: Display installation status
+      debug:
+        msg:
+          - "ByteFreezer Piper installation completed!"
+          - "Binary: {{ paths.binary_path }}"
+          - "Config: {{ paths.config_path }}"
+          - "Logs: {{ paths.log_dir }}"
+          - "Cache: {{ paths.cache_dir }}"
+          - "Spool: {{ paths.spool_dir }}"
+          - "Installation method: Local binary copy"
+          - "Service: systemctl status {{ service.name }}"
+          - ""
+          - "Configuration Notes:"
+          - "- PostgreSQL must be running and accessible"
+          - "- Control service endpoint: {{ config.pipeline.controller_endpoint }}"
+          - "- S3 source bucket: {{ config.s3_source.bucket_name }}/{{ config.s3_source.prefix }}"
+          - "- S3 destination bucket: {{ config.s3_destination.bucket_name }}/{{ config.s3_destination.prefix }}"
+          - "- Metrics endpoint: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.metrics_port }}/metrics"
+          - "- Health endpoint: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.health_port }}/health"

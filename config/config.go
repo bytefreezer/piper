@@ -14,14 +14,14 @@ import (
 
 // Config represents the main configuration structure for bytefreezer-piper
 type Config struct {
-	App         App         `koanf:"app"`
-	S3Source    S3Source    `koanf:"s3_source"`
-	S3Dest      S3Dest      `koanf:"s3_destination"`
-	DynamoDB    DynamoDB    `koanf:"dynamodb"`
-	Processing  Processing  `koanf:"processing"`
-	Pipeline    Pipeline    `koanf:"pipeline"`
-	Monitoring  Monitoring  `koanf:"monitoring"`
-	Secrets     Secrets     `koanf:"secrets"`
+	App        App        `koanf:"app"`
+	S3Source   S3Source   `koanf:"s3_source"`
+	S3Dest     S3Dest     `koanf:"s3_destination"`
+	PostgreSQL PostgreSQL `koanf:"postgresql"`
+	Processing Processing `koanf:"processing"`
+	Pipeline   Pipeline   `koanf:"pipeline"`
+	Monitoring Monitoring `koanf:"monitoring"`
+	Secrets    Secrets    `koanf:"secrets"`
 }
 
 // App represents application-level configuration
@@ -57,17 +57,15 @@ type S3Dest struct {
 	SSL        bool   `koanf:"ssl"`
 }
 
-// DynamoDB represents DynamoDB configuration for state management
-type DynamoDB struct {
-	Region           string `koanf:"region"`
-	LockTable        string `koanf:"lock_table"`
-	JobTable         string `koanf:"job_table"`
-	ConfigTable      string `koanf:"config_table"`
-	CoordinationTable string `koanf:"coordination_table"`
-	AccessKey        string `koanf:"access_key"`
-	SecretKey        string `koanf:"secret_key"`
-	SecretName       string `koanf:"secret_name"`
-	Endpoint         string `koanf:"endpoint"`
+// PostgreSQL represents PostgreSQL configuration for state management
+type PostgreSQL struct {
+	Host     string `koanf:"host"`
+	Port     int    `koanf:"port"`
+	Database string `koanf:"database"`
+	Username string `koanf:"username"`
+	Password string `koanf:"password"`
+	SSLMode  string `koanf:"ssl_mode"`
+	Schema   string `koanf:"schema"`
 }
 
 // Processing represents processing engine configuration
@@ -81,20 +79,20 @@ type Processing struct {
 
 // Pipeline represents pipeline-specific configuration
 type Pipeline struct {
-	ControllerEndpoint     string        `koanf:"controller_endpoint"`
-	ConfigRefreshInterval  time.Duration `koanf:"config_refresh_interval"`
-	GeoIPDatabasePath      string        `koanf:"geoip_database_path"`
-	GeoIPCityDatabase      string        `koanf:"geoip_city_database"`
-	GeoIPCountryDatabase   string        `koanf:"geoip_country_database"`
-	EnableGeoIP            bool          `koanf:"enable_geoip"`
+	ControllerEndpoint    string        `koanf:"controller_endpoint"`
+	ConfigRefreshInterval time.Duration `koanf:"config_refresh_interval"`
+	GeoIPDatabasePath     string        `koanf:"geoip_database_path"`
+	GeoIPCityDatabase     string        `koanf:"geoip_city_database"`
+	GeoIPCountryDatabase  string        `koanf:"geoip_country_database"`
+	EnableGeoIP           bool          `koanf:"enable_geoip"`
 }
 
 // Monitoring represents monitoring and observability configuration
 type Monitoring struct {
-	MetricsPort  int    `koanf:"metrics_port"`
-	HealthPort   int    `koanf:"health_port"`
-	LogLevel     string `koanf:"log_level"`
-	EnableTracing bool  `koanf:"enable_tracing"`
+	MetricsPort     int    `koanf:"metrics_port"`
+	HealthPort      int    `koanf:"health_port"`
+	LogLevel        string `koanf:"log_level"`
+	EnableTracing   bool   `koanf:"enable_tracing"`
 	TracingEndpoint string `koanf:"tracing_endpoint"`
 }
 
@@ -153,17 +151,12 @@ func getDefaults() map[string]interface{} {
 		"app.instance_id": "piper-${HOSTNAME}",
 		"app.log_level":   "info",
 
-		"s3_source.prefix":        "raw/",
+		"s3_source.prefix":        "",
 		"s3_source.poll_interval": "30s",
 		"s3_source.ssl":           true,
 
-		"s3_destination.prefix": "processed/",
+		"s3_destination.prefix": "",
 		"s3_destination.ssl":    true,
-
-		"dynamodb.lock_table":        "bytefreezer-file-locks",
-		"dynamodb.job_table":         "bytefreezer-job-status",
-		"dynamodb.config_table":      "bytefreezer-pipeline-configs",
-		"dynamodb.coordination_table": "bytefreezer-service-coordination",
 
 		"processing.max_concurrent_jobs": 10,
 		"processing.job_timeout":         "30m",
@@ -177,10 +170,10 @@ func getDefaults() map[string]interface{} {
 		"pipeline.geoip_country_database":  "GeoLite2-Country.mmdb",
 		"pipeline.enable_geoip":            true,
 
-		"monitoring.metrics_port":    9090,
-		"monitoring.health_port":     8080,
-		"monitoring.log_level":       "info",
-		"monitoring.enable_tracing":  false,
+		"monitoring.metrics_port":   9090,
+		"monitoring.health_port":    8080,
+		"monitoring.log_level":      "info",
+		"monitoring.enable_tracing": false,
 
 		"secrets.provider": "aws",
 	}
