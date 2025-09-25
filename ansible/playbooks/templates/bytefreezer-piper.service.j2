@@ -1,9 +1,8 @@
 [Unit]
 Description=ByteFreezer Piper - Data Pipeline Processing Service
 Documentation=https://github.com/{{ github_repo }}
-After=network-online.target postgresql.service
+After=network-online.target
 Wants=network-online.target
-Requires=postgresql.service
 
 [Service]
 Type=simple
@@ -19,8 +18,12 @@ TimeoutStopSec=30
 # Restart settings
 Restart=always
 RestartSec=10
-StartLimitInterval=60
+StartLimitInterval=300
 StartLimitBurst=5
+
+# Exit codes that should trigger a restart
+RestartKillSignal=SIGTERM
+RestartPreventExitStatus=0
 
 # Resource limits
 LimitNOFILE=65536

@@ -11,10 +11,5 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-Staticcheck..............................................................Failed
-- hook id: staticcheck
-- exit code: 1
-
-services/config_manager.go:190:12: the argument is already a string, there's no need to use fmt.Sprintf (S1025)
-services/config_manager.go:191:23: the argument is already a string, there's no need to use fmt.Sprintf (S1025)
-services/config_manager.go:193:19: the argument is already a string, there's no need to use fmt.Sprintf (S1025)
+- please remove dynamodb support and convert to postgress.
+- remove all remnants of dynamodb , clean documentation and tests please

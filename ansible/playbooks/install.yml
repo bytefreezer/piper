@@ -111,6 +111,22 @@
         group: root
         mode: '0644'
 
+    - name: Test PostgreSQL connectivity
+      ansible.builtin.wait_for:
+        host: "{{ config.postgresql.host }}"
+        port: "{{ config.postgresql.port }}"
+        timeout: 10
+      register: pg_connectivity
+      failed_when: false
+
+    - name: Display PostgreSQL connectivity status
+      debug:
+        msg:
+          - "PostgreSQL connectivity: {{ 'SUCCESS' if pg_connectivity.failed == false else 'FAILED' }}"
+          - "Host: {{ config.postgresql.host }}:{{ config.postgresql.port }}"
+          - "Database: {{ config.postgresql.database }}"
+          - "{{ 'PostgreSQL is accessible' if pg_connectivity.failed == false else 'WARNING: PostgreSQL is not accessible. Service may fail to start.' }}"
+
     - name: Create systemd service file
       ansible.builtin.template:
         src: templates/bytefreezer-piper.service.j2
@@ -119,12 +135,34 @@
         group: root
         mode: '0644'
 
-    - name: Enable and start service
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable service
       ansible.builtin.systemd:
         name: "{{ service.name }}"
         enabled: yes
+
+    - name: Start service
+      ansible.builtin.systemd:
+        name: "{{ service.name }}"
         state: started
-        daemon_reload: yes
+      register: service_start
+      failed_when: false
+
+    - name: Check service status
+      ansible.builtin.systemd:
+        name: "{{ service.name }}"
+      register: service_status
+
+    - name: Display service status
+      debug:
+        msg:
+          - "Service start result: {{ 'SUCCESS' if service_start.failed == false else 'FAILED' }}"
+          - "Service state: {{ service_status.status.ActiveState }}"
+          - "Service enabled: {{ service_status.status.UnitFileState }}"
+          - "{{ 'Service started successfully' if service_start.failed == false else 'Service failed to start. Check logs with: journalctl -u ' + service.name }}"
 
     - name: Clean up temporary directory
       ansible.builtin.file:
@@ -144,9 +182,15 @@
           - "Service: systemctl status {{ service.name }}"
           - ""
           - "Configuration Notes:"
-          - "- PostgreSQL must be running and accessible"
-          - "- Control service endpoint: {{ config.pipeline.controller_endpoint }}"
-          - "- S3 source bucket: {{ config.s3_source.bucket_name }}/{{ config.s3_source.prefix }}"
-          - "- S3 destination bucket: {{ config.s3_destination.bucket_name }}/{{ config.s3_destination.prefix }}"
-          - "- Metrics endpoint: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.metrics_port }}/metrics"
-          - "- Health endpoint: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.health_port }}/health"
+          - "- PostgreSQL: {{ config.postgresql.host }}:{{ config.postgresql.port }}/{{ config.postgresql.database }}"
+          - "- Control service: {{ config.pipeline.controller_endpoint }}"
+          - "- S3 source: {{ config.s3_source.bucket_name }}/{{ config.s3_source.prefix }}"
+          - "- S3 destination: {{ config.s3_destination.bucket_name }}/{{ config.s3_destination.prefix }}"
+          - "- Metrics: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.metrics_port }}/metrics"
+          - "- Health: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.health_port }}/health"
+          - ""
+          - "Troubleshooting:"
+          - "- Check service logs: journalctl -u {{ service.name }} -f"
+          - "- Check service status: systemctl status {{ service.name }}"
+          - "- Test PostgreSQL: nc -zv {{ config.postgresql.host }} {{ config.postgresql.port }}"
+          - "- If PostgreSQL is not installed, run: ansible-playbook postgresql_install.yml"
