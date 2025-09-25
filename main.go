@@ -43,8 +43,18 @@ func main() {
 
 	log.Infof("Configuration loaded successfully")
 	log.Infof("Instance ID: %s", cfg.App.InstanceID)
-	log.Infof("Source bucket: %s (prefix: %s)", cfg.S3Source.BucketName, cfg.S3Source.Prefix)
-	log.Infof("Destination bucket: %s (prefix: %s)", cfg.S3Dest.BucketName, cfg.S3Dest.Prefix)
+
+	sourcePrefix := cfg.S3Source.Prefix
+	if sourcePrefix == "" {
+		sourcePrefix = "(none)"
+	}
+	destPrefix := cfg.S3Dest.Prefix
+	if destPrefix == "" {
+		destPrefix = "(none)"
+	}
+
+	log.Infof("Source bucket: %s (prefix: %s)", cfg.S3Source.BucketName, sourcePrefix)
+	log.Infof("Destination bucket: %s (prefix: %s)", cfg.S3Dest.BucketName, destPrefix)
 
 	// Create main service (using pipeline processing)
 	piperService, err := services.NewPiperService(cfg)

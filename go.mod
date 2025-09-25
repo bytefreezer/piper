@@ -16,7 +16,7 @@ require (
 	github.com/knadh/koanf/providers/rawbytes v1.0.0
 	github.com/knadh/koanf/v2 v2.2.2
 	github.com/lib/pq v1.10.9
-	github.com/n0needt0/go-goodies/log v0.0.0-20250630220836-1971f86125fe
+	github.com/n0needt0/go-goodies/log v0.0.0-20250911153747-5be7cbbfc35a
 	gopkg.in/yaml.v3 v3.0.1
 )
 
