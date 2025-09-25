@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -312,6 +313,336 @@ func (f *ConditionalFilter) evaluateCondition(fieldValue interface{}, exists boo
 
 // Placeholder implementations for other filters
 // These would be implemented similar to the above patterns
+
+// JSONValidateFilter validates JSON content and fails if invalid
+type JSONValidateFilter struct {
+	sourceField    string
+	failOnInvalid bool
+}
+
+// NewJSONValidateFilter creates a new JSON validation filter
+func NewJSONValidateFilter(config map[string]interface{}) (Filter, error) {
+	sourceField, ok := config["source_field"].(string)
+	if !ok || sourceField == "" {
+		sourceField = "message" // Default field
+	}
+
+	failOnInvalid, ok := config["fail_on_invalid"].(bool)
+	if !ok {
+		failOnInvalid = true // Default to failing on invalid JSON
+	}
+
+	return &JSONValidateFilter{
+		sourceField:    sourceField,
+		failOnInvalid: failOnInvalid,
+	}, nil
+}
+
+// Type returns the filter type
+func (f *JSONValidateFilter) Type() string {
+	return "json_validate"
+}
+
+// Validate validates the filter configuration
+func (f *JSONValidateFilter) Validate(config map[string]interface{}) error {
+	return nil // No required parameters
+}
+
+// Apply applies the filter to a record
+func (f *JSONValidateFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*FilterResult, error) {
+	start := time.Now()
+
+	// Get the source field value
+	sourceValue, exists := record[f.sourceField]
+	if !exists {
+		if f.failOnInvalid {
+			return &FilterResult{
+				Record:   record,
+				Skip:     true,
+				Applied:  true,
+				Duration: time.Since(start),
+			}, nil
+		}
+		return &FilterResult{
+			Record:   record,
+			Skip:     false,
+			Applied:  false,
+			Duration: time.Since(start),
+		}, nil
+	}
+
+	// Convert to string if needed
+	var jsonStr string
+	if str, ok := sourceValue.(string); ok {
+		jsonStr = str
+	} else {
+		jsonStr = fmt.Sprintf("%v", sourceValue)
+	}
+
+	// Validate JSON by attempting to parse it
+	var parsedJSON interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &parsedJSON); err != nil {
+		if f.failOnInvalid {
+			// Skip this record (fail processing)
+			return &FilterResult{
+				Record:   record,
+				Skip:     true,
+				Applied:  true,
+				Duration: time.Since(start),
+			}, nil
+		}
+		// Continue processing but mark as not applied
+		return &FilterResult{
+			Record:   record,
+			Skip:     false,
+			Applied:  false,
+			Duration: time.Since(start),
+		}, nil
+	}
+
+	// JSON is valid, continue processing
+	return &FilterResult{
+		Record:   record,
+		Skip:     false,
+		Applied:  true,
+		Duration: time.Since(start),
+	}, nil
+}
+
+// JSONFlattenFilter flattens nested JSON objects
+type JSONFlattenFilter struct {
+	sourceField string
+	targetField string
+	separator   string
+}
+
+// NewJSONFlattenFilter creates a new JSON flatten filter
+func NewJSONFlattenFilter(config map[string]interface{}) (Filter, error) {
+	sourceField, ok := config["source_field"].(string)
+	if !ok || sourceField == "" {
+		sourceField = "message" // Default field
+	}
+
+	targetField, ok := config["target_field"].(string)
+	if !ok || targetField == "" {
+		targetField = "@flatten" // Default target field
+	}
+
+	separator, ok := config["separator"].(string)
+	if !ok || separator == "" {
+		separator = "." // Default separator
+	}
+
+	return &JSONFlattenFilter{
+		sourceField: sourceField,
+		targetField: targetField,
+		separator:   separator,
+	}, nil
+}
+
+// Type returns the filter type
+func (f *JSONFlattenFilter) Type() string {
+	return "json_flatten"
+}
+
+// Validate validates the filter configuration
+func (f *JSONFlattenFilter) Validate(config map[string]interface{}) error {
+	return nil // No required parameters
+}
+
+// Apply applies the filter to a record
+func (f *JSONFlattenFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*FilterResult, error) {
+	start := time.Now()
+
+	// Get the source field value
+	sourceValue, exists := record[f.sourceField]
+	if !exists {
+		return &FilterResult{
+			Record:   record,
+			Skip:     false,
+			Applied:  false,
+			Duration: time.Since(start),
+		}, nil
+	}
+
+	// Convert to JSON object if it's a string
+	var jsonObj interface{}
+	if str, ok := sourceValue.(string); ok {
+		if err := json.Unmarshal([]byte(str), &jsonObj); err != nil {
+			// Not valid JSON, skip flattening
+			return &FilterResult{
+				Record:   record,
+				Skip:     false,
+				Applied:  false,
+				Duration: time.Since(start),
+			}, nil
+		}
+	} else {
+		jsonObj = sourceValue
+	}
+
+	// Flatten the object
+	flattened := f.flattenObject(jsonObj, "")
+	record[f.targetField] = flattened
+
+	return &FilterResult{
+		Record:   record,
+		Skip:     false,
+		Applied:  true,
+		Duration: time.Since(start),
+	}, nil
+}
+
+// flattenObject recursively flattens a nested object
+func (f *JSONFlattenFilter) flattenObject(obj interface{}, prefix string) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	switch v := obj.(type) {
+	case map[string]interface{}:
+		for key, value := range v {
+			newKey := key
+			if prefix != "" {
+				newKey = prefix + f.separator + key
+			}
+
+			if nestedMap, ok := value.(map[string]interface{}); ok {
+				// Recursively flatten nested objects
+				for flatKey, flatValue := range f.flattenObject(nestedMap, newKey) {
+					result[flatKey] = flatValue
+				}
+			} else if nestedArray, ok := value.([]interface{}); ok {
+				// Handle arrays by indexing
+				for i, item := range nestedArray {
+					indexKey := fmt.Sprintf("%s%s%d", newKey, f.separator, i)
+					if nestedMap, ok := item.(map[string]interface{}); ok {
+						for flatKey, flatValue := range f.flattenObject(nestedMap, indexKey) {
+							result[flatKey] = flatValue
+						}
+					} else {
+						result[indexKey] = item
+					}
+				}
+			} else {
+				result[newKey] = value
+			}
+		}
+	default:
+		// If it's not an object, just return it as is
+		if prefix != "" {
+			result[prefix] = v
+		} else {
+			result["value"] = v
+		}
+	}
+
+	return result
+}
+
+// UppercaseKeysFilter converts all keys to uppercase
+type UppercaseKeysFilter struct {
+	sourceField string
+	recursive   bool
+}
+
+// NewUppercaseKeysFilter creates a new uppercase keys filter
+func NewUppercaseKeysFilter(config map[string]interface{}) (Filter, error) {
+	sourceField, ok := config["source_field"].(string)
+	if !ok || sourceField == "" {
+		sourceField = "@flatten" // Default field to operate on
+	}
+
+	recursive, ok := config["recursive"].(bool)
+	if !ok {
+		recursive = true // Default to recursive
+	}
+
+	return &UppercaseKeysFilter{
+		sourceField: sourceField,
+		recursive:   recursive,
+	}, nil
+}
+
+// Type returns the filter type
+func (f *UppercaseKeysFilter) Type() string {
+	return "uppercase_keys"
+}
+
+// Validate validates the filter configuration
+func (f *UppercaseKeysFilter) Validate(config map[string]interface{}) error {
+	return nil // No required parameters
+}
+
+// Apply applies the filter to a record
+func (f *UppercaseKeysFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*FilterResult, error) {
+	start := time.Now()
+
+	// Get the source field value
+	sourceValue, exists := record[f.sourceField]
+	if !exists {
+		return &FilterResult{
+			Record:   record,
+			Skip:     false,
+			Applied:  false,
+			Duration: time.Since(start),
+		}, nil
+	}
+
+	// Convert keys to uppercase
+	var updatedValue interface{}
+	if sourceMap, ok := sourceValue.(map[string]interface{}); ok {
+		updatedValue = f.uppercaseKeys(sourceMap)
+		record[f.sourceField] = updatedValue
+	} else {
+		// If the source field is not a map, try to uppercase all keys in the record
+		record = f.uppercaseKeys(record)
+	}
+
+	return &FilterResult{
+		Record:   record,
+		Skip:     false,
+		Applied:  true,
+		Duration: time.Since(start),
+	}, nil
+}
+
+// uppercaseKeys recursively converts all keys to uppercase
+func (f *UppercaseKeysFilter) uppercaseKeys(obj map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	for key, value := range obj {
+		upperKey := strings.ToUpper(key)
+
+		if f.recursive {
+			switch v := value.(type) {
+			case map[string]interface{}:
+				result[upperKey] = f.uppercaseKeys(v)
+			case []interface{}:
+				result[upperKey] = f.uppercaseArrayKeys(v)
+			default:
+				result[upperKey] = value
+			}
+		} else {
+			result[upperKey] = value
+		}
+	}
+
+	return result
+}
+
+// uppercaseArrayKeys handles arrays that might contain objects
+func (f *UppercaseKeysFilter) uppercaseArrayKeys(arr []interface{}) []interface{} {
+	result := make([]interface{}, len(arr))
+
+	for i, item := range arr {
+		if itemMap, ok := item.(map[string]interface{}); ok {
+			result[i] = f.uppercaseKeys(itemMap)
+		} else {
+			result[i] = item
+		}
+	}
+
+	return result
+}
 
 // NewJSONParseFilter creates a JSON parse filter
 func NewJSONParseFilter(config map[string]interface{}) (Filter, error) {

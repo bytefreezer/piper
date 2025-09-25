@@ -36,10 +36,23 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.3 // indirect
 	github.com/aws/smithy-go v1.23.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-chi/chi/v5 v5.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/santhosh-tekuri/jsonschema/v3 v3.1.0 // indirect
+	github.com/swaggest/form/v5 v5.1.1 // indirect
+	github.com/swaggest/jsonschema-go v0.3.78 // indirect
+	github.com/swaggest/openapi-go v0.2.60 // indirect
+	github.com/swaggest/refl v1.4.0 // indirect
+	github.com/swaggest/rest v0.2.75 // indirect
+	github.com/swaggest/swgui v1.8.4 // indirect
+	github.com/swaggest/usecase v1.3.1 // indirect
+	github.com/vearutop/statigz v1.4.0 // indirect
+	go.opentelemetry.io/otel v1.38.0 // indirect
+	go.opentelemetry.io/otel/metric v1.38.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.3 // indirect
 	golang.org/x/sys v0.32.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

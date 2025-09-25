@@ -1,0 +1,112 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/n0needt0/bytefreezer-piper/config"
+	"github.com/n0needt0/go-goodies/log"
+	"github.com/swaggest/openapi-go/openapi3"
+	"github.com/swaggest/rest/web"
+	swgui "github.com/swaggest/swgui/v5emb"
+	"go.opentelemetry.io/otel/metric"
+)
+
+// ConfigManager interface to avoid import cycles
+type ConfigManager interface {
+	GetPipelineConfigAsInterface(ctx context.Context, tenantID, datasetID string) (interface{}, error)
+	GetCacheStats() map[string]interface{}
+}
+
+type API struct {
+	ApiMetrics    map[string]metric.Int64Counter
+	HttpServer    *http.Server
+	Config        *config.Config
+	ConfigManager ConfigManager
+	sync.RWMutex
+}
+
+// NewAPI creates a new API instance
+func NewAPI(configManager ConfigManager, conf *config.Config) *API {
+	return &API{
+		ApiMetrics:    make(map[string]metric.Int64Counter),
+		Config:        conf,
+		ConfigManager: configManager,
+	}
+}
+
+// NewRouter returns a new router serving API endpoints
+func (api *API) NewRouter() *web.Service {
+	service := web.NewService(openapi3.NewReflector())
+
+	// Configure OpenAPI schema
+	service.OpenAPISchema().SetTitle("ByteFreezer Piper API")
+	service.OpenAPISchema().SetDescription("ByteFreezer Piper API for pipeline management and monitoring")
+	service.OpenAPISchema().SetVersion("v2.0.0")
+
+	// Apply defaults for decoder factory
+	service.DecoderFactory.ApplyDefaults = true
+
+	// Wrap to finalize middleware setup
+	service.Wrap()
+
+	// Health check endpoint (test DB connection)
+	service.Get("/api/v2/health", api.HealthCheck())
+
+	// Configuration endpoint
+	service.Get("/api/v2/config", api.GetConfig())
+
+	// Pipeline endpoints
+	service.Get("/api/v2/pipelines", api.GetPipelineList())
+	service.Get("/api/v2/pipelines/{tenantId}/{datasetId}", api.GetPipelineDetails())
+
+	// API documentation
+	service.Docs("/v2/docs", swgui.New)
+
+	// Root redirect to documentation
+	service.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/v2/docs", http.StatusFound)
+	})
+
+	return service
+}
+
+// Serve serves http endpoints
+func (api *API) Serve(address string, router http.Handler) {
+	log.Infof("API server started on %s", address)
+
+	api.HttpServer = &http.Server{
+		Addr:           address,
+		Handler:        router,
+		ReadTimeout:    30 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    120 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1MB
+	}
+	err := api.HttpServer.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		log.Info("API server closed")
+	} else {
+		log.Errorf("API server failed and closed: %v", err)
+	}
+}
+
+// Stop stops the server
+func (api *API) Stop() {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer func() {
+		api.HttpServer = nil
+		cancel()
+	}()
+
+	if api.HttpServer != nil {
+		if err := api.HttpServer.Shutdown(ctx); err != nil {
+			log.Errorf("Error shutting down API server: %v", err)
+		}
+	}
+
+	log.Info("API server shut down gracefully")
+}

@@ -22,6 +22,7 @@ type Config struct {
 	Pipeline   Pipeline   `koanf:"pipeline"`
 	Monitoring Monitoring `koanf:"monitoring"`
 	Secrets    Secrets    `koanf:"secrets"`
+	Dev        bool       `koanf:"dev"`
 }
 
 // App represents application-level configuration

@@ -47,6 +47,12 @@ func NewConfigManager(cfg *config.Config) *ConfigManager {
 func (cm *ConfigManager) GetPipelineConfig(ctx context.Context, tenantID, datasetID string) (*domain.PipelineConfiguration, error) {
 	configKey := fmt.Sprintf("%s:%s", tenantID, datasetID)
 
+	// If in development mode, return fake configuration
+	if cm.cfg.Dev {
+		log.Debugf("Development mode enabled - returning fake config for %s", configKey)
+		return cm.getFakeConfig(tenantID, datasetID), nil
+	}
+
 	cm.mutex.RLock()
 	cached, exists := cm.cache[configKey]
 	cm.mutex.RUnlock()
@@ -197,6 +203,15 @@ func (cm *ConfigManager) RefreshCache(ctx context.Context) {
 	log.Debugf("Refreshed %d configurations", len(keysToRefresh))
 }
 
+// GetPipelineConfigAsInterface returns pipeline config as interface{} for API use
+func (cm *ConfigManager) GetPipelineConfigAsInterface(ctx context.Context, tenantID, datasetID string) (interface{}, error) {
+	config, err := cm.GetPipelineConfig(ctx, tenantID, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
 // ClearCache clears the entire configuration cache
 func (cm *ConfigManager) ClearCache() {
 	cm.mutex.Lock()
@@ -229,4 +244,74 @@ func (cm *ConfigManager) GetCacheStats() map[string]interface{} {
 		"expired":       expired,
 		"last_refresh":  cm.lastRefresh,
 	}
+}
+
+// getFakeConfig returns fake configuration for development mode
+func (cm *ConfigManager) getFakeConfig(tenantID, datasetID string) *domain.PipelineConfiguration {
+	// Special configuration for customer-1/ebpf-data
+	if tenantID == "customer-1" && datasetID == "ebpf-data" {
+		return &domain.PipelineConfiguration{
+			ConfigKey: fmt.Sprintf("%s:%s", tenantID, datasetID),
+			TenantID:  tenantID,
+			DatasetID: datasetID,
+			Enabled:   true,
+			Version:   "dev-1.0.0",
+			Filters: []domain.FilterConfig{
+				{
+					Type:    "json_validate",
+					Enabled: true,
+					Config: map[string]interface{}{
+						"source_field": "message",
+						"fail_on_invalid": true,
+					},
+				},
+				{
+					Type:    "json_flatten",
+					Enabled: true,
+					Config: map[string]interface{}{
+						"source_field": "message",
+						"target_field": "@flatten",
+						"separator":    ".",
+					},
+				},
+				{
+					Type:    "uppercase_keys",
+					Enabled: true,
+					Config: map[string]interface{}{
+						"source_field": "@flatten",
+						"recursive":    true,
+					},
+				},
+				{
+					Type:    "add_field",
+					Enabled: true,
+					Config: map[string]interface{}{
+						"field": "processed_by",
+						"value": "bytefreezer-piper-dev",
+					},
+				},
+				{
+					Type:    "add_field",
+					Enabled: true,
+					Config: map[string]interface{}{
+						"field": "TESTKEY",
+						"value": fmt.Sprintf("%d", time.Now().Unix()),
+					},
+				},
+			},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			UpdatedBy: "dev-mode",
+			Validated: true,
+			Settings: map[string]interface{}{
+				"auto_format_detection": false, // Expect NDJSON only
+				"drop_parse_failures":   true,
+				"compress_output":       true,
+				"format_hint":           "ndjson",
+			},
+		}
+	}
+
+	// Default fake configuration for other tenants
+	return cm.createDefaultConfig(tenantID, datasetID)
 }

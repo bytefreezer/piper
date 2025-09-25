@@ -116,7 +116,7 @@ parsers:
 # Monitoring and observability
 monitoring:
   metrics_port: 9090
-  health_port: 8080
+  health_port: 8082
   log_level: "info"
   enable_tracing: false
   # tracing_endpoint: ""    # Optional - OpenTelemetry endpoint
@@ -125,3 +125,6 @@ monitoring:
 secrets:
   provider: "aws"         # "aws", "env", "file"
   region: "us-east-1"
+
+# Development mode
+dev: true  # Use fake control responses for testing

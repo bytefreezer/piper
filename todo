@@ -1,4 +1,4 @@
-ALWAYS:
+  ALWAYS:
 Avoid flattery, compliments, or positive language. Be clear and concise. Do not use agreeable language to deceive.
 
 - Do comprehensive verification before claiming completion
@@ -10,6 +10,8 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 
 requirements explanation and todo:
-
-- please remove dynamodb support and convert to postgress.
-- remove all remnants of dynamodb , clean documentation and tests please
+please copy api implementation from receiver, keep the following end points:
+- health test connection to db
+- configuration
+- list of tenant/dataset that are in pipeline cache db with date_created/date_modified
+- display pipeline details for tenant/dataset

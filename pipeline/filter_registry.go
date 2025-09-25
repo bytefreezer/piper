@@ -102,6 +102,21 @@ func (r *DefaultFilterRegistry) registerBuiltInFilters() {
 		return NewGeoIPFilter(config)
 	})
 
+	// JSON validation filter
+	r.Register("json_validate", func(config map[string]interface{}) (Filter, error) {
+		return NewJSONValidateFilter(config)
+	})
+
+	// JSON flatten filter
+	r.Register("json_flatten", func(config map[string]interface{}) (Filter, error) {
+		return NewJSONFlattenFilter(config)
+	})
+
+	// Uppercase keys filter
+	r.Register("uppercase_keys", func(config map[string]interface{}) (Filter, error) {
+		return NewUppercaseKeysFilter(config)
+	})
+
 	// Parse filter will be registered externally to avoid import cycles
 }
 

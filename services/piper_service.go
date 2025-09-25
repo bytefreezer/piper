@@ -8,6 +8,7 @@ import (
 
 	"github.com/n0needt0/go-goodies/log"
 
+	"github.com/n0needt0/bytefreezer-piper/api"
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/domain"
 	"github.com/n0needt0/bytefreezer-piper/storage"
@@ -20,6 +21,8 @@ type PiperService struct {
 	stateManager      *storage.PostgreSQLStateManager
 	discoveryManager  *SimpleDiscoveryManager
 	processor         *FormatProcessor
+	configManager     *ConfigManager
+	apiServer         *api.API
 	running           bool
 	mutex             sync.RWMutex
 	workers           chan struct{}
@@ -51,12 +54,20 @@ func NewPiperService(cfg *config.Config) (*PiperService, error) {
 		return nil, fmt.Errorf("failed to create format processor: %w", err)
 	}
 
+	// Create config manager
+	configManager := NewConfigManager(cfg)
+
+	// Create API server
+	apiServer := api.NewAPI(configManager, cfg)
+
 	service := &PiperService{
 		cfg:              cfg,
 		s3Client:         s3Client,
 		stateManager:     stateManager,
 		discoveryManager: discoveryManager,
 		processor:        processor,
+		configManager:    configManager,
+		apiServer:        apiServer,
 		workers:          make(chan struct{}, cfg.Processing.MaxConcurrentJobs),
 		jobQueue:         make(chan *domain.ProcessingJob, cfg.Processing.BufferSize),
 		stopChan:         make(chan struct{}),
@@ -92,7 +103,17 @@ func (s *PiperService) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go s.cleanupLoop(ctx)
 
+	// Start API server
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		address := fmt.Sprintf(":%d", s.cfg.Monitoring.HealthPort)
+		router := s.apiServer.NewRouter()
+		s.apiServer.Serve(address, router.Router)
+	}()
+
 	log.Infof("ByteFreezer Piper service started successfully")
+	log.Infof("API server running on port %d", s.cfg.Monitoring.HealthPort)
 	return nil
 }
 
@@ -107,6 +128,11 @@ func (s *PiperService) Stop(ctx context.Context) error {
 	s.mutex.Unlock()
 
 	log.Infof("Stopping ByteFreezer Piper service...")
+
+	// Stop API server first
+	if s.apiServer != nil {
+		s.apiServer.Stop()
+	}
 
 	// Signal stop to all goroutines
 	close(s.stopChan)
