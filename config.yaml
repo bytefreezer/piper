@@ -33,7 +33,7 @@ postgresql:
   port: 5432
   database: "bytefreezer"
   username: "bytefreezer"
-  password: "bytefreezer"
+  password: "bytefreezer123"
   ssl_mode: "disable"
   schema: "public"
 
