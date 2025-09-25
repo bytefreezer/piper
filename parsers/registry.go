@@ -23,6 +23,16 @@ func NewRegistry() ParserRegistry {
 	registry.Register("syslog-rfc3164", NewSyslogParser)
 	registry.Register("plaintext", NewPlaintextParser)
 
+	// Register format parsers for data pipeline
+	registry.Register("ndjson", NewNDJSONParser)
+	registry.Register("csv", NewCSVParser)
+	registry.Register("tsv", NewTSVParser)
+	registry.Register("apache", NewApacheLogParser)
+	registry.Register("nginx", NewNginxLogParser)
+	registry.Register("influx", NewInfluxLineProtocolParser)
+	registry.Register("cef", NewCEFParser)
+	registry.Register("raw", NewRawTextParser)
+
 	return registry
 }
 

@@ -1,0 +1,153 @@
+{
+  "config_key": "tenant-001:dataset-logs",
+  "tenant_id": "tenant-001",
+  "dataset_id": "dataset-logs",
+  "enabled": true,
+  "version": "2.1.0",
+  "description": "Production web server log processing pipeline for tenant-001",
+  "created_at": "2025-09-24T14:30:00Z",
+  "updated_at": "2025-09-24T14:30:00Z",
+  "updated_by": "admin@company.com",
+  "validated": true,
+  "checksum": "sha256:a1b2c3d4e5f6...",
+  "settings": {
+    "auto_format_detection": true,
+    "drop_parse_failures": true,
+    "compress_output": true,
+    "max_line_length": 32768,
+    "processing_timeout": "5m",
+    "batch_size": 1000
+  },
+  "filters": [
+    {
+      "type": "add_field",
+      "name": "environment_tagging",
+      "enabled": true,
+      "description": "Add environment and processing metadata",
+      "config": {
+        "field": "environment",
+        "value": "production"
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "datacenter_info",
+      "enabled": true,
+      "config": {
+        "field": "datacenter",
+        "value": "${DC_REGION}"
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "processing_timestamp",
+      "enabled": true,
+      "config": {
+        "field": "@timestamp",
+        "value": "${timestamp}"
+      }
+    },
+    {
+      "type": "conditional",
+      "name": "drop_debug_logs",
+      "enabled": true,
+      "description": "Drop debug level logs to reduce noise",
+      "condition": "if [level] == 'debug'",
+      "config": {
+        "field": "level",
+        "operator": "eq",
+        "value": "debug",
+        "action": "drop"
+      }
+    },
+    {
+      "type": "conditional",
+      "name": "drop_health_checks",
+      "enabled": true,
+      "description": "Filter out health check requests",
+      "condition": "if [request] =~ /health|ping|status/",
+      "config": {
+        "field": "request",
+        "operator": "contains",
+        "value": "/health",
+        "action": "drop"
+      }
+    },
+    {
+      "type": "rename_field",
+      "name": "standardize_field_names",
+      "enabled": true,
+      "description": "Rename fields to match company standards",
+      "config": {
+        "from": "remote_addr",
+        "to": "client_ip"
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "response_category",
+      "enabled": true,
+      "description": "Categorize HTTP responses",
+      "condition": "if [status] >= 200 and [status] < 300",
+      "config": {
+        "field": "response_type",
+        "value": "success"
+      }
+    },
+    {
+      "type": "conditional",
+      "name": "flag_errors",
+      "enabled": true,
+      "description": "Add error flag for 4xx/5xx responses",
+      "config": {
+        "field": "status",
+        "operator": "gte",
+        "value": 400,
+        "action": "keep"
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "error_category",
+      "enabled": true,
+      "condition": "if [status] >= 400",
+      "config": {
+        "field": "error_category",
+        "value": "http_error"
+      }
+    },
+    {
+      "type": "remove_field",
+      "name": "cleanup_sensitive_fields",
+      "enabled": true,
+      "description": "Remove sensitive fields for security",
+      "config": {
+        "fields": ["raw", "_parse_error", "internal_id"]
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "geo_location_placeholder",
+      "enabled": false,
+      "description": "Add geo-location data (requires GeoIP setup)",
+      "config": {
+        "field": "geo_country",
+        "value": "US"
+      }
+    }
+  ],
+  "output": {
+    "format": "ndjson",
+    "compression": "gzip",
+    "s3": {
+      "bucket": "processed-logs-prod",
+      "key_pattern": "${tenant_id}/${dataset_id}/year=${year}/month=${month}/day=${day}/hour=${hour}/${filename}"
+    }
+  },
+  "monitoring": {
+    "enabled": true,
+    "alert_on_errors": true,
+    "error_threshold": 0.05,
+    "metrics": ["throughput", "error_rate", "latency", "filter_performance"]
+  }
+}

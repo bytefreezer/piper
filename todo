@@ -1,24 +1,20 @@
-✅ COMPLETED: Migrate from DynamoDB to PostgreSQL for state management
-✅ COMPLETED: Implement simple file copying from source to destination buckets
-✅ COMPLETED: Add file deletion after successful copy
-✅ COMPLETED: Integrate with control service to get active tenant lists
-✅ COMPLETED: Update configuration to use PostgreSQL instead of DynamoDB
-✅ COMPLETED: Remove all DynamoDB references and unused code
-✅ COMPLETED: Create complete AWX/Ansible deployment suite
+ALWAYS:
+Avoid flattery, compliments, or positive language. Be clear and concise. Do not use agreeable language to deceive.
 
-NEXT STEPS (when needed):
-- Add advanced pipeline filtering back (currently disabled for simplicity)
-- Implement data transformation filters
-- Add complex data processing logic
-- Performance optimization for high-volume processing
+- Do comprehensive verification before claiming completion
+- Show me proof of completion, don’t just assert it
+- Prioritize thoroughness over speed
+- If I correct you, adapt your method for the rest of the task
+- No completion claims until you can demonstrate test end to end. 
 
-The piper now successfully:
-1. Runs multiple nodes in parallel with PostgreSQL coordination
-2. Reads data from incoming S3 bucket (raw/ prefix)
-3. Copies files to outgoing bucket (processed/ prefix) as-is
-4. Deletes source files after successful copy
-5. Uses PostgreSQL for distributed locking instead of DynamoDB
-6. Gets tenant information from the control service
-7. Deploys via Ansible playbooks matching receiver structure
 
-Ready for production use in simple copy mode! 
+
+requirements explanation and todo:
+
+Staticcheck..............................................................Failed
+- hook id: staticcheck
+- exit code: 1
+
+services/config_manager.go:190:12: the argument is already a string, there's no need to use fmt.Sprintf (S1025)
+services/config_manager.go:191:23: the argument is already a string, there's no need to use fmt.Sprintf (S1025)
+services/config_manager.go:193:19: the argument is already a string, there's no need to use fmt.Sprintf (S1025)

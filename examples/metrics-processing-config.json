@@ -1,0 +1,134 @@
+{
+  "config_key": "devops:application-metrics",
+  "tenant_id": "devops",
+  "dataset_id": "application-metrics",
+  "enabled": true,
+  "version": "2.0.1",
+  "description": "Application metrics processing from InfluxDB line protocol",
+  "created_at": "2025-09-24T14:30:00Z",
+  "updated_at": "2025-09-24T14:30:00Z",
+  "updated_by": "devops@company.com",
+  "validated": true,
+  "checksum": "sha256:9f8e7d6c5b4a...",
+  "settings": {
+    "auto_format_detection": true,
+    "drop_parse_failures": true,
+    "compress_output": true,
+    "expected_format": "influx",
+    "batch_size": 5000
+  },
+  "filters": [
+    {
+      "type": "conditional",
+      "name": "filter_test_metrics",
+      "enabled": true,
+      "description": "Drop test environment metrics",
+      "config": {
+        "field": "tags.environment",
+        "operator": "eq",
+        "value": "test",
+        "action": "drop"
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "metric_source",
+      "enabled": true,
+      "description": "Add metric source identifier",
+      "config": {
+        "field": "metric_source",
+        "value": "application-monitoring"
+      }
+    },
+    {
+      "type": "rename_field",
+      "name": "standardize_measurement",
+      "enabled": true,
+      "description": "Rename measurement to metric_name for consistency",
+      "config": {
+        "from": "measurement",
+        "to": "metric_name"
+      }
+    },
+    {
+      "type": "conditional",
+      "name": "filter_high_cardinality",
+      "enabled": true,
+      "description": "Drop metrics with too many tags (high cardinality)",
+      "condition": "if size([tags]) > 10",
+      "config": {
+        "field": "tags",
+        "operator": "exists",
+        "value": true,
+        "action": "keep"
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "processing_metadata",
+      "enabled": true,
+      "config": {
+        "field": "ingested_at",
+        "value": "${timestamp}"
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "retention_policy",
+      "enabled": true,
+      "description": "Add retention policy based on metric type",
+      "config": {
+        "field": "retention_days",
+        "value": "90"
+      }
+    },
+    {
+      "type": "conditional",
+      "name": "critical_metrics_retention",
+      "enabled": true,
+      "description": "Extend retention for critical metrics",
+      "condition": "if [metric_name] in ['cpu_usage', 'memory_usage', 'error_rate']",
+      "config": {
+        "field": "metric_name",
+        "operator": "eq",
+        "value": "cpu_usage",
+        "action": "keep"
+      }
+    },
+    {
+      "type": "add_field",
+      "name": "extended_retention",
+      "enabled": true,
+      "condition": "if [metric_name] == 'cpu_usage'",
+      "config": {
+        "field": "retention_days",
+        "value": "365"
+      }
+    },
+    {
+      "type": "remove_field",
+      "name": "cleanup_internal_fields",
+      "enabled": true,
+      "description": "Remove internal processing fields",
+      "config": {
+        "fields": ["raw", "_internal_id", "_debug_info"]
+      }
+    }
+  ],
+  "output": {
+    "format": "ndjson",
+    "compression": "gzip",
+    "s3": {
+      "bucket": "metrics-warehouse",
+      "key_pattern": "metrics/${tenant_id}/${dataset_id}/year=${year}/month=${month}/day=${day}/hour=${hour}/${filename}",
+      "partitioning": "hourly"
+    }
+  },
+  "monitoring": {
+    "enabled": true,
+    "alert_on_errors": true,
+    "error_threshold": 0.02,
+    "performance_tracking": true,
+    "metrics": ["ingestion_rate", "processing_latency", "filter_efficiency"]
+  }
+}

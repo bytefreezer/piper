@@ -19,7 +19,7 @@ type PiperService struct {
 	s3Client          *storage.S3Client
 	stateManager      *storage.PostgreSQLStateManager
 	discoveryManager  *SimpleDiscoveryManager
-	processor         *PipelineProcessor
+	processor         *FormatProcessor
 	running           bool
 	mutex             sync.RWMutex
 	workers           chan struct{}
@@ -45,10 +45,10 @@ func NewPiperService(cfg *config.Config) (*PiperService, error) {
 	// Create discovery manager
 	discoveryManager := NewSimpleDiscoveryManager(cfg, s3Client, stateManager)
 
-	// Create pipeline processor
-	processor, err := NewPipelineProcessor(cfg, s3Client, stateManager)
+	// Create format processor
+	processor, err := NewFormatProcessor(cfg, s3Client, stateManager)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pipeline processor: %w", err)
+		return nil, fmt.Errorf("failed to create format processor: %w", err)
 	}
 
 	service := &PiperService{
@@ -75,7 +75,7 @@ func (s *PiperService) Start(ctx context.Context) error {
 	s.running = true
 	s.mutex.Unlock()
 
-	log.Infof("Starting ByteFreezer Piper service with pipeline processing")
+	log.Infof("Starting ByteFreezer Piper service with format processing")
 	log.Infof("Max concurrent jobs: %d", s.cfg.Processing.MaxConcurrentJobs)
 
 	// Start discovery goroutine
