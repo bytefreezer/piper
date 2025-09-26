@@ -32,11 +32,10 @@ config:
   app:
     name: "bytefreezer-piper"
     version: "1.0.0"
-    instance_id: "piper-prod-001"
     log_level: "info"
 
   server:
-    apiport: 8080
+    apiport: 8090
 
   # S3 source configuration (raw data input from bytefreezer-receiver)
   s3_source:
