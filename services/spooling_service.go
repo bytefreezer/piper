@@ -504,7 +504,15 @@ func (s *SpoolingService) retryWorker(ctx context.Context, workerID int) {
 	defer s.wg.Done()
 
 	log.Infof("Starting retry worker %d", workerID)
-	ticker := time.NewTicker(s.config.Spooling.RetryInterval)
+
+	// Ensure retry interval is positive (fallback to 30 seconds if misconfigured)
+	retryInterval := s.config.Spooling.RetryInterval
+	if retryInterval <= 0 {
+		log.Warnf("Invalid retry interval %v, using default 30s", retryInterval)
+		retryInterval = 30 * time.Second
+	}
+
+	ticker := time.NewTicker(retryInterval)
 	defer ticker.Stop()
 
 	for {
