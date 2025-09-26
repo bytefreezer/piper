@@ -114,4 +114,4 @@
           - "- S3 source bucket: {{ config.s3_source.bucket_name }}"
           - "- S3 destination bucket: {{ config.s3_destination.bucket_name }}"
           - "- Metrics endpoint: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.metrics_port }}/metrics"
-          - "- Health endpoint: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.health_port }}/health"
+          - "- API endpoint: http://{{ ansible_default_ipv4.address }}:{{ config.server.apiport }}/api/v2/status"
