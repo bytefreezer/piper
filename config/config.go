@@ -2,6 +2,9 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/knadh/koanf/parsers/yaml"
@@ -15,6 +18,7 @@ import (
 // Config represents the main configuration structure for bytefreezer-piper
 type Config struct {
 	App          App          `koanf:"app"`
+	Server       Server       `koanf:"server"`
 	S3Source     S3Source     `koanf:"s3_source"`
 	S3Dest       S3Dest       `koanf:"s3_destination"`
 	PostgreSQL   PostgreSQL   `koanf:"postgresql"`
@@ -32,6 +36,11 @@ type App struct {
 	Version    string `koanf:"version"`
 	InstanceID string `koanf:"instance_id"`
 	LogLevel   string `koanf:"log_level"`
+}
+
+// Server represents server configuration following receiver pattern
+type Server struct {
+	ApiPort int `koanf:"apiport"`
 }
 
 // S3Source represents configuration for reading raw data from S3
@@ -144,6 +153,11 @@ func LoadConfig(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Handle instance ID if not set in config
+	if config.App.InstanceID == "" {
+		config.App.InstanceID = generateInstanceID()
+	}
+
 	// Validate configuration
 	if err := validateConfig(&config); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
@@ -155,12 +169,61 @@ func LoadConfig(configPath string) (*Config, error) {
 	return &config, nil
 }
 
+// generateInstanceID generates a dynamic instance ID based on IP address with fallbacks
+func generateInstanceID() string {
+	// Try to get the first non-loopback IP address
+	interfaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+				continue
+			}
+
+			addrs, err := iface.Addrs()
+			if err != nil {
+				continue
+			}
+
+			for _, addr := range addrs {
+				var ip net.IP
+				switch v := addr.(type) {
+				case *net.IPNet:
+					ip = v.IP
+				case *net.IPAddr:
+					ip = v.IP
+				}
+
+				if ip == nil || ip.IsLoopback() || ip.To4() == nil {
+					continue
+				}
+
+				// Format IP as piper-192-168-1-100
+				ipStr := ip.String()
+				ipFormatted := strings.ReplaceAll(ipStr, ".", "-")
+				return fmt.Sprintf("piper-%s", ipFormatted)
+			}
+		}
+	}
+
+	// Fallback to hostname
+	hostname, err := os.Hostname()
+	if err == nil && hostname != "" {
+		return fmt.Sprintf("piper-%s", hostname)
+	}
+
+	// Final fallback to static default
+	return "piper-default"
+}
+
 // getDefaults returns a map of default configuration values
 func getDefaults() map[string]interface{} {
+	// Generate dynamic instance ID based on IP address with fallbacks
+	instanceID := generateInstanceID()
+
 	return map[string]interface{}{
 		"app.name":        "bytefreezer-piper",
 		"app.version":     "1.0.0",
-		"app.instance_id": "piper-${HOSTNAME}",
+		"app.instance_id": instanceID,
 		"app.log_level":   "info",
 
 		"s3_source.prefix":        "",

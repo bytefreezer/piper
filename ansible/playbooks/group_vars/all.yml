@@ -35,6 +35,9 @@ config:
     instance_id: "piper-prod-001"
     log_level: "info"
 
+  server:
+    apiport: 8080
+
   # S3 source configuration (raw data input from bytefreezer-receiver)
   s3_source:
     bucket_name: "intake"

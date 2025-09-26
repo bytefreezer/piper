@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/n0needt0/go-goodies/log"
 
 	"github.com/n0needt0/bytefreezer-piper/config"
@@ -443,7 +443,7 @@ func (sm *PostgreSQLStateManager) CacheTenant(ctx context.Context, tenantID, nam
 			cached_at = NOW(),
 			expires_at = EXCLUDED.expires_at`
 
-	_, err := sm.db.ExecContext(ctx, upsertSQL, tenantID, name, datasets, active, expiresAt)
+	_, err := sm.db.ExecContext(ctx, upsertSQL, tenantID, name, pq.Array(datasets), active, expiresAt)
 	if err != nil {
 		return fmt.Errorf("failed to cache tenant: %w", err)
 	}
@@ -469,7 +469,7 @@ func (sm *PostgreSQLStateManager) GetCachedTenants(ctx context.Context) ([]map[s
 	var tenants []map[string]interface{}
 	for rows.Next() {
 		var tenantID, name string
-		var datasets []string
+		var datasets pq.StringArray
 		var active bool
 		var createdAt, updatedAt, cachedAt, expiresAt time.Time
 
@@ -481,7 +481,7 @@ func (sm *PostgreSQLStateManager) GetCachedTenants(ctx context.Context) ([]map[s
 		tenant := map[string]interface{}{
 			"tenant_id":  tenantID,
 			"name":       name,
-			"datasets":   datasets,
+			"datasets":   []string(datasets),
 			"active":     active,
 			"created_at": createdAt.Format(time.RFC3339),
 		}

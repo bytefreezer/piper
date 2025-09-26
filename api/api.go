@@ -15,27 +15,27 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-// ConfigManager interface to avoid import cycles
-type ConfigManager interface {
+// Services interface to match receiver pattern
+type Services interface {
 	GetPipelineConfigAsInterface(ctx context.Context, tenantID, datasetID string) (interface{}, error)
 	GetCacheStats() map[string]interface{}
 	GetCachedPipelineList(ctx context.Context) ([]map[string]interface{}, error)
 }
 
 type API struct {
-	ApiMetrics    map[string]metric.Int64Counter
-	HttpServer    *http.Server
-	Config        *config.Config
-	ConfigManager ConfigManager
+	Services   Services
+	ApiMetrics map[string]metric.Int64Counter
+	HttpServer *http.Server
+	Config     *config.Config
 	sync.RWMutex
 }
 
-// NewAPI creates a new API instance
-func NewAPI(configManager ConfigManager, conf *config.Config) *API {
+// NewAPI creates a new API instance following receiver pattern
+func NewAPI(services Services, conf *config.Config) *API {
 	return &API{
-		ApiMetrics:    make(map[string]metric.Int64Counter),
-		Config:        conf,
-		ConfigManager: configManager,
+		Services:   services,
+		ApiMetrics: make(map[string]metric.Int64Counter),
+		Config:     conf,
 	}
 }
 

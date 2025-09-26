@@ -254,7 +254,7 @@ func (api *API) GetConfig() usecase.Interactor {
 func (api *API) GetPipelineList() usecase.Interactor {
 	u := usecase.NewInteractor(func(ctx context.Context, input struct{}, output *PipelineListResponse) error {
 		// Get cached pipeline list from database
-		cachedPipelines, err := api.ConfigManager.GetCachedPipelineList(ctx)
+		cachedPipelines, err := api.Services.GetCachedPipelineList(ctx)
 		if err != nil {
 			log.Errorf("Failed to get cached pipeline list: %v", err)
 			// Return empty list on error
@@ -284,7 +284,7 @@ func (api *API) GetPipelineList() usecase.Interactor {
 		output.Pipelines = pipelines
 		output.Count = len(pipelines)
 
-		cacheStats := api.ConfigManager.GetCacheStats()
+		cacheStats := api.Services.GetCacheStats()
 		log.Debugf("Retrieved %d cached pipeline configurations. Cache stats: %+v", len(pipelines), cacheStats)
 
 		return nil
@@ -301,7 +301,7 @@ func (api *API) GetPipelineList() usecase.Interactor {
 func (api *API) GetPipelineDetails() usecase.Interactor {
 	u := usecase.NewInteractor(func(ctx context.Context, input PipelineDetailsRequest, output *PipelineDetailsResponse) error {
 		// Get pipeline configuration for the specific tenant/dataset
-		pipelineConfig, err := api.ConfigManager.GetPipelineConfigAsInterface(ctx, input.TenantID, input.DatasetID)
+		pipelineConfig, err := api.Services.GetPipelineConfigAsInterface(ctx, input.TenantID, input.DatasetID)
 		if err != nil {
 			log.Errorf("Failed to get pipeline config for %s/%s: %v", input.TenantID, input.DatasetID, err)
 			return status.Wrap(status.InvalidArgument, status.NotFound)
