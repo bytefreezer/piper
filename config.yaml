@@ -3,7 +3,7 @@
 app:
   name: "bytefreezer-piper"
   version: "1.0.0"
-  log_level: "info"
+  log_level: "debug"
 
 server:
   apiport: 8090
@@ -58,7 +58,7 @@ processing:
 pipeline:
   controller_endpoint: ""  # Use database cache instead of API calls
   config_refresh_interval: "5m"
-  geoip_database_path: "/opt/geoip"
+  geoip_database_path: "/tmp/geoip"
   geoip_city_database: "GeoLite2-City.mmdb"
   geoip_country_database: "GeoLite2-Country.mmdb"
   enable_geoip: false
@@ -66,7 +66,7 @@ pipeline:
 # Parser configuration for log parsing (Logstash-style)
 parsers:
   # Enable parser system
-  enabled: true
+  enabled: false
   
   # Default parser configurations
   load_defaults: true

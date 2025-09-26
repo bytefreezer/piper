@@ -29,6 +29,15 @@ s3_destination:
   access_key: {{ config.s3_destination.access_key }}
   secret_key: {{ config.s3_destination.secret_key }}
 
+# S3 GeoIP configuration (GeoIP database updates)
+s3_geoip:
+  bucket_name: {{ config.s3_geoip.bucket_name }}
+  region: {{ config.s3_geoip.region }}
+  endpoint: {{ config.s3_geoip.endpoint }}
+  ssl: {{ config.s3_geoip.ssl | lower }}
+  access_key: {{ config.s3_geoip.access_key }}
+  secret_key: {{ config.s3_geoip.secret_key }}
+
 # PostgreSQL configuration for state management
 postgresql:
   host: {{ config.postgresql.host }}

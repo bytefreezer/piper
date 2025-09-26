@@ -56,6 +56,15 @@ config:
     access_key: "AKIAQNXBAHUKIMJP26P6"
     secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
 
+  # S3 GeoIP configuration (GeoIP database updates)
+  s3_geoip:
+    bucket_name: "geoip"
+    region: "us-east-1"
+    endpoint: "192.168.86.125:9000"
+    ssl: false
+    access_key: "AKIAQNXBAHUKIMJP26P6"
+    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+
   # PostgreSQL configuration for state management
   postgresql:
     host: "192.168.86.137"
@@ -84,7 +93,7 @@ config:
 
   # Parser configuration for log parsing (Logstash-style)
   parsers:
-    enabled: true
+    enabled: false
     load_defaults: true
     settings:
       max_line_length: 65536
