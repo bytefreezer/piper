@@ -10,8 +10,8 @@ import (
 
 // DefaultFilterRegistry implements the FilterRegistry interface
 type DefaultFilterRegistry struct {
-	factories   map[string]FilterFactory
-	mu          sync.RWMutex
+	factories map[string]FilterFactory
+	mu        sync.RWMutex
 }
 
 // NewFilterRegistry creates a new filter registry with default filters

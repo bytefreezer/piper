@@ -520,16 +520,16 @@ func (sm *PostgreSQLStateManager) GetCachedPipelineList(ctx context.Context) ([]
 		}
 
 		pipeline := map[string]interface{}{
-			"config_key":     configKey,
-			"tenant_id":      tenantID,
-			"dataset_id":     datasetID,
-			"version":        version,
-			"enabled":        enabled,
-			"date_created":   createdAt,
-			"date_modified":  updatedAt,
-			"cached_at":      cachedAt,
-			"expires_at":     expiresAt,
-			"filter_count":   filterCount,
+			"config_key":    configKey,
+			"tenant_id":     tenantID,
+			"dataset_id":    datasetID,
+			"version":       version,
+			"enabled":       enabled,
+			"date_created":  createdAt,
+			"date_modified": updatedAt,
+			"cached_at":     cachedAt,
+			"expires_at":    expiresAt,
+			"filter_count":  filterCount,
 		}
 		pipelines = append(pipelines, pipeline)
 	}

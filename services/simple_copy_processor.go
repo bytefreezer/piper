@@ -118,7 +118,7 @@ func (scp *SimpleCopyProcessor) generateDestinationKey(sourceKey string, metadat
 	// Example: raw/tenant=acme/dataset=logs/2024/01/15/file.ndjson.gz
 	//       -> processed/tenant=acme/dataset=logs/2024/01/15/file.ndjson.gz
 
-	destKey := strings.Replace(sourceKey, scp.config.S3Source.Prefix, scp.config.S3Dest.Prefix, 1)
+	destKey := sourceKey
 
 	log.Debugf("Generated destination key: %s -> %s", sourceKey, destKey)
 	return destKey

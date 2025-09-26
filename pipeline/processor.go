@@ -11,19 +11,19 @@ import (
 
 // BasicPipeline implements a basic filter pipeline
 type BasicPipeline struct {
-	config      *domain.PipelineConfiguration
-	filters     []Filter
-	stats       *PipelineStats
-	registry    FilterRegistry
-	mutex       sync.RWMutex
+	config   *domain.PipelineConfiguration
+	filters  []Filter
+	stats    *PipelineStats
+	registry FilterRegistry
+	mutex    sync.RWMutex
 }
 
 // NewBasicPipeline creates a new basic pipeline
 func NewBasicPipeline(config *domain.PipelineConfiguration, filterRegistry FilterRegistry) (*BasicPipeline, error) {
 	pipeline := &BasicPipeline{
-		config:    config,
-		filters:   make([]Filter, 0),
-		registry:  filterRegistry,
+		config:   config,
+		filters:  make([]Filter, 0),
+		registry: filterRegistry,
 		stats: &PipelineStats{
 			TenantID:           config.TenantID,
 			DatasetID:          config.DatasetID,
@@ -152,9 +152,9 @@ func (p *BasicPipeline) isFilterEnabled(filter Filter) bool {
 
 // BasicPipelineProcessor manages multiple pipelines
 type BasicPipelineProcessor struct {
-	pipelines    map[string]Pipeline
-	filterReg    FilterRegistry
-	mutex        sync.RWMutex
+	pipelines map[string]Pipeline
+	filterReg FilterRegistry
+	mutex     sync.RWMutex
 }
 
 // NewBasicPipelineProcessor creates a new pipeline processor

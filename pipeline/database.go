@@ -134,6 +134,17 @@ func (pdb *PipelineDatabase) UpdateDatabase(ctx context.Context) error {
 func (pdb *PipelineDatabase) GetPipelineConfiguration(ctx context.Context, tenantID, datasetID string) (*domain.PipelineConfiguration, error) {
 	configKey := fmt.Sprintf("%s:%s", tenantID, datasetID)
 
+	// In development mode, always fetch fresh fake data to bypass caching issues
+	if pdb.client.config.Dev {
+		log.Infof("Development mode: fetching fresh pipeline config for %s", configKey)
+		response, _ := pdb.client.FetchPipelineConfiguration(ctx, tenantID, datasetID)
+		if response != nil && response.Configuration != nil {
+			log.Infof("Development mode: returning fresh config with metadata: %+v", response.Configuration)
+			return response.Configuration, nil
+		}
+		return nil, fmt.Errorf("pipeline configuration not found for %s/%s", tenantID, datasetID)
+	}
+
 	// Try in-memory cache first
 	pdb.pipelineMutex.RLock()
 	config, exists := pdb.pipelines[configKey]
@@ -232,13 +243,13 @@ func (pdb *PipelineDatabase) GetCacheStats() map[string]interface{} {
 	defer pdb.statsMutex.RUnlock()
 
 	return map[string]interface{}{
-		"cache_hits":      pdb.cacheHits,
-		"cache_misses":    pdb.cacheMisses,
-		"hit_ratio":       pdb.calculateHitRatio(),
-		"tenant_count":    pdb.GetTenantCount(),
-		"pipeline_count":  pdb.GetPipelineCount(),
-		"is_healthy":      pdb.IsHealthy(),
-		"last_sync":       pdb.GetLastSync(),
+		"cache_hits":     pdb.cacheHits,
+		"cache_misses":   pdb.cacheMisses,
+		"hit_ratio":      pdb.calculateHitRatio(),
+		"tenant_count":   pdb.GetTenantCount(),
+		"pipeline_count": pdb.GetPipelineCount(),
+		"is_healthy":     pdb.IsHealthy(),
+		"last_sync":      pdb.GetLastSync(),
 	}
 }
 

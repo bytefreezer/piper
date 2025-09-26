@@ -148,8 +148,8 @@ func (p *PipelineProcessor) processData(ctx context.Context, tenantID, datasetID
 
 			// Create a basic record with the raw line
 			record = map[string]interface{}{
-				"message":   line,
-				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"message":      line,
+				"timestamp":    time.Now().UTC().Format(time.RFC3339),
 				"_parse_error": err.Error(),
 			}
 		}
@@ -211,10 +211,10 @@ func (p *PipelineProcessor) getPipelineConfig(ctx context.Context, tenantID, dat
 				Type:    "parse",
 				Enabled: true,
 				Config: map[string]interface{}{
-					"auto_select":       true,
-					"source_field":      "message",
-					"on_parse_failure":  "pass_through",
-					"preserve_raw":      false,
+					"auto_select":      true,
+					"source_field":     "message",
+					"on_parse_failure": "pass_through",
+					"preserve_raw":     false,
 				},
 			},
 			{
@@ -247,12 +247,5 @@ func (p *PipelineProcessor) getPipelineConfig(ctx context.Context, tenantID, dat
 // generateOutputKey generates the output S3 key for a processed file
 func (p *PipelineProcessor) generateOutputKey(sourceKey string) string {
 	// With separate buckets and no prefixes, we can use the same key structure
-	if p.cfg.S3Source.Prefix != "" && strings.HasPrefix(sourceKey, p.cfg.S3Source.Prefix) {
-		// Remove source prefix and add destination prefix
-		relativePath := strings.TrimPrefix(sourceKey, p.cfg.S3Source.Prefix)
-		return p.cfg.S3Dest.Prefix + relativePath
-	}
-
-	// No prefix handling needed, use the same key structure
-	return p.cfg.S3Dest.Prefix + sourceKey
+	return sourceKey
 }

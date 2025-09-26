@@ -15,18 +15,18 @@ import (
 
 // PiperService orchestrates the data processing pipeline
 type PiperService struct {
-	cfg               *config.Config
-	s3Client          *storage.S3Client
-	stateManager      *storage.PostgreSQLStateManager
-	discoveryManager  *SimpleDiscoveryManager
-	processor         *FormatProcessor
-	configManager     *ConfigManager
-	running           bool
-	mutex             sync.RWMutex
-	workers           chan struct{}
-	jobQueue          chan *domain.ProcessingJob
-	stopChan          chan struct{}
-	wg                sync.WaitGroup
+	cfg              *config.Config
+	s3Client         *storage.S3Client
+	stateManager     *storage.PostgreSQLStateManager
+	discoveryManager *SimpleDiscoveryManager
+	processor        *FormatProcessor
+	configManager    *ConfigManager
+	running          bool
+	mutex            sync.RWMutex
+	workers          chan struct{}
+	jobQueue         chan *domain.ProcessingJob
+	stopChan         chan struct{}
+	wg               sync.WaitGroup
 }
 
 // NewPiperService creates a new piper service with pipeline processing

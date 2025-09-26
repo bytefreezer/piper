@@ -53,7 +53,7 @@ func (f *AddFieldFilter) Apply(ctx *FilterContext, record map[string]interface{}
 
 	// Interpolate template variables in the value
 	interpolatedValue := interpolateVariables(f.value, ctx)
-	
+
 	// Add the field to the record
 	record[f.fieldName] = interpolatedValue
 
@@ -196,10 +196,10 @@ func (f *RenameFieldFilter) Apply(ctx *FilterContext, record map[string]interfac
 
 // ConditionalFilter filters records based on field values
 type ConditionalFilter struct {
-	field     string
-	operator  string
-	value     interface{}
-	action    string // "keep" or "drop"
+	field    string
+	operator string
+	value    interface{}
+	action   string // "keep" or "drop"
 }
 
 // NewConditionalFilter creates a new conditional filter
@@ -316,7 +316,7 @@ func (f *ConditionalFilter) evaluateCondition(fieldValue interface{}, exists boo
 
 // JSONValidateFilter validates JSON content and fails if invalid
 type JSONValidateFilter struct {
-	sourceField    string
+	sourceField   string
 	failOnInvalid bool
 }
 
@@ -333,7 +333,7 @@ func NewJSONValidateFilter(config map[string]interface{}) (Filter, error) {
 	}
 
 	return &JSONValidateFilter{
-		sourceField:    sourceField,
+		sourceField:   sourceField,
 		failOnInvalid: failOnInvalid,
 	}, nil
 }

@@ -2,20 +2,20 @@ package parsers
 
 // ParserSettings represents parser configuration settings
 type ParserSettings struct {
-	MaxLineLength    int    `koanf:"max_line_length"`
-	BufferSize       int    `koanf:"buffer_size"`
-	ParseTimeout     string `koanf:"parse_timeout"`
-	MaxParseErrors   int    `koanf:"max_parse_errors"`
-	GrokPatternsDir  string `koanf:"grok_patterns_dir"`
+	MaxLineLength   int    `koanf:"max_line_length"`
+	BufferSize      int    `koanf:"buffer_size"`
+	ParseTimeout    string `koanf:"parse_timeout"`
+	MaxParseErrors  int    `koanf:"max_parse_errors"`
+	GrokPatternsDir string `koanf:"grok_patterns_dir"`
 }
 
 // ParserConfig represents the overall parser configuration
 type ParserConfig struct {
-	Enabled            bool                              `koanf:"enabled"`
-	LoadDefaults       bool                              `koanf:"load_defaults"`
-	Settings           ParserSettings                    `koanf:"settings"`
-	AutoTenantParsers  bool                              `koanf:"auto_tenant_parsers"`
-	FormatDefaults     map[string][]ParseConfig          `koanf:"format_defaults"`
+	Enabled           bool                     `koanf:"enabled"`
+	LoadDefaults      bool                     `koanf:"load_defaults"`
+	Settings          ParserSettings           `koanf:"settings"`
+	AutoTenantParsers bool                     `koanf:"auto_tenant_parsers"`
+	FormatDefaults    map[string][]ParseConfig `koanf:"format_defaults"`
 }
 
 // GetDefaultParserConfig returns default parser configuration

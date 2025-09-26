@@ -140,21 +140,21 @@ func (p *ApacheLogParser) Parse(ctx context.Context, data []byte) (map[string]in
 	}
 
 	result := map[string]interface{}{
-		"remote_addr":  matches[1],
-		"timestamp":    matches[2],
-		"request":      matches[3],
-		"status":       status,
-		"body_size":    size,
-		"log_type":     "apache",
-		"raw":          line,
+		"remote_addr": matches[1],
+		"timestamp":   matches[2],
+		"request":     matches[3],
+		"status":      status,
+		"body_size":   size,
+		"log_type":    "apache",
+		"raw":         line,
 		"parsed_time": time.Now().UTC().Format(time.RFC3339),
 	}
 
 	return result, nil
 }
 
-func (p *ApacheLogParser) Name() string { return p.name }
-func (p *ApacheLogParser) Type() string { return "apache" }
+func (p *ApacheLogParser) Name() string                                  { return p.name }
+func (p *ApacheLogParser) Type() string                                  { return "apache" }
 func (p *ApacheLogParser) Configure(config map[string]interface{}) error { return nil }
 
 // NginxLogParser parses Nginx access logs
@@ -203,8 +203,8 @@ func (p *NginxLogParser) Parse(ctx context.Context, data []byte) (map[string]int
 	return result, nil
 }
 
-func (p *NginxLogParser) Name() string { return p.name }
-func (p *NginxLogParser) Type() string { return "nginx" }
+func (p *NginxLogParser) Name() string                                  { return p.name }
+func (p *NginxLogParser) Type() string                                  { return "nginx" }
 func (p *NginxLogParser) Configure(config map[string]interface{}) error { return nil }
 
 // InfluxLineProtocolParser parses InfluxDB line protocol
@@ -277,8 +277,8 @@ func (p *InfluxLineProtocolParser) Parse(ctx context.Context, data []byte) (map[
 	return result, nil
 }
 
-func (p *InfluxLineProtocolParser) Name() string { return p.name }
-func (p *InfluxLineProtocolParser) Type() string { return "influx" }
+func (p *InfluxLineProtocolParser) Name() string                                  { return p.name }
+func (p *InfluxLineProtocolParser) Type() string                                  { return "influx" }
 func (p *InfluxLineProtocolParser) Configure(config map[string]interface{}) error { return nil }
 
 // CEFParser parses Common Event Format (CEF) logs
@@ -311,17 +311,17 @@ func (p *CEFParser) Parse(ctx context.Context, data []byte) (map[string]interfac
 	severity, _ := strconv.Atoi(matches[7])
 
 	result := map[string]interface{}{
-		"cef_version":     matches[1],
-		"device_vendor":   matches[2],
-		"device_product":  matches[3],
-		"device_version":  matches[4],
-		"event_class_id":  matches[5],
-		"name":            matches[6],
-		"severity":        severity,
-		"extension":       matches[8],
-		"log_type":        "cef",
-		"raw":             line,
-		"parsed_time":     time.Now().UTC().Format(time.RFC3339),
+		"cef_version":    matches[1],
+		"device_vendor":  matches[2],
+		"device_product": matches[3],
+		"device_version": matches[4],
+		"event_class_id": matches[5],
+		"name":           matches[6],
+		"severity":       severity,
+		"extension":      matches[8],
+		"log_type":       "cef",
+		"raw":            line,
+		"parsed_time":    time.Now().UTC().Format(time.RFC3339),
 	}
 
 	// Parse extension fields
@@ -340,8 +340,8 @@ func (p *CEFParser) Parse(ctx context.Context, data []byte) (map[string]interfac
 	return result, nil
 }
 
-func (p *CEFParser) Name() string { return p.name }
-func (p *CEFParser) Type() string { return "cef" }
+func (p *CEFParser) Name() string                                  { return p.name }
+func (p *CEFParser) Type() string                                  { return "cef" }
 func (p *CEFParser) Configure(config map[string]interface{}) error { return nil }
 
 // RawTextParser handles raw text files requiring custom parsing
@@ -378,8 +378,8 @@ func (p *RawTextParser) Parse(ctx context.Context, data []byte) (map[string]inte
 	return result, nil
 }
 
-func (p *RawTextParser) Name() string { return p.name }
-func (p *RawTextParser) Type() string { return "raw" }
+func (p *RawTextParser) Name() string                                  { return p.name }
+func (p *RawTextParser) Type() string                                  { return "raw" }
 func (p *RawTextParser) Configure(config map[string]interface{}) error { return nil }
 
 // SflowParser parses sFlow v5 packets to JSON format using the Cistern sFlow library
@@ -494,7 +494,6 @@ func (p *SflowParser) parseRecord(record sflow.Record) map[string]interface{} {
 	return recordData
 }
 
-
-func (p *SflowParser) Name() string { return p.name }
-func (p *SflowParser) Type() string { return "sflow" }
+func (p *SflowParser) Name() string                                  { return p.name }
+func (p *SflowParser) Type() string                                  { return "sflow" }
 func (p *SflowParser) Configure(config map[string]interface{}) error { return nil }

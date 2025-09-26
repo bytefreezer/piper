@@ -14,6 +14,7 @@ import (
 
 	"github.com/n0needt0/bytefreezer-piper/api"
 	"github.com/n0needt0/bytefreezer-piper/config"
+	"github.com/n0needt0/bytefreezer-piper/geoip"
 	"github.com/n0needt0/bytefreezer-piper/services"
 )
 
@@ -57,17 +58,16 @@ func Run() error {
 	log.Infof("Configuration loaded successfully")
 	log.Infof("Instance ID: %s", cfg.App.InstanceID)
 
-	sourcePrefix := cfg.S3Source.Prefix
-	if sourcePrefix == "" {
-		sourcePrefix = "(none)"
-	}
-	destPrefix := cfg.S3Dest.Prefix
-	if destPrefix == "" {
-		destPrefix = "(none)"
-	}
+	log.Infof("Source bucket: %s (prefix: %s)", cfg.S3Source.BucketName, "(none)")
+	log.Infof("Destination bucket: %s (prefix: %s)", cfg.S3Dest.BucketName, "(none)")
 
-	log.Infof("Source bucket: %s (prefix: %s)", cfg.S3Source.BucketName, sourcePrefix)
-	log.Infof("Destination bucket: %s (prefix: %s)", cfg.S3Dest.BucketName, destPrefix)
+	// Initialize GeoIP updater
+	geoipUpdater, err := geoip.NewUpdater(cfg)
+	if err != nil {
+		log.Errorf("Failed to initialize GeoIP updater: %v", err)
+		// Continue without GeoIP updates rather than failing completely
+		geoipUpdater = nil
+	}
 
 	// Business Logic - Initialize services
 	servicesInstance := services.NewServices(cfg)
@@ -78,7 +78,7 @@ func Run() error {
 	// Create API server
 	server.HttpApi = api.NewAPI(servicesInstance, cfg)
 
-	// Define housekeeping function for pipeline database updates
+	// Define housekeeping function for pipeline database updates and GeoIP updates
 	housekeepingFn := func() {
 		log.Debug("Starting housekeeping cycle...")
 
@@ -88,8 +88,18 @@ func Run() error {
 			log.Errorf("Failed to update pipeline database during housekeeping: %v", err)
 			return
 		}
-
 		log.Debug("Pipeline database updated successfully")
+
+		// Update GeoIP databases during housekeeping
+		if geoipUpdater != nil {
+			log.Debug("Checking for GeoIP database updates during housekeeping...")
+			if err := geoipUpdater.CheckAndUpdate(server.ctx); err != nil {
+				log.Errorf("Failed to update GeoIP databases during housekeeping: %v", err)
+			} else {
+				log.Debug("GeoIP database update check completed successfully")
+			}
+		}
+
 		log.Debug("Housekeeping cycle completed")
 	}
 
@@ -127,6 +137,8 @@ func NewServer(services *services.Services, conf *config.Config) *Server {
 }
 
 func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
+	// Capture geoipUpdater from Run() function scope
+	geoipUpdater, _ := geoip.NewUpdater(svc.Config)
 	// exit cleanly on signal
 	signalC := make(chan os.Signal, 1)
 	signal.Notify(signalC, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGTERM)
@@ -155,6 +167,16 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 	log.Info("Running initial housekeeping on startup...")
 	if housekeepingFn != nil && svc.Config.Housekeeping.Enabled {
 		housekeepingFn()
+	}
+
+	// Run initial GeoIP update on startup (separate from housekeeping)
+	if geoipUpdater != nil {
+		log.Info("Running initial GeoIP database update on startup...")
+		if err := geoipUpdater.CheckAndUpdate(svc.ctx); err != nil {
+			log.Errorf("Failed to update GeoIP databases on startup: %v", err)
+		} else {
+			log.Info("Initial GeoIP database update completed successfully")
+		}
 	}
 
 	// Continue with regular intervals

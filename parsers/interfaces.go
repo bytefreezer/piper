@@ -42,11 +42,11 @@ type ParseResult struct {
 
 // ParseConfig represents parser configuration
 type ParseConfig struct {
-	ParserName       string                 `json:"parser_name"`
-	SourceField      string                 `json:"source_field"`
-	TargetField      string                 `json:"target_field,omitempty"`
-	OnParseFailure   string                 `json:"on_parse_failure"` // "skip", "tag", "pass_through"
-	PreserveRaw      bool                   `json:"preserve_raw"`
-	Settings         map[string]interface{} `json:"settings,omitempty"`
-	AutoSelect       bool                   `json:"auto_select"`
+	ParserName     string                 `json:"parser_name"`
+	SourceField    string                 `json:"source_field"`
+	TargetField    string                 `json:"target_field,omitempty"`
+	OnParseFailure string                 `json:"on_parse_failure"` // "skip", "tag", "pass_through"
+	PreserveRaw    bool                   `json:"preserve_raw"`
+	Settings       map[string]interface{} `json:"settings,omitempty"`
+	AutoSelect     bool                   `json:"auto_select"`
 }

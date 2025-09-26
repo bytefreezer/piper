@@ -14,7 +14,6 @@ server:
 s3_source:
   bucket_name: {{ config.s3_source.bucket_name }}
   region: {{ config.s3_source.region }}
-  prefix: {{ config.s3_source.prefix }}
   poll_interval: {{ config.s3_source.poll_interval }}
   endpoint: {{ config.s3_source.endpoint }}
   ssl: {{ config.s3_source.ssl | lower }}
@@ -25,7 +24,6 @@ s3_source:
 s3_destination:
   bucket_name: {{ config.s3_destination.bucket_name }}
   region: {{ config.s3_destination.region }}
-  prefix: {{ config.s3_destination.prefix }}
   endpoint: {{ config.s3_destination.endpoint }}
   ssl: {{ config.s3_destination.ssl | lower }}
   access_key: {{ config.s3_destination.access_key }}
@@ -56,7 +54,6 @@ pipeline:
   geoip_database_path: {{ config.pipeline.geoip_database_path }}
   geoip_city_database: {{ config.pipeline.geoip_city_database }}
   geoip_country_database: {{ config.pipeline.geoip_country_database }}
-  enable_geoip: {{ config.pipeline.enable_geoip | lower }}
 
 # Parser configuration for log parsing (Logstash-style)
 parsers:
@@ -106,7 +103,6 @@ parsers:
 # Monitoring and observability
 monitoring:
   metrics_port: {{ config.monitoring.metrics_port }}
-  health_port: {{ config.monitoring.health_port }}
   log_level: {{ config.monitoring.log_level }}
   enable_tracing: {{ config.monitoring.enable_tracing | lower }}
 

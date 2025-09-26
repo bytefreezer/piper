@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/n0needt0/go-goodies/log"
 	"github.com/swaggest/usecase"
 	"github.com/swaggest/usecase/status"
-	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 // HealthResponse represents the health check response
@@ -23,14 +23,14 @@ type HealthResponse struct {
 
 // ConfigResponse represents the current system configuration
 type ConfigResponse struct {
-	App        AppConfig     `json:"app"`
-	S3Source   S3ConfigMasked `json:"s3_source"`
-	S3Dest     S3ConfigMasked `json:"s3_destination"`
+	App        AppConfig              `json:"app"`
+	S3Source   S3ConfigMasked         `json:"s3_source"`
+	S3Dest     S3ConfigMasked         `json:"s3_destination"`
 	PostgreSQL PostgreSQLConfigMasked `json:"postgresql"`
-	Processing ProcessingConfig `json:"processing"`
-	Pipeline   PipelineConfig   `json:"pipeline"`
-	Monitoring MonitoringConfig `json:"monitoring"`
-	DevMode    bool            `json:"dev_mode"`
+	Processing ProcessingConfig       `json:"processing"`
+	Pipeline   PipelineConfig         `json:"pipeline"`
+	Monitoring MonitoringConfig       `json:"monitoring"`
+	DevMode    bool                   `json:"dev_mode"`
 }
 
 // Configuration sections for response
@@ -44,7 +44,6 @@ type AppConfig struct {
 type S3ConfigMasked struct {
 	BucketName string `json:"bucket_name"`
 	Region     string `json:"region"`
-	Prefix     string `json:"prefix"`
 	AccessKey  string `json:"access_key"` // Will be masked
 	SecretKey  string `json:"secret_key"` // Will be masked
 	Endpoint   string `json:"endpoint"`
@@ -72,27 +71,25 @@ type ProcessingConfig struct {
 type PipelineConfig struct {
 	ControllerEndpoint    string `json:"controller_endpoint"`
 	ConfigRefreshInterval string `json:"config_refresh_interval"`
-	EnableGeoIP           bool   `json:"enable_geoip"`
 }
 
 type MonitoringConfig struct {
 	MetricsPort   int  `json:"metrics_port"`
-	HealthPort    int  `json:"health_port"`
 	EnableTracing bool `json:"enable_tracing"`
 }
 
 // PipelineEntry represents a cached pipeline configuration
 type PipelineEntry struct {
-	TenantID      string    `json:"tenant_id"`
-	DatasetID     string    `json:"dataset_id"`
-	ConfigKey     string    `json:"config_key"`
-	Version       string    `json:"version"`
-	Enabled       bool      `json:"enabled"`
-	DateCreated   time.Time `json:"date_created"`
-	DateModified  time.Time `json:"date_modified"`
-	CachedAt      time.Time `json:"cached_at"`
-	ExpiresAt     time.Time `json:"expires_at"`
-	FilterCount   int       `json:"filter_count"`
+	TenantID     string    `json:"tenant_id"`
+	DatasetID    string    `json:"dataset_id"`
+	ConfigKey    string    `json:"config_key"`
+	Version      string    `json:"version"`
+	Enabled      bool      `json:"enabled"`
+	DateCreated  time.Time `json:"date_created"`
+	DateModified time.Time `json:"date_modified"`
+	CachedAt     time.Time `json:"cached_at"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	FilterCount  int       `json:"filter_count"`
 }
 
 // PipelineListResponse represents the pipeline list response
@@ -183,7 +180,6 @@ func (api *API) GetConfig() usecase.Interactor {
 		output.S3Source = S3ConfigMasked{
 			BucketName: cfg.S3Source.BucketName,
 			Region:     cfg.S3Source.Region,
-			Prefix:     cfg.S3Source.Prefix,
 			AccessKey:  maskSensitiveValue(cfg.S3Source.AccessKey),
 			SecretKey:  maskSensitiveValue(cfg.S3Source.SecretKey),
 			Endpoint:   cfg.S3Source.Endpoint,
@@ -194,7 +190,6 @@ func (api *API) GetConfig() usecase.Interactor {
 		output.S3Dest = S3ConfigMasked{
 			BucketName: cfg.S3Dest.BucketName,
 			Region:     cfg.S3Dest.Region,
-			Prefix:     cfg.S3Dest.Prefix,
 			AccessKey:  maskSensitiveValue(cfg.S3Dest.AccessKey),
 			SecretKey:  maskSensitiveValue(cfg.S3Dest.SecretKey),
 			Endpoint:   cfg.S3Dest.Endpoint,
@@ -225,13 +220,11 @@ func (api *API) GetConfig() usecase.Interactor {
 		output.Pipeline = PipelineConfig{
 			ControllerEndpoint:    cfg.Pipeline.ControllerEndpoint,
 			ConfigRefreshInterval: cfg.Pipeline.ConfigRefreshInterval.String(),
-			EnableGeoIP:           cfg.Pipeline.EnableGeoIP,
 		}
 
 		// Monitoring configuration
 		output.Monitoring = MonitoringConfig{
 			MetricsPort:   cfg.Monitoring.MetricsPort,
-			HealthPort:    cfg.Monitoring.HealthPort,
 			EnableTracing: cfg.Monitoring.EnableTracing,
 		}
 
@@ -267,16 +260,16 @@ func (api *API) GetPipelineList() usecase.Interactor {
 		pipelines := make([]PipelineEntry, 0, len(cachedPipelines))
 		for _, cached := range cachedPipelines {
 			entry := PipelineEntry{
-				TenantID:      cached["tenant_id"].(string),
-				DatasetID:     cached["dataset_id"].(string),
-				ConfigKey:     cached["config_key"].(string),
-				Version:       cached["version"].(string),
-				Enabled:       cached["enabled"].(bool),
-				DateCreated:   cached["date_created"].(time.Time),
-				DateModified:  cached["date_modified"].(time.Time),
-				CachedAt:      cached["cached_at"].(time.Time),
-				ExpiresAt:     cached["expires_at"].(time.Time),
-				FilterCount:   cached["filter_count"].(int),
+				TenantID:     cached["tenant_id"].(string),
+				DatasetID:    cached["dataset_id"].(string),
+				ConfigKey:    cached["config_key"].(string),
+				Version:      cached["version"].(string),
+				Enabled:      cached["enabled"].(bool),
+				DateCreated:  cached["date_created"].(time.Time),
+				DateModified: cached["date_modified"].(time.Time),
+				CachedAt:     cached["cached_at"].(time.Time),
+				ExpiresAt:    cached["expires_at"].(time.Time),
+				FilterCount:  cached["filter_count"].(int),
 			}
 			pipelines = append(pipelines, entry)
 		}

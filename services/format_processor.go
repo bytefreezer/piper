@@ -20,13 +20,13 @@ import (
 
 // FormatProcessor processes files with automatic format detection
 type FormatProcessor struct {
-	cfg             *config.Config
-	s3Client        *storage.S3Client
-	stateManager    *storage.PostgreSQLStateManager
-	parserRegistry  parsers.ParserRegistry
-	formatDetector  *parsers.FormatDetector
-	filterRegistry  pipeline.FilterRegistry
-	configManager   *ConfigManager
+	cfg            *config.Config
+	s3Client       *storage.S3Client
+	stateManager   *storage.PostgreSQLStateManager
+	parserRegistry parsers.ParserRegistry
+	formatDetector *parsers.FormatDetector
+	filterRegistry pipeline.FilterRegistry
+	configManager  *ConfigManager
 }
 
 // NewFormatProcessor creates a new format processor
@@ -44,13 +44,13 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 	configManager := NewConfigManager(cfg, stateManager)
 
 	processor := &FormatProcessor{
-		cfg:             cfg,
-		s3Client:        s3Client,
-		stateManager:    stateManager,
-		parserRegistry:  parserRegistry,
-		formatDetector:  formatDetector,
-		filterRegistry:  filterRegistry,
-		configManager:   configManager,
+		cfg:            cfg,
+		s3Client:       s3Client,
+		stateManager:   stateManager,
+		parserRegistry: parserRegistry,
+		formatDetector: formatDetector,
+		filterRegistry: filterRegistry,
+		configManager:  configManager,
 	}
 
 	return processor, nil
@@ -338,7 +338,7 @@ func (p *FormatProcessor) generateOutputKey(sourceKey string, formatHint *parser
 		outputKey += ".gz"
 	}
 
-	return p.cfg.S3Dest.Prefix + outputKey
+	return outputKey
 }
 
 // applyFilters applies the configured filters to a record

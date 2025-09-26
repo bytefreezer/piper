@@ -12,7 +12,6 @@ server:
 s3_source:
   bucket_name: "intake"  # Dedicated intake bucket from bytefreezer-receiver
   region: "us-east-1"
-  prefix: ""
   poll_interval: "30s"
   access_key: "AKIAQNXBAHUKIMJP26P6"
   secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
@@ -23,7 +22,6 @@ s3_source:
 s3_destination:
   bucket_name: "piper"  # Dedicated piper output bucket for bytefreezer-packer
   region: "us-east-1"
-  prefix: ""
   access_key: "AKIAQNXBAHUKIMJP26P6"
   secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
   endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
@@ -42,7 +40,7 @@ postgresql:
 # Processing engine configuration
 processing:
   max_concurrent_jobs: 10
-  job_timeout: "30m"
+  job_timeout: "10m"
   retry_attempts: 3
   retry_backoff: "exponential"
   buffer_size: 1000
@@ -118,7 +116,6 @@ parsers:
 # Monitoring and observability
 monitoring:
   metrics_port: 9090
-  health_port: 8082
   log_level: "info"
   enable_tracing: false
   # tracing_endpoint: ""    # Optional - OpenTelemetry endpoint

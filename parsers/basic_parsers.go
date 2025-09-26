@@ -83,8 +83,8 @@ func (p *NDJSONParser) Configure(config map[string]interface{}) error {
 
 // SyslogParser parses RFC3164 syslog entries
 type SyslogParser struct {
-	name   string
-	regex  *regexp.Regexp
+	name  string
+	regex *regexp.Regexp
 }
 
 func NewSyslogParser(config map[string]interface{}) (Parser, error) {

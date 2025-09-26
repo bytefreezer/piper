@@ -41,7 +41,6 @@ config:
   s3_source:
     bucket_name: "intake"
     region: "us-east-1"
-    prefix: ""
     poll_interval: "30s"
     endpoint: "192.168.86.125:9000"
     ssl: false
@@ -52,7 +51,6 @@ config:
   s3_destination:
     bucket_name: "piper"
     region: "us-east-1"
-    prefix: ""
     endpoint: "192.168.86.125:9000"
     ssl: false
     access_key: "AKIAQNXBAHUKIMJP26P6"
@@ -71,7 +69,7 @@ config:
   # Processing engine configuration
   processing:
     max_concurrent_jobs: 10
-    job_timeout: "30m"
+    job_timeout: "10m"
     retry_attempts: 3
     retry_backoff: "exponential"
     buffer_size: 1000
@@ -83,7 +81,6 @@ config:
     geoip_database_path: "/opt/geoip"
     geoip_city_database: "GeoLite2-City.mmdb"
     geoip_country_database: "GeoLite2-Country.mmdb"
-    enable_geoip: false
 
   # Parser configuration for log parsing (Logstash-style)
   parsers:
@@ -126,7 +123,6 @@ config:
   # Monitoring and observability
   monitoring:
     metrics_port: 9090
-    health_port: 8082
     log_level: "info"
     enable_tracing: false
 

@@ -9,9 +9,9 @@ import (
 
 // ParseFilter is a pipeline filter that can parse data using registered parsers
 type ParseFilter struct {
-	config       ParseConfig
-	parser       Parser
-	parserReg    ParserRegistry
+	config    ParseConfig
+	parser    Parser
+	parserReg ParserRegistry
 }
 
 // NewParseFilter creates a new parse filter

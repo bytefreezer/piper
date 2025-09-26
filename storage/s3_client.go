@@ -58,8 +58,8 @@ func NewS3Client(sourceConfig *config.S3Source, destConfig *config.S3Dest) (*S3C
 		destClient:   destClient,
 		sourceBucket: sourceConfig.BucketName,
 		destBucket:   destConfig.BucketName,
-		sourcePrefix: sourceConfig.Prefix,
-		destPrefix:   destConfig.Prefix,
+		sourcePrefix: "",
+		destPrefix:   "",
 	}, nil
 }
 

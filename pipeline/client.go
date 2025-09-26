@@ -137,48 +137,50 @@ func (pc *PipelineClient) getFakeTenants() []TenantInfo {
 			Active:    true,
 			CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
 		},
-		{
-			TenantID:  "tenant-001",
-			Name:      "Demo Tenant 001",
-			Datasets:  []string{"dataset-001", "logs"},
-			Active:    true,
-			CreatedAt: time.Now().Add(-7 * 24 * time.Hour).Format(time.RFC3339),
-		},
-		{
-			TenantID:  "tenant-002",
-			Name:      "Demo Tenant 002",
-			Datasets:  []string{"dataset-002", "metrics"},
-			Active:    true,
-			CreatedAt: time.Now().Add(-3 * 24 * time.Hour).Format(time.RFC3339),
-		},
 	}
 }
 
 // getFakePipelineConfig returns fake pipeline configuration for development mode
 func (pc *PipelineClient) getFakePipelineConfig(tenantID, datasetID string) *PipelineConfigResponse {
 	if tenantID == "customer-1" && datasetID == "ebpf-data" {
+		createdAt := time.Now().Add(-24 * time.Hour)
+		updatedAt := time.Now().Add(-1 * time.Hour)
+
 		return &PipelineConfigResponse{
 			TenantID:  tenantID,
 			DatasetID: datasetID,
 			Configuration: &domain.PipelineConfiguration{
+				ConfigKey: fmt.Sprintf("%s:%s", tenantID, datasetID),
+				TenantID:  tenantID,
+				DatasetID: datasetID,
+				Enabled:   true,
+				Version:   "dev-1.0.0",
+				CreatedAt: createdAt,
+				UpdatedAt: updatedAt,
+				UpdatedBy: "dev-system",
+				Checksum:  "fake-checksum-ebpf",
+				Validated: true,
 				Filters: []domain.FilterConfig{
 					{
 						Type: "json_validate",
 						Config: map[string]interface{}{
 							"fail_on_invalid": true,
 						},
+						Enabled: false,
 					},
 					{
 						Type: "json_flatten",
 						Config: map[string]interface{}{
 							"separator": ".",
 						},
+						Enabled: false,
 					},
 					{
 						Type: "uppercase_keys",
 						Config: map[string]interface{}{
 							"recursive": true,
 						},
+						Enabled: false,
 					},
 					{
 						Type: "add_field",
@@ -186,6 +188,7 @@ func (pc *PipelineClient) getFakePipelineConfig(tenantID, datasetID string) *Pip
 							"field": "TESTKEY",
 							"value": fmt.Sprintf("%d", time.Now().Unix()),
 						},
+						Enabled: false,
 					},
 					{
 						Type: "add_field",
@@ -193,27 +196,42 @@ func (pc *PipelineClient) getFakePipelineConfig(tenantID, datasetID string) *Pip
 							"field": "PIPELINE_VERSION",
 							"value": "dev-1.0.0",
 						},
+						Enabled: false,
 					},
 				},
 			},
 			Version:   "dev-1.0.0",
 			Enabled:   true,
-			CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-			UpdatedAt: time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
+			CreatedAt: createdAt.Format(time.RFC3339),
+			UpdatedAt: updatedAt.Format(time.RFC3339),
 		}
 	}
 
 	if tenantID == "customer-1" && datasetID == "sflow-data" {
+		createdAt := time.Now().Add(-24 * time.Hour)
+		updatedAt := time.Now().Add(-1 * time.Hour)
+
 		return &PipelineConfigResponse{
 			TenantID:  tenantID,
 			DatasetID: datasetID,
 			Configuration: &domain.PipelineConfiguration{
+				ConfigKey: fmt.Sprintf("%s:%s", tenantID, datasetID),
+				TenantID:  tenantID,
+				DatasetID: datasetID,
+				Enabled:   true,
+				Version:   "dev-1.0.0",
+				CreatedAt: createdAt,
+				UpdatedAt: updatedAt,
+				UpdatedBy: "dev-system",
+				Checksum:  "fake-checksum-sflow",
+				Validated: true,
 				Filters: []domain.FilterConfig{
 					{
 						Type: "parse",
 						Config: map[string]interface{}{
 							"parser": "sflow",
 						},
+						Enabled: false,
 					},
 					{
 						Type: "add_field",
@@ -221,6 +239,7 @@ func (pc *PipelineClient) getFakePipelineConfig(tenantID, datasetID string) *Pip
 							"field": "data_type",
 							"value": "sflow",
 						},
+						Enabled: false,
 					},
 					{
 						Type: "add_field",
@@ -228,52 +247,40 @@ func (pc *PipelineClient) getFakePipelineConfig(tenantID, datasetID string) *Pip
 							"field": "PIPELINE_VERSION",
 							"value": "dev-1.0.0",
 						},
+						Enabled: false,
 					},
 				},
 			},
 			Version:   "dev-1.0.0",
 			Enabled:   true,
-			CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-			UpdatedAt: time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
-		}
-	}
-
-	if tenantID == "tenant-001" && datasetID == "dataset-001" {
-		return &PipelineConfigResponse{
-			TenantID:  tenantID,
-			DatasetID: datasetID,
-			Configuration: &domain.PipelineConfiguration{
-				Filters: []domain.FilterConfig{
-					{
-						Type: "json_validate",
-						Config: map[string]interface{}{
-							"fail_on_invalid": false,
-						},
-					},
-					{
-						Type: "add_field",
-						Config: map[string]interface{}{
-							"field": "TENANT",
-							"value": "tenant-001",
-						},
-					},
-				},
-			},
-			Version:   "dev-0.9.0",
-			Enabled:   true,
-			CreatedAt: time.Now().Add(-7 * 24 * time.Hour).Format(time.RFC3339),
-			UpdatedAt: time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
+			CreatedAt: createdAt.Format(time.RFC3339),
+			UpdatedAt: updatedAt.Format(time.RFC3339),
 		}
 	}
 
 	// Default empty configuration for unknown tenant/dataset combinations
+	createdAt := time.Now().Add(-1 * time.Hour)
+	updatedAt := time.Now()
+
 	return &PipelineConfigResponse{
-		TenantID:      tenantID,
-		DatasetID:     datasetID,
-		Configuration: &domain.PipelineConfiguration{Filters: []domain.FilterConfig{}},
-		Version:       "default-1.0.0",
-		Enabled:       true,
-		CreatedAt:     time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
-		UpdatedAt:     time.Now().Format(time.RFC3339),
+		TenantID:  tenantID,
+		DatasetID: datasetID,
+		Configuration: &domain.PipelineConfiguration{
+			ConfigKey: fmt.Sprintf("%s:%s", tenantID, datasetID),
+			TenantID:  tenantID,
+			DatasetID: datasetID,
+			Enabled:   true,
+			Version:   "default-1.0.0",
+			CreatedAt: createdAt,
+			UpdatedAt: updatedAt,
+			UpdatedBy: "dev-system",
+			Checksum:  "fake-checksum-default",
+			Validated: true,
+			Filters:   []domain.FilterConfig{},
+		},
+		Version:   "default-1.0.0",
+		Enabled:   true,
+		CreatedAt: createdAt.Format(time.RFC3339),
+		UpdatedAt: updatedAt.Format(time.RFC3339),
 	}
 }

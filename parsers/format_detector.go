@@ -7,12 +7,12 @@ import (
 
 // FormatHint represents a data format hint extracted from filename
 type FormatHint struct {
-	Format    string   // The detected format
-	TenantID  string   // Tenant identifier
-	DatasetID string   // Dataset identifier
-	Extension string   // File extension (gz, bz2, etc.)
-	Basename  string   // Original basename without extension
-	Binary    bool     // Whether this is a binary format
+	Format    string // The detected format
+	TenantID  string // Tenant identifier
+	DatasetID string // Dataset identifier
+	Extension string // File extension (gz, bz2, etc.)
+	Basename  string // Original basename without extension
+	Binary    bool   // Whether this is a binary format
 }
 
 // FormatDetector detects data format from filename hints
@@ -26,7 +26,7 @@ type FormatDetector struct {
 // NewFormatDetector creates a new format detector with predefined mappings
 func NewFormatDetector() *FormatDetector {
 	detector := &FormatDetector{
-		hintMap: make(map[string]string),
+		hintMap:       make(map[string]string),
 		binaryFormats: make(map[string]bool),
 	}
 

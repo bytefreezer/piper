@@ -21,6 +21,7 @@ type Config struct {
 	Server       Server       `koanf:"server"`
 	S3Source     S3Source     `koanf:"s3_source"`
 	S3Dest       S3Dest       `koanf:"s3_destination"`
+	S3GeoIP      S3GeoIP      `koanf:"s3_geoip"`
 	PostgreSQL   PostgreSQL   `koanf:"postgresql"`
 	Processing   Processing   `koanf:"processing"`
 	Pipeline     Pipeline     `koanf:"pipeline"`
@@ -47,7 +48,6 @@ type Server struct {
 type S3Source struct {
 	BucketName   string        `koanf:"bucket_name"`
 	Region       string        `koanf:"region"`
-	Prefix       string        `koanf:"prefix"`
 	PollInterval time.Duration `koanf:"poll_interval"`
 	AccessKey    string        `koanf:"access_key"`
 	SecretKey    string        `koanf:"secret_key"`
@@ -60,7 +60,17 @@ type S3Source struct {
 type S3Dest struct {
 	BucketName string `koanf:"bucket_name"`
 	Region     string `koanf:"region"`
-	Prefix     string `koanf:"prefix"`
+	AccessKey  string `koanf:"access_key"`
+	SecretKey  string `koanf:"secret_key"`
+	SecretName string `koanf:"secret_name"`
+	Endpoint   string `koanf:"endpoint"`
+	SSL        bool   `koanf:"ssl"`
+}
+
+// S3GeoIP represents configuration for GeoIP database updates from S3
+type S3GeoIP struct {
+	BucketName string `koanf:"bucket_name"`
+	Region     string `koanf:"region"`
 	AccessKey  string `koanf:"access_key"`
 	SecretKey  string `koanf:"secret_key"`
 	SecretName string `koanf:"secret_name"`
@@ -95,13 +105,11 @@ type Pipeline struct {
 	GeoIPDatabasePath     string        `koanf:"geoip_database_path"`
 	GeoIPCityDatabase     string        `koanf:"geoip_city_database"`
 	GeoIPCountryDatabase  string        `koanf:"geoip_country_database"`
-	EnableGeoIP           bool          `koanf:"enable_geoip"`
 }
 
 // Monitoring represents monitoring and observability configuration
 type Monitoring struct {
 	MetricsPort     int    `koanf:"metrics_port"`
-	HealthPort      int    `koanf:"health_port"`
 	LogLevel        string `koanf:"log_level"`
 	EnableTracing   bool   `koanf:"enable_tracing"`
 	TracingEndpoint string `koanf:"tracing_endpoint"`
@@ -115,9 +123,9 @@ type Secrets struct {
 
 // Housekeeping represents housekeeping configuration
 type Housekeeping struct {
-	Enabled        bool          `koanf:"enabled"`
+	Enabled         bool          `koanf:"enabled"`
 	IntervalSeconds int           `koanf:"intervalseconds"`
-	Interval       time.Duration // Calculated from IntervalSeconds
+	Interval        time.Duration // Calculated from IntervalSeconds
 }
 
 // LoadConfig loads configuration from file and environment variables
@@ -226,15 +234,18 @@ func getDefaults() map[string]interface{} {
 		"app.instance_id": instanceID,
 		"app.log_level":   "info",
 
-		"s3_source.prefix":        "",
 		"s3_source.poll_interval": "30s",
 		"s3_source.ssl":           true,
 
-		"s3_destination.prefix": "",
-		"s3_destination.ssl":    true,
+		"s3_destination.ssl": true,
+
+		"s3_geoip.bucket_name": "geoip",
+		"s3_geoip.region":      "us-east-1",
+		"s3_geoip.endpoint":    "192.168.86.125:9000",
+		"s3_geoip.ssl":         false,
 
 		"processing.max_concurrent_jobs": 10,
-		"processing.job_timeout":         "30m",
+		"processing.job_timeout":         "10m",
 		"processing.retry_attempts":      3,
 		"processing.retry_backoff":       "exponential",
 		"processing.buffer_size":         1000,
@@ -243,16 +254,14 @@ func getDefaults() map[string]interface{} {
 		"pipeline.geoip_database_path":     "/opt/geoip",
 		"pipeline.geoip_city_database":     "GeoLite2-City.mmdb",
 		"pipeline.geoip_country_database":  "GeoLite2-Country.mmdb",
-		"pipeline.enable_geoip":            true,
 
 		"monitoring.metrics_port":   9090,
-		"monitoring.health_port":    8080,
 		"monitoring.log_level":      "info",
 		"monitoring.enable_tracing": false,
 
 		"secrets.provider": "aws",
 
-		"housekeeping.enabled":        true,
+		"housekeeping.enabled":         true,
 		"housekeeping.intervalseconds": 600,
 	}
 }
@@ -277,10 +286,6 @@ func validateConfig(config *Config) error {
 
 	if config.Monitoring.MetricsPort <= 0 || config.Monitoring.MetricsPort > 65535 {
 		return fmt.Errorf("monitoring.metrics_port must be between 1 and 65535")
-	}
-
-	if config.Monitoring.HealthPort <= 0 || config.Monitoring.HealthPort > 65535 {
-		return fmt.Errorf("monitoring.health_port must be between 1 and 65535")
 	}
 
 	return nil

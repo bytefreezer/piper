@@ -85,9 +85,9 @@ func (sdm *SimpleDiscoveryManager) DiscoverJobs(ctx context.Context) ([]*domain.
 
 			// Create job record
 			job := &domain.ProcessingJob{
-				JobID:       jobID,
-				TenantID:    tenant.TenantID,
-				DatasetID:   datasetID,
+				JobID:     jobID,
+				TenantID:  tenant.TenantID,
+				DatasetID: datasetID,
 				SourceFile: domain.S3Object{
 					Key: fileKey,
 				},
@@ -315,7 +315,7 @@ func (sdm *SimpleDiscoveryManager) discoverFilesForTenant(ctx context.Context, t
 	var allFiles []string
 
 	// Build prefix for tenant
-	tenantPrefix := fmt.Sprintf("%stenant=%s/", sdm.config.S3Source.Prefix, tenantID)
+	tenantPrefix := fmt.Sprintf("tenant=%s/", tenantID)
 
 	// List objects with tenant prefix
 	files, err := sdm.s3Client.ListSourceObjects(ctx, tenantPrefix)
