@@ -54,8 +54,8 @@ func NewPiperService(cfg *config.Config) (*PiperService, error) {
 		return nil, fmt.Errorf("failed to create format processor: %w", err)
 	}
 
-	// Create config manager
-	configManager := NewConfigManager(cfg)
+	// Create config manager with database support
+	configManager := NewConfigManager(cfg, stateManager)
 
 	// Create API server
 	apiServer := api.NewAPI(configManager, cfg)
@@ -102,6 +102,12 @@ func (s *PiperService) Start(ctx context.Context) error {
 	// Start cleanup goroutine
 	s.wg.Add(1)
 	go s.cleanupLoop(ctx)
+
+	// Start housekeeping goroutine
+	if s.cfg.Housekeeping.Enabled {
+		s.wg.Add(1)
+		go s.housekeepingLoop(ctx)
+	}
 
 	// Start API server
 	s.wg.Add(1)
@@ -303,6 +309,70 @@ func (s *PiperService) cleanupLoop(ctx context.Context) {
 			if err := s.stateManager.CleanupExpiredLocks(ctx); err != nil {
 				log.Errorf("Error during cleanup: %v", err)
 			}
+			if err := s.stateManager.CleanupExpiredCache(ctx); err != nil {
+				log.Errorf("Error during cache cleanup: %v", err)
+			}
 		}
 	}
+}
+
+// housekeepingLoop periodically updates pipeline configurations and tenant information
+func (s *PiperService) housekeepingLoop(ctx context.Context) {
+	defer s.wg.Done()
+
+	// Initial delay to allow system to start up
+	initialDelay := 30 * time.Second
+	time.Sleep(initialDelay)
+
+	// Perform initial update
+	s.performHousekeeping(ctx)
+
+	// Create ticker with randomized interval (like receiver)
+	baseInterval := s.cfg.Housekeeping.Interval
+	log.Infof("Starting housekeeping loop with base interval: %v", baseInterval)
+
+	failureCount := 0
+	for {
+		// Randomized interval between 1x and 2x base interval for load balancing
+		randomMultiplier := 1.0 + (0.5 * float64(time.Now().UnixNano()%1000) / 1000.0)
+		nextInterval := time.Duration(float64(baseInterval) * randomMultiplier)
+
+		timer := time.NewTimer(nextInterval)
+
+		select {
+		case <-s.stopChan:
+			timer.Stop()
+			log.Infof("Housekeeping loop stopping")
+			return
+		case <-ctx.Done():
+			timer.Stop()
+			log.Infof("Housekeeping loop stopped due to context cancellation")
+			return
+		case <-timer.C:
+			if err := s.performHousekeeping(ctx); err != nil {
+				failureCount++
+				log.Errorf("Housekeeping failed (attempt %d): %v", failureCount, err)
+			} else {
+				if failureCount > 0 {
+					log.Infof("Housekeeping recovered after %d failures", failureCount)
+					failureCount = 0
+				}
+			}
+		}
+	}
+}
+
+// performHousekeeping performs a single housekeeping cycle
+func (s *PiperService) performHousekeeping(ctx context.Context) error {
+	log.Debugf("Starting housekeeping cycle...")
+
+	// Update pipeline configuration database
+	if err := s.configManager.UpdateDatabase(ctx); err != nil {
+		return fmt.Errorf("failed to update pipeline configuration database: %w", err)
+	}
+
+	cacheStats := s.configManager.GetCacheStats()
+	log.Infof("Housekeeping completed successfully. Cache stats: %+v", cacheStats)
+
+	return nil
 }

@@ -273,6 +273,12 @@ func (sdm *SimpleDiscoveryManager) runDiscovery(ctx context.Context, jobChan cha
 
 // getActiveTenants retrieves active tenants from the control service
 func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]TenantInfo, error) {
+	// If in development mode, return fake tenant data
+	if sdm.config.Dev {
+		log.Debugf("Development mode enabled - returning fake tenant data")
+		return sdm.getFakeTenants(), nil
+	}
+
 	if sdm.config.Pipeline.ControllerEndpoint == "" {
 		// If no control service is configured, return empty list
 		log.Warnf("No controller endpoint configured, no tenants will be processed")
@@ -421,4 +427,22 @@ func (sdm *SimpleDiscoveryManager) createJob(ctx context.Context, fileKey, tenan
 		jobID, fileKey, metadata.TenantID, metadata.DatasetID)
 
 	return job, nil
+}
+
+// getFakeTenants returns fake tenant data for development mode
+func (sdm *SimpleDiscoveryManager) getFakeTenants() []TenantInfo {
+	return []TenantInfo{
+		{
+			TenantID:  "customer-1",
+			Datasets:  []string{"ebpf-data"},
+			Active:    true,
+			CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // Created yesterday
+		},
+		{
+			TenantID:  "tenant-001",
+			Datasets:  []string{"dataset-001", "logs"},
+			Active:    true,
+			CreatedAt: time.Now().Add(-7 * 24 * time.Hour).Format(time.RFC3339), // Created a week ago
+		},
+	}
 }

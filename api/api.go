@@ -19,6 +19,7 @@ import (
 type ConfigManager interface {
 	GetPipelineConfigAsInterface(ctx context.Context, tenantID, datasetID string) (interface{}, error)
 	GetCacheStats() map[string]interface{}
+	GetCachedPipelineList(ctx context.Context) ([]map[string]interface{}, error)
 }
 
 type API struct {

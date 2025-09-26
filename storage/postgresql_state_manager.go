@@ -125,12 +125,53 @@ func (sm *PostgreSQLStateManager) initTables() error {
 		return fmt.Errorf("failed to create job_records table: %w", err)
 	}
 
+	// Create pipeline configurations cache table
+	pipelineTableSQL := `
+		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("pipeline_configurations") + ` (
+			config_key VARCHAR(200) PRIMARY KEY,
+			tenant_id VARCHAR(100) NOT NULL,
+			dataset_id VARCHAR(100) NOT NULL,
+			configuration JSONB NOT NULL,
+			version VARCHAR(50) NOT NULL,
+			enabled BOOLEAN NOT NULL DEFAULT true,
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			cached_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			expires_at TIMESTAMP NOT NULL,
+			filter_count INTEGER NOT NULL DEFAULT 0
+		)`
+
+	if _, err := sm.db.ExecContext(ctx, pipelineTableSQL); err != nil {
+		return fmt.Errorf("failed to create pipeline_configurations table: %w", err)
+	}
+
+	// Create tenants cache table
+	tenantsTableSQL := `
+		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("tenants_cache") + ` (
+			tenant_id VARCHAR(100) PRIMARY KEY,
+			name VARCHAR(200) NOT NULL,
+			datasets TEXT[] NOT NULL DEFAULT '{}',
+			active BOOLEAN NOT NULL DEFAULT true,
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			cached_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			expires_at TIMESTAMP NOT NULL
+		)`
+
+	if _, err := sm.db.ExecContext(ctx, tenantsTableSQL); err != nil {
+		return fmt.Errorf("failed to create tenants_cache table: %w", err)
+	}
+
 	// Create indexes for better performance
 	indexes := []string{
 		"CREATE INDEX IF NOT EXISTS idx_file_locks_ttl ON " + sm.buildTableName("file_locks") + " (ttl)",
 		"CREATE INDEX IF NOT EXISTS idx_job_records_status ON " + sm.buildTableName("job_records") + " (status)",
 		"CREATE INDEX IF NOT EXISTS idx_job_records_tenant_dataset ON " + sm.buildTableName("job_records") + " (tenant_id, dataset_id)",
 		"CREATE INDEX IF NOT EXISTS idx_job_records_created_at ON " + sm.buildTableName("job_records") + " (created_at)",
+		"CREATE INDEX IF NOT EXISTS idx_pipeline_configurations_tenant_dataset ON " + sm.buildTableName("pipeline_configurations") + " (tenant_id, dataset_id)",
+		"CREATE INDEX IF NOT EXISTS idx_pipeline_configurations_expires_at ON " + sm.buildTableName("pipeline_configurations") + " (expires_at)",
+		"CREATE INDEX IF NOT EXISTS idx_tenants_cache_expires_at ON " + sm.buildTableName("tenants_cache") + " (expires_at)",
+		"CREATE INDEX IF NOT EXISTS idx_tenants_cache_active ON " + sm.buildTableName("tenants_cache") + " (active)",
 	}
 
 	for _, indexSQL := range indexes {
@@ -327,6 +368,205 @@ func (sm *PostgreSQLStateManager) CleanupExpiredLocks(ctx context.Context) error
 	rowsAffected, err := result.RowsAffected()
 	if err == nil && rowsAffected > 0 {
 		log.Infof("Cleaned up %d expired file locks", rowsAffected)
+	}
+
+	return nil
+}
+
+// CachePipelineConfiguration caches a pipeline configuration
+func (sm *PostgreSQLStateManager) CachePipelineConfiguration(ctx context.Context, configKey, tenantID, datasetID, version string, configuration []byte, filterCount int) error {
+	expiresAt := time.Now().Add(5 * time.Minute) // 5 minute cache
+
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	upsertSQL := `
+		INSERT INTO ` + sm.buildTableName("pipeline_configurations") + ` (
+			config_key, tenant_id, dataset_id, configuration, version,
+			enabled, created_at, updated_at, cached_at, expires_at, filter_count
+		) VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW(), NOW(), $6, $7)
+		ON CONFLICT (config_key) DO UPDATE SET
+			configuration = EXCLUDED.configuration,
+			version = EXCLUDED.version,
+			updated_at = NOW(),
+			cached_at = NOW(),
+			expires_at = EXCLUDED.expires_at,
+			filter_count = EXCLUDED.filter_count`
+
+	_, err := sm.db.ExecContext(ctx, upsertSQL, configKey, tenantID, datasetID, configuration, version, expiresAt, filterCount)
+	if err != nil {
+		return fmt.Errorf("failed to cache pipeline configuration: %w", err)
+	}
+
+	return nil
+}
+
+// GetCachedPipelineConfiguration retrieves a cached pipeline configuration
+func (sm *PostgreSQLStateManager) GetCachedPipelineConfiguration(ctx context.Context, configKey string) ([]byte, bool, error) {
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	querySQL := `
+		SELECT configuration, expires_at
+		FROM ` + sm.buildTableName("pipeline_configurations") + `
+		WHERE config_key = $1 AND enabled = true`
+
+	var configuration []byte
+	var expiresAt time.Time
+
+	err := sm.db.QueryRowContext(ctx, querySQL, configKey).Scan(&configuration, &expiresAt)
+	if err == sql.ErrNoRows {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get cached pipeline configuration: %w", err)
+	}
+
+	// Check if expired
+	if time.Now().After(expiresAt) {
+		return nil, false, nil
+	}
+
+	return configuration, true, nil
+}
+
+// CacheTenant caches tenant information
+func (sm *PostgreSQLStateManager) CacheTenant(ctx context.Context, tenantID, name string, datasets []string, active bool) error {
+	expiresAt := time.Now().Add(10 * time.Minute) // 10 minute cache for tenants
+
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	upsertSQL := `
+		INSERT INTO ` + sm.buildTableName("tenants_cache") + ` (
+			tenant_id, name, datasets, active, created_at, updated_at, cached_at, expires_at
+		) VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW(), $5)
+		ON CONFLICT (tenant_id) DO UPDATE SET
+			name = EXCLUDED.name,
+			datasets = EXCLUDED.datasets,
+			active = EXCLUDED.active,
+			updated_at = NOW(),
+			cached_at = NOW(),
+			expires_at = EXCLUDED.expires_at`
+
+	_, err := sm.db.ExecContext(ctx, upsertSQL, tenantID, name, datasets, active, expiresAt)
+	if err != nil {
+		return fmt.Errorf("failed to cache tenant: %w", err)
+	}
+
+	return nil
+}
+
+// GetCachedTenants retrieves all cached active tenants
+func (sm *PostgreSQLStateManager) GetCachedTenants(ctx context.Context) ([]map[string]interface{}, error) {
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	querySQL := `
+		SELECT tenant_id, name, datasets, active, created_at, updated_at, cached_at, expires_at
+		FROM ` + sm.buildTableName("tenants_cache") + `
+		WHERE active = true AND expires_at > NOW()
+		ORDER BY tenant_id`
+
+	rows, err := sm.db.QueryContext(ctx, querySQL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cached tenants: %w", err)
+	}
+	defer rows.Close()
+
+	var tenants []map[string]interface{}
+	for rows.Next() {
+		var tenantID, name string
+		var datasets []string
+		var active bool
+		var createdAt, updatedAt, cachedAt, expiresAt time.Time
+
+		err := rows.Scan(&tenantID, &name, &datasets, &active, &createdAt, &updatedAt, &cachedAt, &expiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan tenant: %w", err)
+		}
+
+		tenant := map[string]interface{}{
+			"tenant_id":  tenantID,
+			"name":       name,
+			"datasets":   datasets,
+			"active":     active,
+			"created_at": createdAt.Format(time.RFC3339),
+		}
+		tenants = append(tenants, tenant)
+	}
+
+	return tenants, nil
+}
+
+// GetCachedPipelineList retrieves all cached pipeline configurations
+func (sm *PostgreSQLStateManager) GetCachedPipelineList(ctx context.Context) ([]map[string]interface{}, error) {
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	querySQL := `
+		SELECT config_key, tenant_id, dataset_id, version, enabled,
+			   created_at, updated_at, cached_at, expires_at, filter_count
+		FROM ` + sm.buildTableName("pipeline_configurations") + `
+		WHERE enabled = true
+		ORDER BY tenant_id, dataset_id`
+
+	rows, err := sm.db.QueryContext(ctx, querySQL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cached pipeline list: %w", err)
+	}
+	defer rows.Close()
+
+	var pipelines []map[string]interface{}
+	for rows.Next() {
+		var configKey, tenantID, datasetID, version string
+		var enabled bool
+		var createdAt, updatedAt, cachedAt, expiresAt time.Time
+		var filterCount int
+
+		err := rows.Scan(&configKey, &tenantID, &datasetID, &version, &enabled, &createdAt, &updatedAt, &cachedAt, &expiresAt, &filterCount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan pipeline: %w", err)
+		}
+
+		pipeline := map[string]interface{}{
+			"config_key":     configKey,
+			"tenant_id":      tenantID,
+			"dataset_id":     datasetID,
+			"version":        version,
+			"enabled":        enabled,
+			"date_created":   createdAt,
+			"date_modified":  updatedAt,
+			"cached_at":      cachedAt,
+			"expires_at":     expiresAt,
+			"filter_count":   filterCount,
+		}
+		pipelines = append(pipelines, pipeline)
+	}
+
+	return pipelines, nil
+}
+
+// CleanupExpiredCache removes expired pipeline configurations and tenants
+func (sm *PostgreSQLStateManager) CleanupExpiredCache(ctx context.Context) error {
+	// Clean up expired pipeline configurations
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	deletePipelineSQL := `
+		DELETE FROM ` + sm.buildTableName("pipeline_configurations") + `
+		WHERE expires_at < NOW()`
+
+	result, err := sm.db.ExecContext(ctx, deletePipelineSQL)
+	if err != nil {
+		log.Warnf("Failed to cleanup expired pipeline configurations: %v", err)
+	} else {
+		if rowsAffected, err := result.RowsAffected(); err == nil && rowsAffected > 0 {
+			log.Infof("Cleaned up %d expired pipeline configurations", rowsAffected)
+		}
+	}
+
+	// Clean up expired tenants
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	deleteTenantsSQL := `
+		DELETE FROM ` + sm.buildTableName("tenants_cache") + `
+		WHERE expires_at < NOW()`
+
+	result, err = sm.db.ExecContext(ctx, deleteTenantsSQL)
+	if err != nil {
+		log.Warnf("Failed to cleanup expired tenants: %v", err)
+	} else {
+		if rowsAffected, err := result.RowsAffected(); err == nil && rowsAffected > 0 {
+			log.Infof("Cleaned up %d expired tenants", rowsAffected)
+		}
 	}
 
 	return nil

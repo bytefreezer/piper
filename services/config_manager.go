@@ -2,205 +2,51 @@ package services
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"sync"
 	"time"
-
-	"github.com/n0needt0/go-goodies/log"
 
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/domain"
+	"github.com/n0needt0/bytefreezer-piper/pipeline"
+	"github.com/n0needt0/bytefreezer-piper/storage"
 )
 
-// ConfigManager manages pipeline configurations from control service with local caching
+// ConfigManager manages pipeline configurations using local database caching
 type ConfigManager struct {
-	cfg         *config.Config
-	cache       map[string]*CachedConfig
-	mutex       sync.RWMutex
-	httpClient  *http.Client
-	lastRefresh time.Time
+	cfg              *config.Config
+	pipelineClient   *pipeline.PipelineClient
+	pipelineDatabase *pipeline.PipelineDatabase
+	stateManager     *storage.PostgreSQLStateManager
 }
 
-// CachedConfig represents a cached pipeline configuration
-type CachedConfig struct {
-	Config    *domain.PipelineConfiguration
-	CachedAt  time.Time
-	ExpiresAt time.Time
-}
+// NewConfigManager creates a new configuration manager with database caching
+func NewConfigManager(cfg *config.Config, stateManager *storage.PostgreSQLStateManager) *ConfigManager {
+	// Initialize pipeline client for control API communication
+	pipelineClient := pipeline.NewPipelineClient(cfg)
 
-// NewConfigManager creates a new configuration manager
-func NewConfigManager(cfg *config.Config) *ConfigManager {
+	// Initialize pipeline database for local caching
+	pipelineDatabase := pipeline.NewPipelineDatabase(pipelineClient, stateManager)
+
 	return &ConfigManager{
-		cfg:   cfg,
-		cache: make(map[string]*CachedConfig),
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		lastRefresh: time.Now(),
+		cfg:              cfg,
+		pipelineClient:   pipelineClient,
+		pipelineDatabase: pipelineDatabase,
+		stateManager:     stateManager,
 	}
 }
 
-// GetPipelineConfig retrieves pipeline configuration for tenant/dataset
+// GetPipelineConfig retrieves pipeline configuration for tenant/dataset using database cache
 func (cm *ConfigManager) GetPipelineConfig(ctx context.Context, tenantID, datasetID string) (*domain.PipelineConfiguration, error) {
-	configKey := fmt.Sprintf("%s:%s", tenantID, datasetID)
-
-	// If in development mode, return fake configuration
-	if cm.cfg.Dev {
-		log.Debugf("Development mode enabled - returning fake config for %s", configKey)
-		return cm.getFakeConfig(tenantID, datasetID), nil
-	}
-
-	cm.mutex.RLock()
-	cached, exists := cm.cache[configKey]
-	cm.mutex.RUnlock()
-
-	// Check if cached config is still valid
-	if exists && time.Now().Before(cached.ExpiresAt) {
-		log.Debugf("Using cached config for %s", configKey)
-		return cached.Config, nil
-	}
-
-	// Try to fetch from control service
-	if cm.cfg.Pipeline.ControllerEndpoint != "" {
-		log.Debugf("Fetching config for %s from control service", configKey)
-		if config, err := cm.fetchFromControl(ctx, tenantID, datasetID); err == nil {
-			cm.cacheConfig(configKey, config)
-			return config, nil
-		} else {
-			log.Warnf("Failed to fetch config from control service: %v", err)
-		}
-	}
-
-	// Fall back to cached config even if expired, or create default
-	if exists {
-		log.Infof("Using expired cached config for %s", configKey)
-		return cached.Config, nil
-	}
-
-	// Create default configuration
-	log.Infof("Creating default config for %s", configKey)
-	defaultConfig := cm.createDefaultConfig(tenantID, datasetID)
-	cm.cacheConfig(configKey, defaultConfig)
-	return defaultConfig, nil
+	return cm.pipelineDatabase.GetPipelineConfiguration(ctx, tenantID, datasetID)
 }
 
-// fetchFromControl fetches configuration from the control service
-func (cm *ConfigManager) fetchFromControl(ctx context.Context, tenantID, datasetID string) (*domain.PipelineConfiguration, error) {
-	url := fmt.Sprintf("%s/api/v2/pipeline/config/%s/%s", cm.cfg.Pipeline.ControllerEndpoint, tenantID, datasetID)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "bytefreezer-piper/1.0.0")
-
-	resp, err := cm.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch config: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		// No specific config exists, will use default
-		return nil, fmt.Errorf("config not found for %s:%s", tenantID, datasetID)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("control service returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var config domain.PipelineConfiguration
-	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return nil, fmt.Errorf("failed to decode config response: %w", err)
-	}
-
-	log.Debugf("Successfully fetched config for %s:%s from control service", tenantID, datasetID)
-	return &config, nil
+// UpdateDatabase performs a full update of the pipeline configuration database cache
+func (cm *ConfigManager) UpdateDatabase(ctx context.Context) error {
+	return cm.pipelineDatabase.UpdateDatabase(ctx)
 }
 
-// cacheConfig stores a configuration in the local cache
-func (cm *ConfigManager) cacheConfig(configKey string, config *domain.PipelineConfiguration) {
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
-
-	cm.cache[configKey] = &CachedConfig{
-		Config:    config,
-		CachedAt:  time.Now(),
-		ExpiresAt: time.Now().Add(cm.cfg.Pipeline.ConfigRefreshInterval),
-	}
-
-	log.Debugf("Cached config for %s, expires at %v", configKey, cm.cache[configKey].ExpiresAt)
-}
-
-// createDefaultConfig creates a default pipeline configuration
-func (cm *ConfigManager) createDefaultConfig(tenantID, datasetID string) *domain.PipelineConfiguration {
-	return &domain.PipelineConfiguration{
-		ConfigKey: fmt.Sprintf("%s:%s", tenantID, datasetID),
-		TenantID:  tenantID,
-		DatasetID: datasetID,
-		Enabled:   true,
-		Version:   "1.0.0",
-		Filters: []domain.FilterConfig{
-			{
-				Type:    "add_field",
-				Enabled: true,
-				Config: map[string]interface{}{
-					"field": "processed_by",
-					"value": "bytefreezer-piper",
-				},
-			},
-			{
-				Type:    "add_field",
-				Enabled: true,
-				Config: map[string]interface{}{
-					"field": "processed_at",
-					"value": time.Now().UTC().Format(time.RFC3339),
-				},
-			},
-		},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		UpdatedBy: "system-default",
-		Validated: true,
-		Settings: map[string]interface{}{
-			"auto_format_detection": true,
-			"drop_parse_failures":   true,
-			"compress_output":       true,
-		},
-	}
-}
-
-// RefreshCache refreshes configurations that are about to expire
-func (cm *ConfigManager) RefreshCache(ctx context.Context) {
-	if time.Since(cm.lastRefresh) < time.Minute {
-		return // Don't refresh too frequently
-	}
-
-	cm.mutex.RLock()
-	var keysToRefresh []string
-	for key, cached := range cm.cache {
-		// Refresh configs that expire within the next 5 minutes
-		if time.Until(cached.ExpiresAt) < 5*time.Minute {
-			keysToRefresh = append(keysToRefresh, key)
-		}
-	}
-	cm.mutex.RUnlock()
-
-	for _, key := range keysToRefresh {
-		if len(key) > 0 {
-			log.Debugf("Refreshing config for %s", key)
-			// This would trigger a refresh on next access
-		}
-	}
-
-	cm.lastRefresh = time.Now()
-	log.Debugf("Refreshed %d configurations", len(keysToRefresh))
+// GetAllTenants retrieves all cached tenants
+func (cm *ConfigManager) GetAllTenants() []pipeline.TenantInfo {
+	return cm.pipelineDatabase.GetAllTenants()
 }
 
 // GetPipelineConfigAsInterface returns pipeline config as interface{} for API use
@@ -212,106 +58,27 @@ func (cm *ConfigManager) GetPipelineConfigAsInterface(ctx context.Context, tenan
 	return config, nil
 }
 
-// ClearCache clears the entire configuration cache
-func (cm *ConfigManager) ClearCache() {
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
-
-	cm.cache = make(map[string]*CachedConfig)
-	log.Infof("Configuration cache cleared")
-}
-
 // GetCacheStats returns statistics about the configuration cache
 func (cm *ConfigManager) GetCacheStats() map[string]interface{} {
-	cm.mutex.RLock()
-	defer cm.mutex.RUnlock()
-
-	active := 0
-	expired := 0
-	now := time.Now()
-
-	for _, cached := range cm.cache {
-		if now.Before(cached.ExpiresAt) {
-			active++
-		} else {
-			expired++
-		}
-	}
-
-	return map[string]interface{}{
-		"total_cached":  len(cm.cache),
-		"active_cached": active,
-		"expired":       expired,
-		"last_refresh":  cm.lastRefresh,
-	}
+	return cm.pipelineDatabase.GetCacheStats()
 }
 
-// getFakeConfig returns fake configuration for development mode
-func (cm *ConfigManager) getFakeConfig(tenantID, datasetID string) *domain.PipelineConfiguration {
-	// Special configuration for customer-1/ebpf-data
-	if tenantID == "customer-1" && datasetID == "ebpf-data" {
-		return &domain.PipelineConfiguration{
-			ConfigKey: fmt.Sprintf("%s:%s", tenantID, datasetID),
-			TenantID:  tenantID,
-			DatasetID: datasetID,
-			Enabled:   true,
-			Version:   "dev-1.0.0",
-			Filters: []domain.FilterConfig{
-				{
-					Type:    "json_validate",
-					Enabled: true,
-					Config: map[string]interface{}{
-						"source_field": "message",
-						"fail_on_invalid": true,
-					},
-				},
-				{
-					Type:    "json_flatten",
-					Enabled: true,
-					Config: map[string]interface{}{
-						"source_field": "message",
-						"target_field": "@flatten",
-						"separator":    ".",
-					},
-				},
-				{
-					Type:    "uppercase_keys",
-					Enabled: true,
-					Config: map[string]interface{}{
-						"source_field": "@flatten",
-						"recursive":    true,
-					},
-				},
-				{
-					Type:    "add_field",
-					Enabled: true,
-					Config: map[string]interface{}{
-						"field": "processed_by",
-						"value": "bytefreezer-piper-dev",
-					},
-				},
-				{
-					Type:    "add_field",
-					Enabled: true,
-					Config: map[string]interface{}{
-						"field": "TESTKEY",
-						"value": fmt.Sprintf("%d", time.Now().Unix()),
-					},
-				},
-			},
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-			UpdatedBy: "dev-mode",
-			Validated: true,
-			Settings: map[string]interface{}{
-				"auto_format_detection": false, // Expect NDJSON only
-				"drop_parse_failures":   true,
-				"compress_output":       true,
-				"format_hint":           "ndjson",
-			},
-		}
-	}
+// IsHealthy returns the health status of the database cache
+func (cm *ConfigManager) IsHealthy() bool {
+	return cm.pipelineDatabase.IsHealthy()
+}
 
-	// Default fake configuration for other tenants
-	return cm.createDefaultConfig(tenantID, datasetID)
+// GetLastSync returns the last sync timestamp
+func (cm *ConfigManager) GetLastSync() time.Time {
+	return cm.pipelineDatabase.GetLastSync()
+}
+
+// GetCachedPipelineList retrieves all cached pipeline configurations with metadata
+func (cm *ConfigManager) GetCachedPipelineList(ctx context.Context) ([]map[string]interface{}, error) {
+	return cm.pipelineDatabase.GetCachedPipelineList(ctx)
+}
+
+// GetCachedTenantList retrieves all cached tenants with metadata
+func (cm *ConfigManager) GetCachedTenantList(ctx context.Context) ([]map[string]interface{}, error) {
+	return cm.pipelineDatabase.GetCachedTenantList(ctx)
 }

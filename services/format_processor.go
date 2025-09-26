@@ -41,7 +41,7 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 	filterRegistry := pipeline.NewFilterRegistry()
 
 	// Create configuration manager
-	configManager := NewConfigManager(cfg)
+	configManager := NewConfigManager(cfg, stateManager)
 
 	processor := &FormatProcessor{
 		cfg:             cfg,

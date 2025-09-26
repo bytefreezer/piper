@@ -14,15 +14,16 @@ import (
 
 // Config represents the main configuration structure for bytefreezer-piper
 type Config struct {
-	App        App        `koanf:"app"`
-	S3Source   S3Source   `koanf:"s3_source"`
-	S3Dest     S3Dest     `koanf:"s3_destination"`
-	PostgreSQL PostgreSQL `koanf:"postgresql"`
-	Processing Processing `koanf:"processing"`
-	Pipeline   Pipeline   `koanf:"pipeline"`
-	Monitoring Monitoring `koanf:"monitoring"`
-	Secrets    Secrets    `koanf:"secrets"`
-	Dev        bool       `koanf:"dev"`
+	App          App          `koanf:"app"`
+	S3Source     S3Source     `koanf:"s3_source"`
+	S3Dest       S3Dest       `koanf:"s3_destination"`
+	PostgreSQL   PostgreSQL   `koanf:"postgresql"`
+	Processing   Processing   `koanf:"processing"`
+	Pipeline     Pipeline     `koanf:"pipeline"`
+	Monitoring   Monitoring   `koanf:"monitoring"`
+	Secrets      Secrets      `koanf:"secrets"`
+	Housekeeping Housekeeping `koanf:"housekeeping"`
+	Dev          bool         `koanf:"dev"`
 }
 
 // App represents application-level configuration
@@ -103,6 +104,13 @@ type Secrets struct {
 	Region   string `koanf:"region"`
 }
 
+// Housekeeping represents housekeeping configuration
+type Housekeeping struct {
+	Enabled        bool          `koanf:"enabled"`
+	IntervalSeconds int           `koanf:"intervalseconds"`
+	Interval       time.Duration // Calculated from IntervalSeconds
+}
+
 // LoadConfig loads configuration from file and environment variables
 func LoadConfig(configPath string) (*Config, error) {
 	k := koanf.New(".")
@@ -141,6 +149,9 @@ func LoadConfig(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
+	// Calculate derived fields
+	config.Housekeeping.Interval = time.Duration(config.Housekeeping.IntervalSeconds) * time.Second
+
 	return &config, nil
 }
 
@@ -177,6 +188,9 @@ func getDefaults() map[string]interface{} {
 		"monitoring.enable_tracing": false,
 
 		"secrets.provider": "aws",
+
+		"housekeeping.enabled":        true,
+		"housekeeping.intervalseconds": 600,
 	}
 }
 

@@ -253,31 +253,39 @@ func (api *API) GetConfig() usecase.Interactor {
 // GetPipelineList returns a handler for getting all cached pipeline configurations
 func (api *API) GetPipelineList() usecase.Interactor {
 	u := usecase.NewInteractor(func(ctx context.Context, input struct{}, output *PipelineListResponse) error {
-		// Get cache statistics from config manager
-		cacheStats := api.ConfigManager.GetCacheStats()
-		pipelines := []PipelineEntry{}
+		// Get cached pipeline list from database
+		cachedPipelines, err := api.ConfigManager.GetCachedPipelineList(ctx)
+		if err != nil {
+			log.Errorf("Failed to get cached pipeline list: %v", err)
+			// Return empty list on error
+			output.Pipelines = []PipelineEntry{}
+			output.Count = 0
+			return nil
+		}
 
-		// For now, we'll return minimal info since we don't have direct cache access
-		// In dev mode, show the fake pipeline
-		if api.Config.Dev {
-			pipelines = append(pipelines, PipelineEntry{
-				TenantID:      "customer-1",
-				DatasetID:     "ebpf-data",
-				ConfigKey:     "customer-1:ebpf-data",
-				Version:       "dev-1.0.0",
-				Enabled:       true,
-				DateCreated:   time.Now().Add(-24 * time.Hour), // Fake created yesterday
-				DateModified:  time.Now().Add(-1 * time.Hour),  // Fake modified 1 hour ago
-				CachedAt:      time.Now(),
-				ExpiresAt:     time.Now().Add(5 * time.Minute),
-				FilterCount:   5, // json_validate, json_flatten, uppercase_keys, 2x add_field
-			})
+		// Convert database format to API format
+		pipelines := make([]PipelineEntry, 0, len(cachedPipelines))
+		for _, cached := range cachedPipelines {
+			entry := PipelineEntry{
+				TenantID:      cached["tenant_id"].(string),
+				DatasetID:     cached["dataset_id"].(string),
+				ConfigKey:     cached["config_key"].(string),
+				Version:       cached["version"].(string),
+				Enabled:       cached["enabled"].(bool),
+				DateCreated:   cached["date_created"].(time.Time),
+				DateModified:  cached["date_modified"].(time.Time),
+				CachedAt:      cached["cached_at"].(time.Time),
+				ExpiresAt:     cached["expires_at"].(time.Time),
+				FilterCount:   cached["filter_count"].(int),
+			}
+			pipelines = append(pipelines, entry)
 		}
 
 		output.Pipelines = pipelines
 		output.Count = len(pipelines)
 
-		log.Debugf("Retrieved %d pipeline configurations. Cache stats: %+v", len(pipelines), cacheStats)
+		cacheStats := api.ConfigManager.GetCacheStats()
+		log.Debugf("Retrieved %d cached pipeline configurations. Cache stats: %+v", len(pipelines), cacheStats)
 
 		return nil
 	})
