@@ -21,6 +21,7 @@ require (
 )
 
 require (
+	github.com/Cistern/sflow v0.0.0-20240622235316-ed105e3cf9fb // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.1 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.7 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.7 // indirect

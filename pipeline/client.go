@@ -133,7 +133,7 @@ func (pc *PipelineClient) getFakeTenants() []TenantInfo {
 		{
 			TenantID:  "customer-1",
 			Name:      "Customer One Corp",
-			Datasets:  []string{"ebpf-data"},
+			Datasets:  []string{"ebpf-data", "sflow-data"},
 			Active:    true,
 			CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
 		},
@@ -185,6 +185,41 @@ func (pc *PipelineClient) getFakePipelineConfig(tenantID, datasetID string) *Pip
 						Config: map[string]interface{}{
 							"field": "TESTKEY",
 							"value": fmt.Sprintf("%d", time.Now().Unix()),
+						},
+					},
+					{
+						Type: "add_field",
+						Config: map[string]interface{}{
+							"field": "PIPELINE_VERSION",
+							"value": "dev-1.0.0",
+						},
+					},
+				},
+			},
+			Version:   "dev-1.0.0",
+			Enabled:   true,
+			CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+			UpdatedAt: time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
+		}
+	}
+
+	if tenantID == "customer-1" && datasetID == "sflow-data" {
+		return &PipelineConfigResponse{
+			TenantID:  tenantID,
+			DatasetID: datasetID,
+			Configuration: &domain.PipelineConfiguration{
+				Filters: []domain.FilterConfig{
+					{
+						Type: "parse",
+						Config: map[string]interface{}{
+							"parser": "sflow",
+						},
+					},
+					{
+						Type: "add_field",
+						Config: map[string]interface{}{
+							"field": "data_type",
+							"value": "sflow",
 						},
 					},
 					{

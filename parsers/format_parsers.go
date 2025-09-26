@@ -1,6 +1,7 @@
 package parsers
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Cistern/sflow"
 )
 
 // CSVParser parses CSV data to NDJSON
@@ -378,3 +381,120 @@ func (p *RawTextParser) Parse(ctx context.Context, data []byte) (map[string]inte
 func (p *RawTextParser) Name() string { return p.name }
 func (p *RawTextParser) Type() string { return "raw" }
 func (p *RawTextParser) Configure(config map[string]interface{}) error { return nil }
+
+// SflowParser parses sFlow v5 packets to JSON format using the Cistern sFlow library
+type SflowParser struct {
+	name string
+}
+
+func NewSflowParser(config map[string]interface{}) (Parser, error) {
+	return &SflowParser{
+		name: "sflow-parser",
+	}, nil
+}
+
+func (p *SflowParser) Parse(ctx context.Context, data []byte) (map[string]interface{}, error) {
+	// Create decoder for sFlow v5 packets
+	decoder := sflow.NewDecoder(bytes.NewReader(data))
+
+	// Decode the sFlow datagram
+	dgram, err := decoder.Decode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode sFlow packet: %w", err)
+	}
+
+	result := map[string]interface{}{
+		"log_type":      "sflow",
+		"parsed_time":   time.Now().UTC().Format(time.RFC3339),
+		"version":       dgram.Version,
+		"agent_address": dgram.IpAddress.String(),
+		"sub_agent_id":  dgram.SubAgentId,
+		"sequence":      dgram.SequenceNumber,
+		"uptime":        dgram.Uptime,
+		"sample_count":  dgram.NumSamples,
+		"samples":       []map[string]interface{}{},
+	}
+
+	// Process each sample in the datagram
+	for _, sample := range dgram.Samples {
+		sampleData := map[string]interface{}{
+			"sample_type": sample.SampleType(),
+		}
+
+		switch s := sample.(type) {
+		case *sflow.FlowSample:
+			sampleData["type"] = "flow"
+			sampleData["sequence"] = s.SequenceNum
+			sampleData["source_id_type"] = s.SourceIdType
+			sampleData["source_id_index"] = s.SourceIdIndexVal
+			sampleData["sampling_rate"] = s.SamplingRate
+			sampleData["sample_pool"] = s.SamplePool
+			sampleData["drops"] = s.Drops
+			sampleData["input_interface"] = s.Input
+			sampleData["output_interface"] = s.Output
+			sampleData["record_count"] = len(s.Records)
+
+			// Process flow records
+			records := []map[string]interface{}{}
+			for _, record := range s.Records {
+				recordData := p.parseRecord(record)
+				if recordData != nil {
+					records = append(records, recordData)
+				}
+			}
+			sampleData["records"] = records
+
+		case *sflow.CounterSample:
+			sampleData["type"] = "counter"
+			sampleData["sequence"] = s.SequenceNum
+			sampleData["source_id_type"] = s.SourceIdType
+			sampleData["source_id_index"] = s.SourceIdIndexVal
+			sampleData["record_count"] = len(s.Records)
+
+			// Process counter records
+			records := []map[string]interface{}{}
+			for _, record := range s.Records {
+				recordData := p.parseRecord(record)
+				if recordData != nil {
+					records = append(records, recordData)
+				}
+			}
+			sampleData["records"] = records
+		}
+
+		result["samples"] = append(result["samples"].([]map[string]interface{}), sampleData)
+	}
+
+	return result, nil
+}
+
+// parseRecord extracts data from sFlow records (both flow and counter records)
+func (p *SflowParser) parseRecord(record sflow.Record) map[string]interface{} {
+	recordData := map[string]interface{}{
+		"record_type": record.RecordType(),
+	}
+
+	// Convert record to JSON for generic parsing
+	// This is a simpler approach that handles all record types
+	recordJSON, err := json.Marshal(record)
+	if err == nil {
+		var recordMap map[string]interface{}
+		if json.Unmarshal(recordJSON, &recordMap) == nil {
+			// Merge the record data
+			for k, v := range recordMap {
+				recordData[k] = v
+			}
+		}
+	}
+
+	// Add some enhanced parsing for common flow records
+	recordStr := fmt.Sprintf("%T", record)
+	recordData["record_type_name"] = recordStr
+
+	return recordData
+}
+
+
+func (p *SflowParser) Name() string { return p.name }
+func (p *SflowParser) Type() string { return "sflow" }
+func (p *SflowParser) Configure(config map[string]interface{}) error { return nil }

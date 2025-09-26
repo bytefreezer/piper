@@ -10,8 +10,12 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 
 requirements explanation and todo:
-please copy api implementation from receiver, keep the following end points:
-- health test connection to db
-- configuration
-- list of tenant/dataset that are in pipeline cache db with date_created/date_modified
-- display pipeline details for tenant/dataset
+
+ok at the moment i see data in s3: .../intake/customer-1/[ebpf-data, sflow-data ] but 
+nothing processes. in logs
+  {"time":"2025-09-26T16:19:51.918594533Z","level":"WARN","source":{"function":"github.com/n0needt0/bytefreezer-piper/services.(*SimpleDiscoveryManager).DiscoverJobs","file":"/home/andrew/workspace/bytefreezer/bytefreezer-piper/services/simple_discovery_manager.go","line":60},"msg":"Failed to discover files for tenant customer-1: failed to list objects for tenant customer-1: failed to list objects in source bucket intake: operation error S3: ListObjectsV2, https response error StatusCode: 0, RequestID: , HostID: , request send failed, Get \"https://192.168.86.125:9000/intake?list-type=2&prefix=tenant%3Dcustomer-1%2F\": http: server gave HTTP response to HTTPS client\nfailed to get rate limit token, retry quota exceeded, 0 available, 5 requested"}
+ 
+
+  - can you please leave single tenant customer-1, datasets ebpf-data and sflow-data
+  - for ebpf-data leave pipeline as you already have
+  - for sflow-data u need to create sflow to json parcer and parce sflow to ndjson

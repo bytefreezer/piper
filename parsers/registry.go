@@ -31,6 +31,7 @@ func NewRegistry() ParserRegistry {
 	registry.Register("nginx", NewNginxLogParser)
 	registry.Register("influx", NewInfluxLineProtocolParser)
 	registry.Register("cef", NewCEFParser)
+	registry.Register("sflow", NewSflowParser)
 	registry.Register("raw", NewRawTextParser)
 
 	return registry

@@ -1,3 +1,5 @@
+github.com/Cistern/sflow v0.0.0-20240622235316-ed105e3cf9fb h1:qyIMnqUY0n8L6vSPUONI87wG1CtA/AUUybMTmgWTHv0=
+github.com/Cistern/sflow v0.0.0-20240622235316-ed105e3cf9fb/go.mod h1:l+o2vDh/2ArP1c4VtYBQeoNbRIdXd78j/aBnfFmKnQE=
 github.com/aws/aws-sdk-go-v2 v1.39.0 h1:xm5WV/2L4emMRmMjHFykqiA4M/ra0DJVSWUkDyBjbg4=
 github.com/aws/aws-sdk-go-v2 v1.39.0/go.mod h1:sDioUELIUO9Znk23YVmIk86/9DOpkbyyVb1i/gUNFXY=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.1 h1:i8p8P4diljCr60PpJp6qZXNlgX4m2yQFpYk+9ZT+J4E=

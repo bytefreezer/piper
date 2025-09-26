@@ -35,6 +35,7 @@ func NewS3Client(sourceConfig *config.S3Source, destConfig *config.S3Dest) (*S3C
 		sourceConfig.AccessKey,
 		sourceConfig.SecretKey,
 		sourceConfig.Endpoint,
+		sourceConfig.SSL,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create source S3 client: %w", err)
@@ -46,6 +47,7 @@ func NewS3Client(sourceConfig *config.S3Source, destConfig *config.S3Dest) (*S3C
 		destConfig.AccessKey,
 		destConfig.SecretKey,
 		destConfig.Endpoint,
+		destConfig.SSL,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create destination S3 client: %w", err)
@@ -62,7 +64,7 @@ func NewS3Client(sourceConfig *config.S3Source, destConfig *config.S3Dest) (*S3C
 }
 
 // createS3Client creates an S3 client with the given configuration
-func createS3Client(region, accessKey, secretKey, endpoint string) (*s3.Client, error) {
+func createS3Client(region, accessKey, secretKey, endpoint string, useSSL bool) (*s3.Client, error) {
 	var awsCfg aws.Config
 	var err error
 
@@ -93,7 +95,11 @@ func createS3Client(region, accessKey, secretKey, endpoint string) (*s3.Client, 
 		// Custom endpoint (MinIO, LocalStack, etc.)
 		endpointURL := endpoint
 		if !strings.HasPrefix(endpointURL, "http") {
-			endpointURL = "https://" + endpointURL
+			if useSSL {
+				endpointURL = "https://" + endpointURL
+			} else {
+				endpointURL = "http://" + endpointURL
+			}
 		}
 
 		client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {

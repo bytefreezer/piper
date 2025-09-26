@@ -434,15 +434,9 @@ func (sdm *SimpleDiscoveryManager) getFakeTenants() []TenantInfo {
 	return []TenantInfo{
 		{
 			TenantID:  "customer-1",
-			Datasets:  []string{"ebpf-data"},
+			Datasets:  []string{"ebpf-data", "sflow-data"},
 			Active:    true,
 			CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // Created yesterday
-		},
-		{
-			TenantID:  "tenant-001",
-			Datasets:  []string{"dataset-001", "logs"},
-			Active:    true,
-			CreatedAt: time.Now().Add(-7 * 24 * time.Hour).Format(time.RFC3339), // Created a week ago
 		},
 	}
 }
