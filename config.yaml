@@ -27,6 +27,15 @@ s3_destination:
   endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
   ssl: false
 
+# S3 GeoIP configuration (GeoIP database updates)
+s3_geoip:
+  bucket_name: "geoip"  # Dedicated GeoIP bucket for database files
+  region: "us-east-1"
+  access_key: "AKIAQNXBAHUKIMJP26P6"
+  secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+  endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
+  ssl: false
+
 # PostgreSQL configuration for state management
 postgresql:
   host: "192.168.86.137"
