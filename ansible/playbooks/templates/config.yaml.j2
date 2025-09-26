@@ -5,8 +5,10 @@
 app:
   name: {{ config.app.name }}
   version: {{ config.app.version }}
-  instance_id: {{ config.app.instance_id }}
   log_level: {{ config.app.log_level }}
+
+server:
+  apiport: {{ config.server.apiport }}
 
 # S3 source configuration (intake bucket from bytefreezer-receiver)
 s3_source:
