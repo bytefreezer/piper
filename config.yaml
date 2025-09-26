@@ -134,6 +134,21 @@ secrets:
   provider: "aws"         # "aws", "env", "file"
   region: "us-east-1"
 
+# Spooling configuration for local staging and processing
+spooling:
+  spool_path: "./spool"
+  upload_worker_count: 4
+  process_worker_count: 2
+  retry_interval_seconds: 30
+
+# Dead Letter Queue configuration
+dlq:
+  enabled: true
+  retry_attempts: 4
+  retry_interval_seconds: 60
+  cleanup_interval_seconds: 3600
+  max_age_days: 7
+
 # Housekeeping configuration
 housekeeping:
   enabled: true

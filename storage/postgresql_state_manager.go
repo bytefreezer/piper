@@ -185,6 +185,11 @@ func (sm *PostgreSQLStateManager) initTables() error {
 
 // AcquireFileLock attempts to acquire a lock on a file
 func (sm *PostgreSQLStateManager) AcquireFileLock(ctx context.Context, fileKey, processorType, processorID, jobID string) error {
+	return sm.AcquireFileLockWithTTL(ctx, fileKey, processorType, processorID, jobID, 30*time.Minute)
+}
+
+// AcquireFileLockWithTTL attempts to acquire a lock on a file with custom TTL
+func (sm *PostgreSQLStateManager) AcquireFileLockWithTTL(ctx context.Context, fileKey, processorType, processorID, jobID string, ttl time.Duration) error {
 	tx, err := sm.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -193,16 +198,16 @@ func (sm *PostgreSQLStateManager) AcquireFileLock(ctx context.Context, fileKey, 
 
 	// Check if lock already exists and is not expired
 	var existingProcessorID string
-	var ttl time.Time
+	var existingTTL time.Time
 	checkSQL := `
 		SELECT processor_id, ttl
 		FROM ` + sm.buildTableName("file_locks") + `
 		WHERE file_key = $1`
 
-	err = tx.QueryRowContext(ctx, checkSQL, fileKey).Scan(&existingProcessorID, &ttl)
+	err = tx.QueryRowContext(ctx, checkSQL, fileKey).Scan(&existingProcessorID, &existingTTL)
 	if err == nil {
 		// Lock exists
-		if time.Now().Before(ttl) {
+		if time.Now().Before(existingTTL) {
 			// Lock is still valid
 			if existingProcessorID != processorID {
 				return domain.ErrFileLocked
@@ -216,7 +221,7 @@ func (sm *PostgreSQLStateManager) AcquireFileLock(ctx context.Context, fileKey, 
 	}
 
 	// Acquire or update the lock
-	lockTTL := time.Now().Add(30 * time.Minute) // 30 minute TTL
+	lockTTL := time.Now().Add(ttl)
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	upsertSQL := `
 		INSERT INTO ` + sm.buildTableName("file_locks") + ` (file_key, processor_type, processor_id, job_id, lock_timestamp, ttl)

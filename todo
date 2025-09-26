@@ -11,30 +11,5 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-i dont think you have s3 configuration for geoipfiles
-
-
-{"time":"2025-09-26T22:23:03.15247248Z","level":"INFO","source":{"function":"github.com/n0needt0/bytefreezer-piper/geoip.(*Updater).CheckAndUpdate","file":"/home/andrew/workspace/bytefreezer/bytefreezer-piper/geoip/updater.go","line":63},"msg":"Checking for GeoIP database updates..."}
-{"time":"2025-09-26T22:23:03.152524282Z","level":"ERROR","source":{"function":"github.com/n0needt0/bytefreezer-piper/geoip.(*Updater).CheckAndUpdate","file":"/home/andrew/workspace/bytefreezer/bytefreezer-piper/geoip/updater.go","line":78},"msg":"Failed to update GeoLite2-City.mmdb: failed to get remote file info for GeoLite2-City.mmdb: MissingRegion: could not find region configuration"}
-{"time":"2025-09-26T22:23:03.152566258Z","level":"ERROR","source":{"function":"github.com/n0needt0/bytefreezer-piper/geoip.(*Updater).CheckAndUpdate","file":"/home/andrew/workspace/bytefreezer/bytefreezer-piper/geoip/updater.go","line":78},"msg":"Failed to update GeoLite2-Country.mmdb: failed to get remote file info for GeoLite2-Country.mmdb: MissingRegion: could not find region configuration"}
-{"time":"2025-09-26T22:23:03.152587886Z","level":"INFO","source":{"function":"github.com/n0needt0/bytefreezer-piper/geoip.(*Updater).CheckAndUpdate","file":"/home/andrew/workspace/bytefreezer/bytefreezer-piper/geoip/updater.go","line":83},"msg":"GeoIP database update check completed"}
-
-
-
-if you forgot use the same config for s3 as for sources bucket name geoip
-
--geo ip files updates
-
-this is destination for files
-
-  geoip_database_path: "/opt/geoip"
-  geoip_city_database: "GeoLite2-City.mmdb"
-  geoip_country_database: "GeoLite2-Country.mmdb"
-
-  they need to be update when new versions showup in S3: 
-    "bucket_name": "geoip",
-    "region": "us-east-1",
-    "endpoint": "192.168.86.125:9000",
-  
-  please add a functionality that checks new version of geoip databases upon start of piper and on every housekeeping run.
-  please make updates atomic and remember of race conditions when you updating  data files together with processing
+- since we have multiple piper nodes reading fles from same s3 directory we need to implement file locking, so only 1 node can process given file.
+we do need to provide for lock removal if file was locked more than 2x configured maximum job timeout

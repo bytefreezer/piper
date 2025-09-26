@@ -28,6 +28,8 @@ type Config struct {
 	Monitoring   Monitoring   `koanf:"monitoring"`
 	Secrets      Secrets      `koanf:"secrets"`
 	Housekeeping Housekeeping `koanf:"housekeeping"`
+	Spooling     Spooling     `koanf:"spooling"`
+	DLQ          DLQ          `koanf:"dlq"`
 	Dev          bool         `koanf:"dev"`
 }
 
@@ -128,6 +130,26 @@ type Housekeeping struct {
 	Interval        time.Duration // Calculated from IntervalSeconds
 }
 
+// Spooling represents local staging configuration following receiver pattern
+type Spooling struct {
+	SpoolPath           string        `koanf:"spool_path"`
+	UploadWorkerCount   int           `koanf:"upload_worker_count"`
+	ProcessWorkerCount  int           `koanf:"process_worker_count"`
+	RetryIntervalSeconds int          `koanf:"retry_interval_seconds"`
+	RetryInterval       time.Duration // Calculated from RetryIntervalSeconds
+}
+
+// DLQ represents dead letter queue configuration following receiver pattern
+type DLQ struct {
+	Enabled                bool          `koanf:"enabled"`
+	RetryAttempts          int           `koanf:"retry_attempts"`
+	RetryIntervalSeconds   int           `koanf:"retry_interval_seconds"`
+	CleanupIntervalSeconds int           `koanf:"cleanup_interval_seconds"`
+	MaxAgeDays             int           `koanf:"max_age_days"`
+	RetryInterval          time.Duration // Calculated from RetryIntervalSeconds
+	CleanupInterval        time.Duration // Calculated from CleanupIntervalSeconds
+}
+
 // LoadConfig loads configuration from file and environment variables
 func LoadConfig(configPath string) (*Config, error) {
 	k := koanf.New(".")
@@ -173,6 +195,9 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	// Calculate derived fields
 	config.Housekeeping.Interval = time.Duration(config.Housekeeping.IntervalSeconds) * time.Second
+	config.Spooling.RetryInterval = time.Duration(config.Spooling.RetryIntervalSeconds) * time.Second
+	config.DLQ.RetryInterval = time.Duration(config.DLQ.RetryIntervalSeconds) * time.Second
+	config.DLQ.CleanupInterval = time.Duration(config.DLQ.CleanupIntervalSeconds) * time.Second
 
 	return &config, nil
 }
@@ -263,6 +288,17 @@ func getDefaults() map[string]interface{} {
 
 		"housekeeping.enabled":         true,
 		"housekeeping.intervalseconds": 600,
+
+		"spooling.spool_path":             "/var/spool/bytefreezer-piper",
+		"spooling.upload_worker_count":    5,
+		"spooling.process_worker_count":   3,
+		"spooling.retry_interval_seconds": 30,
+
+		"dlq.enabled":                  true,
+		"dlq.retry_attempts":           4,
+		"dlq.retry_interval_seconds":   60,
+		"dlq.cleanup_interval_seconds": 3600,
+		"dlq.max_age_days":             7,
 	}
 }
 

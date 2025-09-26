@@ -14,6 +14,7 @@ import (
 type Services struct {
 	Config           *config.Config
 	PiperService     *PiperService
+	SpoolingService  *SpoolingService
 	PipelineDatabase *pipeline.PipelineDatabase
 	StateManager     *storage.PostgreSQLStateManager
 }
@@ -39,9 +40,16 @@ func NewServices(conf *config.Config) *Services {
 		log.Fatalf("Failed to create piper service: %v", err)
 	}
 
+	// Create spooling service
+	spoolingService, err := NewSpoolingService(conf, stateManager)
+	if err != nil {
+		log.Fatalf("Failed to create spooling service: %v", err)
+	}
+
 	return &Services{
 		Config:           conf,
 		PiperService:     piperService,
+		SpoolingService:  spoolingService,
 		PipelineDatabase: pipelineDatabase,
 		StateManager:     stateManager,
 	}

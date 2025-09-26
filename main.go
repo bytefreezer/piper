@@ -77,6 +77,7 @@ func Run() error {
 
 	// Create API server
 	server.HttpApi = api.NewAPI(servicesInstance, cfg)
+	server.HttpApi.SpoolingService = servicesInstance.SpoolingService
 
 	// Define housekeeping function for pipeline database updates and GeoIP updates
 	housekeepingFn := func() {
@@ -156,6 +157,11 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 		log.Fatalf("Failed to start piper service: %v", err)
 	}
 
+	// Start the spooling service
+	if err := svc.Services.SpoolingService.Start(svc.ctx); err != nil {
+		log.Fatalf("Failed to start spooling service: %v", err)
+	}
+
 	baseInterval := time.Duration(svc.Config.Housekeeping.IntervalSeconds) * time.Second
 	if baseInterval <= 0 {
 		baseInterval = 10 * time.Minute
@@ -202,6 +208,7 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeout)
 			defer shutdownCancel()
 			svc.Services.PiperService.Stop(shutdownCtx)
+			svc.Services.SpoolingService.Stop()
 			svc.cancel()
 			return
 		}

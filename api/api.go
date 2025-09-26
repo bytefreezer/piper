@@ -23,10 +23,11 @@ type Services interface {
 }
 
 type API struct {
-	Services   Services
-	ApiMetrics map[string]metric.Int64Counter
-	HttpServer *http.Server
-	Config     *config.Config
+	Services       Services
+	SpoolingService interface{} // SpoolingService interface for DLQ operations
+	ApiMetrics     map[string]metric.Int64Counter
+	HttpServer     *http.Server
+	Config         *config.Config
 	sync.RWMutex
 }
 
@@ -63,6 +64,11 @@ func (api *API) NewRouter() *web.Service {
 	// Pipeline endpoints
 	service.Get("/api/v2/pipelines", api.GetPipelineList())
 	service.Get("/api/v2/pipelines/{tenantId}/{datasetId}", api.GetPipelineDetails())
+
+	// DLQ endpoints
+	service.Get("/api/v2/dlq/stats", api.GetDLQStats())
+	service.Get("/api/v2/dlq/files", api.GetDLQFiles())
+	service.Post("/api/v2/dlq/retry/{tenantId}/{datasetId}/{filename}", api.RetryDLQFile())
 
 	// API documentation
 	service.Docs("/v2/docs", swgui.New)
