@@ -113,6 +113,14 @@ secrets:
   provider: {{ config.secrets.provider }}
   region: {{ config.secrets.region }}
 
+# Housekeeping configuration
+housekeeping:
+  enabled: {{ config.housekeeping.enabled | lower }}
+  intervalseconds: {{ config.housekeeping.intervalseconds }}
+
 # SOC configuration
 soc:
   enabled: {{ config.soc.enabled | lower }}
+
+# Development mode
+dev: {{ config.dev | lower }}

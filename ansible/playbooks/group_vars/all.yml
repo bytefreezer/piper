@@ -124,7 +124,7 @@ config:
   # Monitoring and observability
   monitoring:
     metrics_port: 9090
-    health_port: 8080
+    health_port: 8082
     log_level: "info"
     enable_tracing: false
 
@@ -133,8 +133,16 @@ config:
     provider: "aws"
     region: "us-east-1"
 
+  # Housekeeping configuration
+  housekeeping:
+    enabled: true
+    intervalseconds: 600  # 10 minutes
+
   soc:
     enabled: false
+
+  # Development mode (set to true for dev environment)
+  dev: true
 
 # Download configuration
 download:
