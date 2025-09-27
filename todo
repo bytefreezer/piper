@@ -11,6 +11,6 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-- i see you detected data as X-Amz-Meta-Detected-Format	raw
-the original data format is coded into source file name, more to it in source file meta it is clearly displays: X-Amz-Meta-Data-Type	ndjson
-we should not detect it again, the detection is what receiver does
+- please take ndjson files as they are, they are verified up the stream
+- for each line process pipeline (if disabled or empty just output it as is )
+- the other datahints need to be converted to ndjson first

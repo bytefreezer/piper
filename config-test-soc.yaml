@@ -1,7 +1,7 @@
 app:
   name: bytefreezer-piper-test
   version: 1.0.1
-  dev: true
+  log_level: debug
 
 s3_source:
   bucket_name: "intake"
@@ -51,3 +51,6 @@ failure_threshold:
 housekeeping:
   enabled: true
   intervalseconds: 30
+
+# Development mode - enables fake tenant data for testing
+dev: true

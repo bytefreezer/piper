@@ -66,13 +66,24 @@ func (p *NDJSONParser) Parse(ctx context.Context, data []byte) (map[string]inter
 	}
 
 	// Second attempt: try to fix malformed JSON by reconstructing complete objects
+	// Since proxy is fixing format upstream, be permissive with malformed documents
 	fixedJSON, err := p.reconstructJSONObject(jsonStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse NDJSON line: %w", err)
+		// Return raw data as valid object - no strict validation
+		return map[string]interface{}{
+			"message": jsonStr,
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"_source": "malformed_ndjson",
+		}, nil
 	}
 
 	if err := json.Unmarshal([]byte(fixedJSON), &result); err != nil {
-		return nil, fmt.Errorf("failed to parse reconstructed NDJSON: %w", err)
+		// Return raw data as valid object - no strict validation
+		return map[string]interface{}{
+			"message": jsonStr,
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"_source": "malformed_ndjson",
+		}, nil
 	}
 
 	return result, nil
