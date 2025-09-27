@@ -70,13 +70,25 @@ func (p *FormatProcessor) ProcessFile(ctx context.Context, job *domain.Processin
 		sourceMetadata = make(map[string]string) // Continue with empty metadata
 	}
 
-	// Detect format from filename
+	// Detect format from filename as fallback
 	formatHint, err := p.formatDetector.DetectFormat(job.SourceFile.Key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect format from filename: %w", err)
 	}
 
-	log.Infof("Detected format: %s for file %s", formatHint.Format, job.SourceFile.Key)
+	// Override format detection with metadata from receiver if available
+	if dataType, exists := sourceMetadata["data-type"]; exists && dataType != "" {
+		log.Infof("Using format from source metadata: %s (was %s from filename)", dataType, formatHint.Format)
+		formatHint.Format = dataType
+		// Check if this format is binary
+		if binaryFormats := map[string]bool{"sflow": true, "netflow": true, "ipfix": true}; binaryFormats[dataType] {
+			formatHint.Binary = true
+		} else {
+			formatHint.Binary = false
+		}
+	} else {
+		log.Infof("Using format from filename detection: %s for file %s", formatHint.Format, job.SourceFile.Key)
+	}
 
 	// Skip binary formats for now as per requirements
 	if formatHint.Binary {
