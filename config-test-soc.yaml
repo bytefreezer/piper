@@ -1,0 +1,53 @@
+app:
+  name: bytefreezer-piper-test
+  version: 1.0.1
+  dev: true
+
+s3_source:
+  bucket_name: "intake"
+  endpoint: "192.168.86.125:9000"
+  access_key: "AKIAQNXBAHUKIMJP26P6"
+  secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+  ssl: false
+  poll_interval: "30s"
+
+s3_destination:
+  bucket_name: "piper"
+  endpoint: "192.168.86.125:9000"
+  access_key: "AKIAQNXBAHUKIMJP26P6"
+  secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+  ssl: false
+
+postgresql:
+  host: "192.168.86.137"
+  port: 5432
+  database: "bytefreezer"
+  username: "bytefreezer"
+  password: "bytefreezer123"
+  ssl_mode: "disable"
+
+processing:
+  max_concurrent_jobs: 2
+  job_timeout: "5m"
+
+monitoring:
+  metrics_port: 9090
+
+# Enable SOC alerts for testing
+soc:
+  enabled: true
+  endpoint: "http://httpbin.org/post"  # Test endpoint
+  timeout: 10
+
+# Enable failure monitoring with low thresholds for testing
+failure_threshold:
+  enabled: true
+  failure_threshold: 5.0   # 5% failure rate threshold (low for testing)
+  minimum_samples: 3       # Minimum 3 samples before checking
+  window_size: 10          # Small window for testing
+  check_interval: "30s"    # Check every 30 seconds
+  cooldown_period: "2m"    # 2 minute cooldown between alerts
+
+housekeeping:
+  enabled: true
+  intervalseconds: 30

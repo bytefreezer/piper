@@ -44,7 +44,7 @@ func (p *JSONParser) Configure(config map[string]interface{}) error {
 	return nil
 }
 
-// NDJSONParser parses NDJSON (newline-delimited JSON) entries
+// NDJSONParser parses NDJSON (newline-delimited JSON) entries with robust handling of malformed files
 type NDJSONParser struct {
 	name string
 }
@@ -56,14 +56,74 @@ func NewNDJSONParser(config map[string]interface{}) (Parser, error) {
 }
 
 func (p *NDJSONParser) Parse(ctx context.Context, data []byte) (map[string]interface{}, error) {
-	// Remove trailing newline if present
-	data = []byte(strings.TrimSuffix(string(data), "\n"))
+	// For single-line parsing (called from format processor), try to reconstruct complete JSON
+	jsonStr := string(data)
 
+	// First attempt: try parsing as-is (for well-formed NDJSON)
 	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse NDJSON: %w", err)
+	if err := json.Unmarshal([]byte(jsonStr), &result); err == nil {
+		return result, nil
 	}
+
+	// Second attempt: try to fix malformed JSON by reconstructing complete objects
+	fixedJSON, err := p.reconstructJSONObject(jsonStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse NDJSON line: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(fixedJSON), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse reconstructed NDJSON: %w", err)
+	}
+
 	return result, nil
+}
+
+// reconstructJSONObject attempts to reconstruct a complete JSON object from potentially malformed input
+func (p *NDJSONParser) reconstructJSONObject(input string) (string, error) {
+	input = strings.TrimSpace(input)
+
+	// If it already looks like complete JSON, return as-is
+	if p.isCompleteJSON(input) {
+		return input, nil
+	}
+
+	// Try to fix common issues with embedded newlines
+	fixed := input
+
+	// Remove internal newlines that break JSON structure
+	// This handles cases where newlines are embedded within string values
+	fixed = strings.ReplaceAll(fixed, "\n", "\\n")
+	fixed = strings.ReplaceAll(fixed, "\r", "\\r")
+	fixed = strings.ReplaceAll(fixed, "\t", "\\t")
+
+	// Try to balance braces if missing closing brace
+	if !p.isCompleteJSON(fixed) {
+		openBraces := strings.Count(fixed, "{") - strings.Count(fixed, "}")
+		for i := 0; i < openBraces; i++ {
+			fixed += "}"
+		}
+	}
+
+	// Validate the reconstructed JSON
+	if p.isCompleteJSON(fixed) {
+		return fixed, nil
+	}
+
+	return "", fmt.Errorf("unable to reconstruct valid JSON from: %s", input[:min(50, len(input))])
+}
+
+// isCompleteJSON checks if a string contains valid, complete JSON
+func (p *NDJSONParser) isCompleteJSON(s string) bool {
+	var temp map[string]interface{}
+	return json.Unmarshal([]byte(s), &temp) == nil
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (p *NDJSONParser) Name() string {

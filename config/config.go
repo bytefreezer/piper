@@ -17,19 +17,21 @@ import (
 
 // Config represents the main configuration structure for bytefreezer-piper
 type Config struct {
-	App          App          `koanf:"app"`
-	Server       Server       `koanf:"server"`
-	S3Source     S3Source     `koanf:"s3_source"`
-	S3Dest       S3Dest       `koanf:"s3_destination"`
-	S3GeoIP      S3GeoIP      `koanf:"s3_geoip"`
-	PostgreSQL   PostgreSQL   `koanf:"postgresql"`
-	Processing   Processing   `koanf:"processing"`
-	Pipeline     Pipeline     `koanf:"pipeline"`
-	Monitoring   Monitoring   `koanf:"monitoring"`
-	Secrets      Secrets      `koanf:"secrets"`
-	Housekeeping Housekeeping `koanf:"housekeeping"`
-	DLQ          DLQ          `koanf:"dlq"`
-	Dev          bool         `koanf:"dev"`
+	App              App              `koanf:"app"`
+	Server           Server           `koanf:"server"`
+	S3Source         S3Source         `koanf:"s3_source"`
+	S3Dest           S3Dest           `koanf:"s3_destination"`
+	S3GeoIP          S3GeoIP          `koanf:"s3_geoip"`
+	PostgreSQL       PostgreSQL       `koanf:"postgresql"`
+	Processing       Processing       `koanf:"processing"`
+	Pipeline         Pipeline         `koanf:"pipeline"`
+	Monitoring       Monitoring       `koanf:"monitoring"`
+	Secrets          Secrets          `koanf:"secrets"`
+	Housekeeping     Housekeeping     `koanf:"housekeeping"`
+	DLQ              DLQ              `koanf:"dlq"`
+	SOC              SOC              `koanf:"soc"`
+	FailureThreshold FailureThreshold `koanf:"failure_threshold"`
+	Dev              bool             `koanf:"dev"`
 }
 
 // App represents application-level configuration
@@ -38,6 +40,7 @@ type App struct {
 	Version    string `koanf:"version"`
 	InstanceID string `koanf:"instance_id"`
 	LogLevel   string `koanf:"log_level"`
+	Dev        bool   `koanf:"dev"`
 }
 
 // Server represents server configuration following receiver pattern
@@ -139,6 +142,23 @@ type DLQ struct {
 	MaxAgeDays             int           `koanf:"max_age_days"`
 	RetryInterval          time.Duration // Calculated from RetryIntervalSeconds
 	CleanupInterval        time.Duration // Calculated from CleanupIntervalSeconds
+}
+
+// SOC represents SOC alerting configuration
+type SOC struct {
+	Enabled  bool   `koanf:"enabled"`
+	Endpoint string `koanf:"endpoint"`
+	Timeout  int    `koanf:"timeout"`
+}
+
+// FailureThreshold represents failure monitoring configuration
+type FailureThreshold struct {
+	Enabled          bool    `koanf:"enabled"`
+	FailureThreshold float64 `koanf:"failure_threshold"`
+	MinimumSamples   int     `koanf:"minimum_samples"`
+	WindowSize       int     `koanf:"window_size"`
+	CheckInterval    string  `koanf:"check_interval"`
+	CooldownPeriod   string  `koanf:"cooldown_period"`
 }
 
 // LoadConfig loads configuration from file and environment variables
@@ -285,6 +305,19 @@ func getDefaults() map[string]interface{} {
 		"dlq.retry_interval_seconds":   60,
 		"dlq.cleanup_interval_seconds": 3600,
 		"dlq.max_age_days":             7,
+
+		"soc.enabled":  false,
+		"soc.endpoint": "http://bytefreezer-soc:8080/api/v2/alerts",
+		"soc.timeout":  30,
+
+		"failure_threshold.enabled":           false,
+		"failure_threshold.failure_threshold": 20.0,
+		"failure_threshold.minimum_samples":   10,
+		"failure_threshold.window_size":       100,
+		"failure_threshold.check_interval":    "5m",
+		"failure_threshold.cooldown_period":   "30m",
+
+		"app.dev": false,
 	}
 }
 

@@ -3,9 +3,11 @@ package services
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -99,6 +101,17 @@ func (p *FormatProcessor) ProcessFile(ctx context.Context, job *domain.Processin
 	sourceData, err := p.s3Client.GetSourceObject(ctx, job.SourceFile.Key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download source file: %w", err)
+	}
+
+	// Decompress source file if it's gzipped
+	log.Debugf("Checking compression: formatHint.Extension='%s', filename ends with .gz=%t", formatHint.Extension, strings.HasSuffix(job.SourceFile.Key, ".gz"))
+	if formatHint.Extension == "gz" || strings.HasSuffix(job.SourceFile.Key, ".gz") {
+		log.Infof("Decompressing gzipped file %s (source size: %d bytes)", job.SourceFile.Key, len(sourceData))
+		sourceData, err = p.decompressGzip(sourceData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decompress gzipped source file: %w", err)
+		}
+		log.Infof("Decompressed gzipped file, decompressed size: %d bytes", len(sourceData))
 	}
 
 	// Get pipeline configuration for this tenant/dataset
@@ -197,6 +210,11 @@ func (p *FormatProcessor) processDataWithFormat(ctx context.Context, formatHint 
 	// Special handling for CSV/TSV - extract headers first
 	if formatHint.Format == "csv" || formatHint.Format == "tsv" {
 		return p.processCSVData(ctx, parser, data, stats, pipelineConfig, formatHint)
+	}
+
+	// Special handling for NDJSON - reconstruct complete JSON objects from malformed files
+	if formatHint.Format == "ndjson" || formatHint.Format == "json" {
+		return p.processNDJSONData(ctx, parser, data, stats, pipelineConfig, formatHint)
 	}
 
 	// Process line by line for other formats
@@ -357,6 +375,130 @@ func (p *FormatProcessor) processCSVData(ctx context.Context, parser parsers.Par
 	return processedData, stats, nil
 }
 
+// processNDJSONData handles NDJSON data with robust reconstruction of malformed objects
+func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.Parser, data []byte, stats *domain.ProcessingStats, pipelineConfig *domain.PipelineConfiguration, formatHint *parsers.FormatHint) ([]byte, *domain.ProcessingStats, error) {
+	startTime := time.Now()
+
+	// Convert to string for processing
+	input := string(data)
+
+	// Fix malformed NDJSON by preserving only document boundary newlines
+	fixedInput := p.fixMalformedNDJSON(input)
+
+	// Split into individual JSON objects
+	jsonObjects := p.extractJSONObjects(fixedInput)
+
+	log.Infof("Extracted %d JSON objects from NDJSON input", len(jsonObjects))
+
+	var processedLines []string
+	lineNumber := int64(0)
+
+	for _, jsonObj := range jsonObjects {
+		if strings.TrimSpace(jsonObj) == "" {
+			continue
+		}
+
+		lineNumber++
+		stats.InputRecords++
+
+		// Parse the JSON object
+		record, err := parser.Parse(ctx, []byte(jsonObj))
+		if err != nil {
+			log.Debugf("Failed to parse JSON object %d: %v", lineNumber, err)
+			stats.ErrorRecords++
+			continue
+		}
+
+		// Add metadata
+		record["_source_format"] = formatHint.Format
+		record["_tenant_id"] = formatHint.TenantID
+		record["_dataset_id"] = formatHint.DatasetID
+		record["_processed_at"] = time.Now().UTC().Format(time.RFC3339)
+		record["_line_number"] = lineNumber
+
+		// Apply filters if enabled
+		if pipelineConfig.Enabled {
+			filteredRecord, skip, err := p.applyFilters(ctx, record, formatHint, lineNumber, pipelineConfig)
+			if err != nil {
+				log.Warnf("Filter processing failed for JSON object %d: %v", lineNumber, err)
+				stats.ErrorRecords++
+				continue
+			}
+
+			if skip {
+				stats.FilteredRecords++
+				continue
+			}
+
+			record = filteredRecord
+		}
+
+		// Convert to NDJSON
+		processedJSON, err := json.Marshal(record)
+		if err != nil {
+			log.Warnf("Failed to marshal processed record: %v", err)
+			stats.ErrorRecords++
+			continue
+		}
+
+		processedLines = append(processedLines, string(processedJSON))
+		stats.OutputRecords++
+	}
+
+	// Join processed lines as NDJSON
+	processedData := []byte(strings.Join(processedLines, "\n"))
+	if len(processedLines) > 0 {
+		processedData = append(processedData, '\n') // Add final newline
+	}
+
+	stats.OutputSize = int64(len(processedData))
+	stats.ProcessingTime = time.Since(startTime)
+
+	log.Infof("Processed %d/%d JSON objects successfully, dropped %d failed objects",
+		stats.OutputRecords, stats.InputRecords, stats.ErrorRecords)
+
+	return processedData, stats, nil
+}
+
+// fixMalformedNDJSON removes all newlines except those between JSON document boundaries (}...{)
+func (p *FormatProcessor) fixMalformedNDJSON(input string) string {
+	// Remove all newlines first
+	cleaned := strings.ReplaceAll(input, "\n", "")
+	cleaned = strings.ReplaceAll(cleaned, "\r", "")
+
+	// Now add back newlines only at document boundaries: }{
+	// Use a regex to find }{ patterns and insert newlines
+	result := ""
+	i := 0
+	for i < len(cleaned) {
+		if i < len(cleaned)-1 && cleaned[i] == '}' && cleaned[i+1] == '{' {
+			result += "}\n{"
+			i += 2
+		} else {
+			result += string(cleaned[i])
+			i++
+		}
+	}
+
+	return result
+}
+
+// extractJSONObjects splits the fixed NDJSON into individual JSON objects
+func (p *FormatProcessor) extractJSONObjects(input string) []string {
+	// Split by newlines to get individual JSON objects
+	lines := strings.Split(input, "\n")
+
+	var objects []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			objects = append(objects, trimmed)
+		}
+	}
+
+	return objects
+}
+
 // generateOutputKey generates output key with proper NDJSON extension
 func (p *FormatProcessor) generateOutputKey(sourceKey string, formatHint *parsers.FormatHint) string {
 	// Remove compression extension if present
@@ -459,4 +601,20 @@ func (p *FormatProcessor) createDefaultPipelineConfig(tenantID, datasetID string
 			"compress_output":       true,
 		},
 	}
+}
+
+// decompressGzip decompresses gzipped data
+func (p *FormatProcessor) decompressGzip(data []byte) ([]byte, error) {
+	reader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer reader.Close()
+
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decompress gzip data: %w", err)
+	}
+
+	return decompressed, nil
 }

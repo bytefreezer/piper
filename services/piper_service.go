@@ -8,6 +8,7 @@ import (
 
 	"github.com/n0needt0/go-goodies/log"
 
+	"github.com/n0needt0/bytefreezer-piper/alerts"
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/domain"
 	"github.com/n0needt0/bytefreezer-piper/storage"
@@ -21,6 +22,8 @@ type PiperService struct {
 	discoveryManager *SimpleDiscoveryManager
 	processor        *FormatProcessor
 	configManager    *ConfigManager
+	socClient        *alerts.SOCAlertClient
+	failureMonitor   *alerts.FailureMonitor
 	running          bool
 	mutex            sync.RWMutex
 	workers          chan struct{}
@@ -55,6 +58,32 @@ func NewPiperService(cfg *config.Config) (*PiperService, error) {
 	// Create config manager with database support
 	configManager := NewConfigManager(cfg, stateManager)
 
+	// Create SOC alert client
+	socConfig := alerts.AlertClientConfig{
+		SOC: alerts.SOCConfig{
+			Enabled:  cfg.SOC.Enabled,
+			Endpoint: cfg.SOC.Endpoint,
+			Timeout:  cfg.SOC.Timeout,
+		},
+		App: alerts.AppConfig{
+			Name:    cfg.App.Name,
+			Version: cfg.App.Version,
+		},
+		Dev: cfg.App.Dev,
+	}
+	socClient := alerts.NewSOCAlertClient(socConfig)
+
+	// Create failure monitor
+	failureConfig := alerts.FailureThresholdConfig{
+		Enabled:          cfg.FailureThreshold.Enabled,
+		FailureThreshold: cfg.FailureThreshold.FailureThreshold,
+		MinimumSamples:   cfg.FailureThreshold.MinimumSamples,
+		WindowSize:       cfg.FailureThreshold.WindowSize,
+		CheckInterval:    cfg.FailureThreshold.CheckInterval,
+		CooldownPeriod:   cfg.FailureThreshold.CooldownPeriod,
+	}
+	failureMonitor := alerts.NewFailureMonitor(failureConfig, socClient)
+
 	service := &PiperService{
 		cfg:              cfg,
 		s3Client:         s3Client,
@@ -62,6 +91,8 @@ func NewPiperService(cfg *config.Config) (*PiperService, error) {
 		discoveryManager: discoveryManager,
 		processor:        processor,
 		configManager:    configManager,
+		socClient:        socClient,
+		failureMonitor:   failureMonitor,
 		workers:          make(chan struct{}, cfg.Processing.MaxConcurrentJobs),
 		jobQueue:         make(chan *domain.ProcessingJob, cfg.Processing.BufferSize),
 		stopChan:         make(chan struct{}),
@@ -82,6 +113,16 @@ func (s *PiperService) Start(ctx context.Context) error {
 
 	log.Infof("Starting ByteFreezer Piper service with format processing")
 	log.Infof("Max concurrent jobs: %d", s.cfg.Processing.MaxConcurrentJobs)
+
+	// Start failure monitoring
+	if err := s.failureMonitor.Start(); err != nil {
+		log.Errorf("Failed to start failure monitor: %v", err)
+	}
+
+	// Send service start alert
+	if err := s.socClient.SendServiceStartAlert(); err != nil {
+		log.Warnf("Failed to send service start alert: %v", err)
+	}
 
 	// Start discovery goroutine
 	s.wg.Add(1)
@@ -118,6 +159,9 @@ func (s *PiperService) Stop(ctx context.Context) error {
 	s.mutex.Unlock()
 
 	log.Infof("Stopping ByteFreezer Piper service...")
+
+	// Stop failure monitoring
+	s.failureMonitor.Stop()
 
 	// Stop API server first
 
@@ -251,6 +295,9 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 	if err != nil {
 		log.Errorf("Worker %d failed to process job %s: %v", workerID, job.JobID, err)
 
+		// Record failure in failure monitor
+		s.failureMonitor.RecordProcessingResult(job.TenantID, job.DatasetID, false)
+
 		// Update job status to failed
 		if updateErr := s.stateManager.UpdateJobStatus(jobCtx, job.JobID, domain.JobStatusFailed); updateErr != nil {
 			log.Errorf("Failed to update job status to failed: %v", updateErr)
@@ -263,6 +310,9 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 
 		return
 	}
+
+	// Record success in failure monitor
+	s.failureMonitor.RecordProcessingResult(job.TenantID, job.DatasetID, true)
 
 	// Update job status to completed
 	if err := s.stateManager.UpdateJobStatus(jobCtx, job.JobID, domain.JobStatusCompleted); err != nil {
