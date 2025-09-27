@@ -260,6 +260,14 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 		log.Errorf("Failed to update job status to completed: %v", err)
 	}
 
+	// Delete source file from S3 after successful processing
+	if err := s.s3Client.DeleteSourceObject(jobCtx, job.SourceFile.Key); err != nil {
+		log.Errorf("Failed to delete source file %s after successful processing: %v", job.SourceFile.Key, err)
+		// Don't fail the job if source deletion fails - processing was successful
+	} else {
+		log.Infof("Successfully deleted source file %s after processing", job.SourceFile.Key)
+	}
+
 	// Release file lock
 	if err := s.stateManager.ReleaseFileLock(jobCtx, job.SourceFile.Key, job.ProcessorID); err != nil {
 		log.Errorf("Failed to release file lock: %v", err)

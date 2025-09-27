@@ -70,11 +70,12 @@ func (sdm *SimpleDiscoveryManager) DiscoverJobs(ctx context.Context) ([]*domain.
 				continue
 			}
 
-			// Check if we can acquire a lock on this file
+			// Check if we can acquire a lock on this file with TTL (2x job timeout)
 			processorID := fmt.Sprintf("piper-%s", sdm.config.App.InstanceID)
 			jobID := uuid.New().String()
+			lockTTL := 2 * sdm.config.Processing.JobTimeout
 
-			if err := sdm.stateManager.AcquireFileLock(ctx, fileKey, "piper", processorID, jobID); err != nil {
+			if err := sdm.stateManager.AcquireFileLockWithTTL(ctx, fileKey, "piper", processorID, jobID, lockTTL); err != nil {
 				if err == domain.ErrFileLocked {
 					log.Debugf("File %s is already locked", fileKey)
 					continue

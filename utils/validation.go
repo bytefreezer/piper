@@ -76,10 +76,6 @@ func ParseTenantDatasetFromKey(key string) (tenant, dataset, filename string, er
 	return tenant, dataset, filename, nil
 }
 
-// BuildSpoolPath builds a spool directory path for a tenant/dataset
-func BuildSpoolPath(basePath, tenant, dataset string, stage string) string {
-	return filepath.Join(basePath, tenant, dataset, stage)
-}
 
 // BuildMalformedPath builds a path for quarantining malformed files
 func BuildMalformedPath(basePath string) string {
