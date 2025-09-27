@@ -156,6 +156,12 @@ func (s *PiperService) discoveryLoop(ctx context.Context) {
 
 	log.Infof("Starting discovery loop with interval: %v", s.cfg.S3Source.PollInterval)
 
+	// Run initial discovery immediately
+	log.Debugf("Running initial discovery on startup...")
+	if err := s.discoverAndQueueJobs(ctx); err != nil {
+		log.Errorf("Error during initial discovery: %v", err)
+	}
+
 	for {
 		select {
 		case <-s.stopChan:
@@ -174,10 +180,13 @@ func (s *PiperService) discoveryLoop(ctx context.Context) {
 
 // discoverAndQueueJobs discovers new files and queues them for processing
 func (s *PiperService) discoverAndQueueJobs(ctx context.Context) error {
+	log.Debugf("Starting job discovery...")
 	jobs, err := s.discoveryManager.DiscoverJobs(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to discover jobs: %w", err)
 	}
+
+	log.Infof("Discovery found %d jobs to process", len(jobs))
 
 	for _, job := range jobs {
 		select {

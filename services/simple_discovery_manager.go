@@ -363,9 +363,10 @@ func (sdm *SimpleDiscoveryManager) shouldProcessFile(fileKey, tenantID string, d
 		}
 	}
 
-	// Only process .ndjson.gz files
-	if !strings.HasSuffix(metadata.Filename, ".ndjson.gz") {
-		log.Debugf("Skipping non-NDJSON file: %s", metadata.Filename)
+	// Process all supported formats - they will be converted to NDJSON during processing
+	// Skip already processed files (*.ndjson.gz in the piper bucket indicates processed files)
+	if strings.HasSuffix(metadata.Filename, ".ndjson.gz") {
+		log.Debugf("Skipping already processed NDJSON file: %s", metadata.Filename)
 		return false
 	}
 

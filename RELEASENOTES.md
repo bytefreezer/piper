@@ -12,6 +12,9 @@
 - **Fixed File Discovery**: Fixed S3 path format mismatch that prevented files from being discovered for processing
 - **Fixed Database Schema**: Fixed PostgreSQL string slice conversion error in job record creation
 - **Improved Path Parsing**: Enhanced S3 file path parsing to handle multiple file naming formats
+- **Fixed Discovery Loop**: Fixed missing initial discovery run on startup - discovery now starts immediately
+- **Fixed File Format Filter**: Fixed discovery manager to process all file formats instead of only .ndjson.gz files
+- **Enhanced Discovery Logging**: Added detailed logging to discovery process for better debugging
 
 ## Version 1.0.0 - 2025-09-24
 
