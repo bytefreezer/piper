@@ -222,7 +222,7 @@ func (sc *S3Client) UploadProcessedFile(ctx context.Context, key string, body io
 		return fmt.Errorf("failed to upload processed file %s to bucket %s: %w", fullKey, sc.destBucket, err)
 	}
 
-	log.Debugf("Successfully uploaded processed file %s to destination bucket %s", fullKey, sc.destBucket)
+	log.Debugf("Successfully uploaded processed file %s to destination bucket %s with %d metadata fields", fullKey, sc.destBucket, len(metadata))
 	return nil
 }
 
@@ -355,6 +355,42 @@ func (sc *S3Client) PutDestinationObject(ctx context.Context, key string, data [
 
 	log.Debugf("Successfully uploaded %d bytes to %s", len(data), key)
 	return nil
+}
+
+// GetSourceObjectMetadata retrieves metadata from a source object
+func (sc *S3Client) GetSourceObjectMetadata(ctx context.Context, key string) (map[string]string, error) {
+	log.Debugf("Getting metadata for source object: %s", key)
+
+	result, err := sc.sourceClient.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(sc.sourceBucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metadata for object %s from source bucket %s: %w", key, sc.sourceBucket, err)
+	}
+
+	// Convert AWS metadata to map[string]string
+	metadata := make(map[string]string)
+	for key, value := range result.Metadata {
+		metadata[key] = value
+	}
+
+	// Add standard object attributes as metadata
+	if result.ContentLength != nil {
+		metadata["source-content-length"] = fmt.Sprintf("%d", *result.ContentLength)
+	}
+	if result.ContentType != nil {
+		metadata["source-content-type"] = *result.ContentType
+	}
+	if result.ETag != nil {
+		metadata["source-etag"] = *result.ETag
+	}
+	if result.LastModified != nil {
+		metadata["source-last-modified"] = result.LastModified.Format(time.RFC3339)
+	}
+
+	log.Debugf("Retrieved %d metadata fields for source object: %s", len(metadata), key)
+	return metadata, nil
 }
 
 // DeleteSourceObject deletes an object from the source bucket

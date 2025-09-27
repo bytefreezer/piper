@@ -8,6 +8,17 @@
   - Migration: Convert JSON files to NDJSON format (one JSON object per line)
   - `json_parse` filter also removed from pipeline filters
 
+### New Features
+- **Source Metadata Preservation**: Now preserves all source file metadata from S3 and copies it to processed files
+  - All source metadata preserved with `source-` prefix to avoid conflicts
+  - Includes source file size, content type, ETag, last modified timestamp, and custom metadata
+  - Source file path preserved as `source-file-key` metadata
+- **Processing Time Tracking**: Added detailed processing time metrics to processed file metadata
+  - `processing-time-ms`: Total processing time in milliseconds
+  - `processing-started-at`: ISO timestamp when processing began
+  - Processing statistics: input/output/filtered/error record counts
+  - Processor identification: instance ID and type for debugging
+
 ### Bug Fixes
 - **Fixed File Discovery**: Fixed S3 path format mismatch that prevented files from being discovered for processing
 - **Fixed Database Schema**: Fixed PostgreSQL string slice conversion error in job record creation

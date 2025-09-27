@@ -63,6 +63,13 @@ func (p *FormatProcessor) ProcessFile(ctx context.Context, job *domain.Processin
 	log.Infof("Processing file %s with format detection for tenant %s, dataset %s",
 		job.SourceFile.Key, job.TenantID, job.DatasetID)
 
+	// Get source file metadata before processing
+	sourceMetadata, err := p.s3Client.GetSourceObjectMetadata(ctx, job.SourceFile.Key)
+	if err != nil {
+		log.Warnf("Failed to get source metadata for %s: %v", job.SourceFile.Key, err)
+		sourceMetadata = make(map[string]string) // Continue with empty metadata
+	}
+
 	// Detect format from filename
 	formatHint, err := p.formatDetector.DetectFormat(job.SourceFile.Key)
 	if err != nil {
@@ -98,8 +105,35 @@ func (p *FormatProcessor) ProcessFile(ctx context.Context, job *domain.Processin
 	// Generate output file key (change extension to indicate NDJSON)
 	outputKey := p.generateOutputKey(job.SourceFile.Key, formatHint)
 
-	// Upload processed data
-	if err := p.s3Client.PutDestinationObject(ctx, outputKey, processedData); err != nil {
+	// Calculate processing time and prepare metadata
+	processingTime := time.Since(startTime)
+	processingMetadata := make(map[string]string)
+
+	// Copy source metadata with "source-" prefix to avoid conflicts
+	for key, value := range sourceMetadata {
+		if !strings.HasPrefix(key, "source-") {
+			processingMetadata["source-"+key] = value
+		} else {
+			processingMetadata[key] = value
+		}
+	}
+
+	// Add processing metadata
+	processingMetadata["source-file-key"] = job.SourceFile.Key
+	processingMetadata["detected-format"] = formatHint.Format
+	processingMetadata["processing-time-ms"] = fmt.Sprintf("%d", processingTime.Milliseconds())
+	processingMetadata["processing-started-at"] = startTime.Format(time.RFC3339)
+	processingMetadata["tenant-id"] = job.TenantID
+	processingMetadata["dataset-id"] = job.DatasetID
+	processingMetadata["processor-id"] = job.ProcessorID
+	processingMetadata["input-records"] = fmt.Sprintf("%d", stats.InputRecords)
+	processingMetadata["output-records"] = fmt.Sprintf("%d", stats.OutputRecords)
+	processingMetadata["filtered-records"] = fmt.Sprintf("%d", stats.FilteredRecords)
+	processingMetadata["error-records"] = fmt.Sprintf("%d", stats.ErrorRecords)
+
+	// Upload processed data with metadata
+	processedReader := strings.NewReader(string(processedData))
+	if err := p.s3Client.UploadProcessedFile(ctx, outputKey, processedReader, processingMetadata); err != nil {
 		return nil, fmt.Errorf("failed to upload processed file: %w", err)
 	}
 
@@ -116,9 +150,9 @@ func (p *FormatProcessor) ProcessFile(ctx context.Context, job *domain.Processin
 		PipelineUsed: fmt.Sprintf("format-processor:%s", formatHint.Format),
 	}
 
-	processingTime := time.Since(startTime)
-	log.Infof("Successfully processed file %s (%s format) in %v, processed %d records",
-		job.SourceFile.Key, formatHint.Format, processingTime, stats.OutputRecords)
+	finalProcessingTime := time.Since(startTime)
+	log.Infof("Successfully processed file %s (%s format) in %v, processed %d records, metadata fields: %d",
+		job.SourceFile.Key, formatHint.Format, finalProcessingTime, stats.OutputRecords, len(processingMetadata))
 
 	return result, nil
 }
@@ -319,23 +353,30 @@ func (p *FormatProcessor) generateOutputKey(sourceKey string, formatHint *parser
 		outputKey = strings.TrimSuffix(outputKey, "."+formatHint.Extension)
 	}
 
-	// Replace source format hint with ndjson indicator
-	if strings.Contains(outputKey, "--"+formatHint.Format) {
-		outputKey = strings.Replace(outputKey, "--"+formatHint.Format, "--ndjson", 1)
-	} else {
-		// Add ndjson suffix if no hint was present
-		if strings.Contains(outputKey, ".") {
-			parts := strings.Split(outputKey, ".")
-			parts[len(parts)-2] = parts[len(parts)-2] + "--ndjson"
-			outputKey = strings.Join(parts, ".")
+	// Only add ndjson suffix if not already present to avoid duplication
+	if !strings.Contains(outputKey, "--ndjson") {
+		// Replace source format hint with ndjson indicator if format hint exists
+		if strings.Contains(outputKey, "--"+formatHint.Format) && formatHint.Format != "ndjson" {
+			outputKey = strings.Replace(outputKey, "--"+formatHint.Format, "--ndjson", 1)
 		} else {
-			outputKey = outputKey + "--ndjson"
+			// Add ndjson suffix if no hint was present
+			if strings.Contains(outputKey, ".") {
+				parts := strings.Split(outputKey, ".")
+				parts[len(parts)-2] = parts[len(parts)-2] + "--ndjson"
+				outputKey = strings.Join(parts, ".")
+			} else {
+				outputKey = outputKey + "--ndjson"
+			}
 		}
 	}
 
-	// Ensure .gz extension for output (compressed NDJSON)
-	if !strings.HasSuffix(outputKey, ".gz") {
-		outputKey += ".gz"
+	// Ensure .ndjson.gz extension for output (compressed NDJSON)
+	if !strings.HasSuffix(outputKey, ".ndjson.gz") {
+		if strings.HasSuffix(outputKey, ".gz") {
+			outputKey = strings.TrimSuffix(outputKey, ".gz") + ".ndjson.gz"
+		} else {
+			outputKey += ".ndjson.gz"
+		}
 	}
 
 	return outputKey

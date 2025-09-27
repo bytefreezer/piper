@@ -11,19 +11,9 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-- currently we have both json and ndjson.
-we only need ndjson, as we do not process json arrays, and single json document is a corner case of ndjson. so please remove json plugin, leave ndjson.
-UNLESS you have reservations.
+- i see you modified file name by adding ndjson.
 
-ndjson:
-      - type: parse
-        config:
-          parser_name: json-logs
-          source_field: message
-          on_parse_failure: pass_through
-    json:
-      - type: parse
-        config:
-          parser_name: json-logs
-          source_field: message
-          on_parse_failure: pass_through
+in intake: customer-1--ebpf-data--1758995441570740087--ndjson.gz
+after piper: customer-1--ebpf-data--1758995441570740087--ndjson--ndjson.gz
+
+are you trying to preserve original file extension and adding ndjson because it is converted to ndjson? or this is just an error
