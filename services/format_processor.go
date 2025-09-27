@@ -353,30 +353,18 @@ func (p *FormatProcessor) generateOutputKey(sourceKey string, formatHint *parser
 		outputKey = strings.TrimSuffix(outputKey, "."+formatHint.Extension)
 	}
 
-	// Only add ndjson suffix if not already present to avoid duplication
-	if !strings.Contains(outputKey, "--ndjson") {
-		// Replace source format hint with ndjson indicator if format hint exists
-		if strings.Contains(outputKey, "--"+formatHint.Format) && formatHint.Format != "ndjson" {
-			outputKey = strings.Replace(outputKey, "--"+formatHint.Format, "--ndjson", 1)
-		} else {
-			// Add ndjson suffix if no hint was present
-			if strings.Contains(outputKey, ".") {
-				parts := strings.Split(outputKey, ".")
-				parts[len(parts)-2] = parts[len(parts)-2] + "--ndjson"
-				outputKey = strings.Join(parts, ".")
-			} else {
-				outputKey = outputKey + "--ndjson"
-			}
-		}
+	// Always append --ndjson to show output format, preserving input format hint
+	if strings.Contains(outputKey, ".") {
+		parts := strings.Split(outputKey, ".")
+		parts[len(parts)-2] = parts[len(parts)-2] + "--ndjson"
+		outputKey = strings.Join(parts, ".")
+	} else {
+		outputKey = outputKey + "--ndjson"
 	}
 
-	// Ensure .ndjson.gz extension for output (compressed NDJSON)
-	if !strings.HasSuffix(outputKey, ".ndjson.gz") {
-		if strings.HasSuffix(outputKey, ".gz") {
-			outputKey = strings.TrimSuffix(outputKey, ".gz") + ".ndjson.gz"
-		} else {
-			outputKey += ".ndjson.gz"
-		}
+	// Ensure .gz extension for output (compressed NDJSON)
+	if !strings.HasSuffix(outputKey, ".gz") {
+		outputKey += ".gz"
 	}
 
 	return outputKey

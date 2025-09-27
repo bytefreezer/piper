@@ -11,9 +11,6 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-- i see you modified file name by adding ndjson.
-
-in intake: customer-1--ebpf-data--1758995441570740087--ndjson.gz
-after piper: customer-1--ebpf-data--1758995441570740087--ndjson--ndjson.gz
-
-are you trying to preserve original file extension and adding ndjson because it is converted to ndjson? or this is just an error
+- i see you detected data as X-Amz-Meta-Detected-Format	raw
+the original data format is coded into source file name, more to it in source file meta it is clearly displays: X-Amz-Meta-Data-Type	ndjson
+we should not detect it again, the detection is what receiver does
