@@ -281,7 +281,7 @@ func (sm *PostgreSQLStateManager) CreateJobRecord(ctx context.Context, job *doma
 	_, err := sm.db.ExecContext(ctx, insertSQL,
 		job.JobID, job.TenantID, job.DatasetID, job.ProcessorType, job.ProcessorID, string(job.Status),
 		job.Priority, job.RetryCount, job.MaxRetries, job.CreatedAt, job.UpdatedAt, jobTTL,
-		job.SourceFiles, job.FileSize)
+		pq.Array(job.SourceFiles), job.FileSize)
 
 	if err != nil {
 		return fmt.Errorf("failed to create job record: %w", err)

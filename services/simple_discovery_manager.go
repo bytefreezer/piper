@@ -315,8 +315,8 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 func (sdm *SimpleDiscoveryManager) discoverFilesForTenant(ctx context.Context, tenantID string, datasets []string) ([]string, error) {
 	var allFiles []string
 
-	// Build prefix for tenant
-	tenantPrefix := fmt.Sprintf("tenant=%s/", tenantID)
+	// Build prefix for tenant (using actual S3 path format)
+	tenantPrefix := fmt.Sprintf("%s/", tenantID)
 
 	// List objects with tenant prefix
 	files, err := sdm.s3Client.ListSourceObjects(ctx, tenantPrefix)

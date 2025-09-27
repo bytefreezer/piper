@@ -124,57 +124,74 @@ func (scp *SimpleCopyProcessor) generateDestinationKey(sourceKey string, metadat
 	return destKey
 }
 
-// parseS3Key parses an S3 key to extract metadata (reused from existing code)
+// parseS3Key parses an S3 key to extract metadata (supports multiple formats)
 func parseS3Key(s3Key string) (*domain.S3FileMetadata, error) {
-	// Example key: raw/tenant=customer1/dataset=logs/2024/01/15/file.ndjson.gz
-	parts := strings.Split(s3Key, "/")
-	if len(parts) < 3 {
-		return nil, fmt.Errorf("invalid S3 key format: %s", s3Key)
-	}
-
 	metadata := &domain.S3FileMetadata{}
 
-	for _, part := range parts {
-		if strings.HasPrefix(part, "tenant=") {
-			metadata.TenantID = strings.TrimPrefix(part, "tenant=")
-		} else if strings.HasPrefix(part, "dataset=") {
-			metadata.DatasetID = strings.TrimPrefix(part, "dataset=")
-		} else if strings.HasPrefix(part, "year=") {
-			metadata.Year = strings.TrimPrefix(part, "year=")
-		} else if strings.HasPrefix(part, "month=") {
-			metadata.Month = strings.TrimPrefix(part, "month=")
-		} else if strings.HasPrefix(part, "day=") {
-			metadata.Day = strings.TrimPrefix(part, "day=")
-		} else if strings.HasPrefix(part, "hour=") {
-			metadata.Hour = strings.TrimPrefix(part, "hour=")
+	// Check for new format: customer-1--ebpf-data--timestamp--ndjson.gz
+	if strings.Contains(s3Key, "--") {
+		// Handle filename format: customer-1--ebpf-data--timestamp--ndjson.gz
+		lastSlash := strings.LastIndex(s3Key, "/")
+		filename := s3Key
+		if lastSlash != -1 {
+			filename = s3Key[lastSlash+1:]
 		}
-	}
 
-	// Extract filename from the last part
-	if len(parts) > 0 {
-		metadata.Filename = parts[len(parts)-1]
+		parts := strings.Split(filename, "--")
+		if len(parts) >= 2 {
+			metadata.TenantID = parts[0]
+			metadata.DatasetID = parts[1]
+			metadata.Filename = filename
+		}
+
+		// Extract path components for tenant/dataset structure
+		pathParts := strings.Split(s3Key, "/")
+		if len(pathParts) >= 2 {
+			metadata.TenantID = pathParts[0]
+			metadata.DatasetID = pathParts[1]
+		}
+	} else {
+		// Handle traditional format: tenant=customer1/dataset=logs/file.ndjson.gz or customer-1/ebpf-data/file.ndjson.gz
+		parts := strings.Split(s3Key, "/")
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("invalid S3 key format: %s", s3Key)
+		}
+
+		// Check for key=value format
+		hasKeyValueFormat := false
+		for _, part := range parts {
+			if strings.HasPrefix(part, "tenant=") {
+				metadata.TenantID = strings.TrimPrefix(part, "tenant=")
+				hasKeyValueFormat = true
+			} else if strings.HasPrefix(part, "dataset=") {
+				metadata.DatasetID = strings.TrimPrefix(part, "dataset=")
+				hasKeyValueFormat = true
+			} else if strings.HasPrefix(part, "year=") {
+				metadata.Year = strings.TrimPrefix(part, "year=")
+			} else if strings.HasPrefix(part, "month=") {
+				metadata.Month = strings.TrimPrefix(part, "month=")
+			} else if strings.HasPrefix(part, "day=") {
+				metadata.Day = strings.TrimPrefix(part, "day=")
+			} else if strings.HasPrefix(part, "hour=") {
+				metadata.Hour = strings.TrimPrefix(part, "hour=")
+			}
+		}
+
+		// If no key=value format, assume simple path format: tenant/dataset/file
+		if !hasKeyValueFormat && len(parts) >= 2 {
+			metadata.TenantID = parts[0]
+			metadata.DatasetID = parts[1]
+		}
+
+		// Extract filename from the last part
+		if len(parts) > 0 {
+			metadata.Filename = parts[len(parts)-1]
+		}
 	}
 
 	// Validate required fields
 	if metadata.TenantID == "" || metadata.DatasetID == "" {
 		return nil, fmt.Errorf("missing required tenant_id or dataset_id in S3 key: %s", s3Key)
-	}
-
-	// Try to parse year/month/day from path structure if not found in key-value format
-	if metadata.Year == "" && len(parts) >= 6 {
-		// Look for numeric date parts: raw/tenant=x/dataset=y/2024/01/15/file
-		for i, part := range parts {
-			if len(part) == 4 && isNumeric(part) && metadata.Year == "" {
-				metadata.Year = part
-				if i+1 < len(parts) && len(parts[i+1]) == 2 && isNumeric(parts[i+1]) {
-					metadata.Month = parts[i+1]
-				}
-				if i+2 < len(parts) && len(parts[i+2]) == 2 && isNumeric(parts[i+2]) {
-					metadata.Day = parts[i+2]
-				}
-				break
-			}
-		}
 	}
 
 	return metadata, nil

@@ -77,10 +77,10 @@ func (r *DefaultFilterRegistry) registerBuiltInFilters() {
 		return NewRenameFieldFilter(config)
 	})
 
-	// JSON parse filter
-	r.Register("json_parse", func(config map[string]interface{}) (Filter, error) {
-		return NewJSONParseFilter(config)
-	})
+	// JSON parse filter - removed, only NDJSON supported
+	// r.Register("json_parse", func(config map[string]interface{}) (Filter, error) {
+	//	return NewJSONParseFilter(config)
+	// })
 
 	// Regex replace filter
 	r.Register("regex_replace", func(config map[string]interface{}) (Filter, error) {

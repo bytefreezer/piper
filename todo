@@ -11,10 +11,19 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-- if pipeline processing is disabled, it means files are copied from s3 src to s3 destination as is, nothing is done them.
-really this flag is only for testing at the moment
+- currently we have both json and ndjson.
+we only need ndjson, as we do not process json arrays, and single json document is a corner case of ndjson. so please remove json plugin, leave ndjson.
+UNLESS you have reservations.
 
-- i want you to process files like so
-s3->if attempt to lock file succeds, read to -> piper_service->s3 (unlock on ok or fail, on ok remove source file from s3)
-
-remove all the spooling services, as i think it be much cleaner to use all or nothing approach. worst case we reprocess whole file in different node.
+ndjson:
+      - type: parse
+        config:
+          parser_name: json-logs
+          source_field: message
+          on_parse_failure: pass_through
+    json:
+      - type: parse
+        config:
+          parser_name: json-logs
+          source_field: message
+          on_parse_failure: pass_through

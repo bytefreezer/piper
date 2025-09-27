@@ -18,7 +18,7 @@ func NewRegistry() ParserRegistry {
 	}
 
 	// Register built-in parsers
-	registry.Register("json-logs", NewJSONParser)
+	// registry.Register("json-logs", NewJSONParser) // Removed - only NDJSON supported
 	registry.Register("ndjson-logs", NewNDJSONParser)
 	registry.Register("syslog-rfc3164", NewSyslogParser)
 	registry.Register("plaintext", NewPlaintextParser)
@@ -71,5 +71,5 @@ func (r *DefaultRegistry) ListParsers() []string {
 
 // GetParserTypes returns a list of parser types
 func (r *DefaultRegistry) GetParserTypes() []string {
-	return []string{"json", "ndjson", "syslog", "plaintext", "grok"}
+	return []string{"ndjson", "syslog", "plaintext", "grok"}
 }

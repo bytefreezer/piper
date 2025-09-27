@@ -1,5 +1,18 @@
 # ByteFreezer Piper Release Notes
 
+## Version 1.0.1 - 2025-09-27
+
+### Breaking Changes
+- **Removed JSON Parser Support**: Removed `json-logs` parser - only NDJSON format is now supported
+  - Rationale: Single JSON documents are a corner case of NDJSON, and JSON arrays are not processed by this system
+  - Migration: Convert JSON files to NDJSON format (one JSON object per line)
+  - `json_parse` filter also removed from pipeline filters
+
+### Bug Fixes
+- **Fixed File Discovery**: Fixed S3 path format mismatch that prevented files from being discovered for processing
+- **Fixed Database Schema**: Fixed PostgreSQL string slice conversion error in job record creation
+- **Improved Path Parsing**: Enhanced S3 file path parsing to handle multiple file naming formats
+
 ## Version 1.0.0 - 2025-09-24
 
 ### Major Features Added

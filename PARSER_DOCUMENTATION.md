@@ -32,7 +32,6 @@ The system includes the following built-in parsers:
 #### Text-Based Parsers
 | Parser | Format | Description |
 |--------|--------|-------------|
-| `json-logs` | JSON | Single-line JSON log entries |
 | `ndjson-logs`, `ndjson` | NDJSON | Newline-delimited JSON |
 | `syslog-rfc3164` | Syslog | Standard syslog format (RFC 3164) |
 | `plaintext` | Text | Raw text logs |
