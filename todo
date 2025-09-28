@@ -11,6 +11,8 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-- please take ndjson files as they are, they are verified up the stream
+- please take ndjson files as they are, they are verified up the stream, no need to verify ndjson and hunt for new lines , remove this functionality
+- please use streamable file reader so you do not upload entire file but go line by line, i thin you can uncompress it too, 
+if you can read and uncompress and process as a stream please uncompress file first in some spool directory
 - for each line process pipeline (if disabled or empty just output it as is )
 - the other datahints need to be converted to ndjson first

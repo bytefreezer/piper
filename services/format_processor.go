@@ -156,9 +156,19 @@ func (p *FormatProcessor) ProcessFile(ctx context.Context, job *domain.Processin
 	processingMetadata["filtered-records"] = fmt.Sprintf("%d", stats.FilteredRecords)
 	processingMetadata["error-records"] = fmt.Sprintf("%d", stats.ErrorRecords)
 
-	// Upload processed data with metadata
-	processedReader := strings.NewReader(string(processedData))
-	if err := p.s3Client.UploadProcessedFile(ctx, outputKey, processedReader, processingMetadata); err != nil {
+	// Compress processed data before upload
+	compressedData, err := p.compressData(processedData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compress processed data: %w", err)
+	}
+
+	log.Infof("Compressed data from %d bytes to %d bytes (%.1f%% compression)",
+		len(processedData), len(compressedData),
+		float64(len(compressedData))/float64(len(processedData))*100)
+
+	// Upload compressed data with metadata
+	compressedReader := bytes.NewReader(compressedData)
+	if err := p.s3Client.UploadProcessedFile(ctx, outputKey, compressedReader, processingMetadata); err != nil {
 		return nil, fmt.Errorf("failed to upload processed file: %w", err)
 	}
 
@@ -375,36 +385,30 @@ func (p *FormatProcessor) processCSVData(ctx context.Context, parser parsers.Par
 	return processedData, stats, nil
 }
 
-// processNDJSONData handles NDJSON data with robust reconstruction of malformed objects
+// processNDJSONData handles NDJSON data with simple line-by-line processing (files verified upstream)
 func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.Parser, data []byte, stats *domain.ProcessingStats, pipelineConfig *domain.PipelineConfiguration, formatHint *parsers.FormatHint) ([]byte, *domain.ProcessingStats, error) {
 	startTime := time.Now()
 
-	// Convert to string for processing
-	input := string(data)
+	log.Infof("Processing NDJSON data (%d bytes) line-by-line", len(data))
 
-	// Fix malformed NDJSON by preserving only document boundary newlines
-	fixedInput := p.fixMalformedNDJSON(input)
-
-	// Split into individual JSON objects
-	jsonObjects := p.extractJSONObjects(fixedInput)
-
-	log.Infof("Extracted %d JSON objects from NDJSON input", len(jsonObjects))
-
+	// Create scanner for line-by-line processing
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var processedLines []string
 	lineNumber := int64(0)
 
-	for _, jsonObj := range jsonObjects {
-		if strings.TrimSpace(jsonObj) == "" {
-			continue
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
+			continue // Skip empty lines
 		}
 
 		lineNumber++
 		stats.InputRecords++
 
-		// Parse the JSON object
-		record, err := parser.Parse(ctx, []byte(jsonObj))
+		// Since files are verified upstream, parse directly as JSON
+		record, err := parser.Parse(ctx, []byte(line))
 		if err != nil {
-			log.Debugf("Failed to parse JSON object %d: %v", lineNumber, err)
+			log.Debugf("Failed to parse line %d: %v", lineNumber, err)
 			stats.ErrorRecords++
 			continue
 		}
@@ -416,11 +420,11 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 		record["_processed_at"] = time.Now().UTC().Format(time.RFC3339)
 		record["_line_number"] = lineNumber
 
-		// Apply filters if enabled
+		// Apply filters if enabled (pass-through if disabled)
 		if pipelineConfig.Enabled {
 			filteredRecord, skip, err := p.applyFilters(ctx, record, formatHint, lineNumber, pipelineConfig)
 			if err != nil {
-				log.Warnf("Filter processing failed for JSON object %d: %v", lineNumber, err)
+				log.Warnf("Filter processing failed for line %d: %v", lineNumber, err)
 				stats.ErrorRecords++
 				continue
 			}
@@ -433,7 +437,7 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 			record = filteredRecord
 		}
 
-		// Convert to NDJSON
+		// Convert back to NDJSON
 		processedJSON, err := json.Marshal(record)
 		if err != nil {
 			log.Warnf("Failed to marshal processed record: %v", err)
@@ -445,6 +449,10 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 		stats.OutputRecords++
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, nil, fmt.Errorf("error reading NDJSON data: %w", err)
+	}
+
 	// Join processed lines as NDJSON
 	processedData := []byte(strings.Join(processedLines, "\n"))
 	if len(processedLines) > 0 {
@@ -454,50 +462,12 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 	stats.OutputSize = int64(len(processedData))
 	stats.ProcessingTime = time.Since(startTime)
 
-	log.Infof("Processed %d/%d JSON objects successfully, dropped %d failed objects",
-		stats.OutputRecords, stats.InputRecords, stats.ErrorRecords)
+	log.Infof("Processed %d/%d lines successfully in %v, dropped %d failed lines",
+		stats.OutputRecords, stats.InputRecords, stats.ProcessingTime, stats.ErrorRecords)
 
 	return processedData, stats, nil
 }
 
-// fixMalformedNDJSON removes all newlines except those between JSON document boundaries (}...{)
-func (p *FormatProcessor) fixMalformedNDJSON(input string) string {
-	// Remove all newlines first
-	cleaned := strings.ReplaceAll(input, "\n", "")
-	cleaned = strings.ReplaceAll(cleaned, "\r", "")
-
-	// Now add back newlines only at document boundaries: }{
-	// Use a regex to find }{ patterns and insert newlines
-	result := ""
-	i := 0
-	for i < len(cleaned) {
-		if i < len(cleaned)-1 && cleaned[i] == '}' && cleaned[i+1] == '{' {
-			result += "}\n{"
-			i += 2
-		} else {
-			result += string(cleaned[i])
-			i++
-		}
-	}
-
-	return result
-}
-
-// extractJSONObjects splits the fixed NDJSON into individual JSON objects
-func (p *FormatProcessor) extractJSONObjects(input string) []string {
-	// Split by newlines to get individual JSON objects
-	lines := strings.Split(input, "\n")
-
-	var objects []string
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" {
-			objects = append(objects, trimmed)
-		}
-	}
-
-	return objects
-}
 
 // generateOutputKey generates output key with proper NDJSON extension
 func (p *FormatProcessor) generateOutputKey(sourceKey string, formatHint *parsers.FormatHint) string {
@@ -617,4 +587,22 @@ func (p *FormatProcessor) decompressGzip(data []byte) ([]byte, error) {
 	}
 
 	return decompressed, nil
+}
+
+// compressData compresses data using gzip
+func (p *FormatProcessor) compressData(data []byte) ([]byte, error) {
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+
+	_, err := writer.Write(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write data to gzip writer: %w", err)
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
+	return compressed.Bytes(), nil
 }

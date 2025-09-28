@@ -50,7 +50,7 @@ failure_threshold:
 
 housekeeping:
   enabled: true
-  intervalseconds: 30
+  intervalseconds: 300  # 5 minutes
 
 # Development mode - enables fake tenant data for testing
 dev: true

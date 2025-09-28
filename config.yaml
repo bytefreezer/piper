@@ -152,7 +152,7 @@ dlq:
 # Housekeeping configuration
 housekeeping:
   enabled: true
-  intervalseconds: 30  # 30 seconds to match discovery interval
+  intervalseconds: 300  # 5 minutes
 
 # Development mode
 dev: true  # Use fake control responses for testing
