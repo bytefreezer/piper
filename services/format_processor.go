@@ -556,80 +556,75 @@ func (p *FormatProcessor) ProcessFileStreaming(ctx context.Context, job *domain.
 func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader io.Reader, outputKey string, pipelineConfig *domain.PipelineConfiguration, job *domain.ProcessingJob) (*domain.ProcessingStats, error) {
 	log.Infof("Starting streaming NDJSON processing for output key: %s", outputKey)
 
-	// Set up pipe for streaming compression
-	pipeReader, pipeWriter := io.Pipe()
-
-	// Set up gzip writer for compression
-	gzipWriter := gzip.NewWriter(pipeWriter)
-
-	var processingErr error
+	// Use buffered approach for S3 compatibility (no pipe streaming to S3)
+	var processedLines []string
 	var stats domain.ProcessingStats
+	startTime := time.Now()
 
-	// Start goroutine to process lines and write compressed data
-	go func() {
-		defer func() {
-			if err := gzipWriter.Close(); err != nil {
-				log.Errorf("Failed to close gzip writer: %v", err)
-			}
-			if err := pipeWriter.Close(); err != nil {
-				log.Errorf("Failed to close pipe writer: %v", err)
-			}
-		}()
+	scanner := bufio.NewScanner(dataReader)
+	scanner.Buffer(make([]byte, 64*1024), 10*1024*1024) // 64KB initial, 10MB max
 
-		scanner := bufio.NewScanner(dataReader)
-		scanner.Buffer(make([]byte, 64*1024), 10*1024*1024) // 64KB initial, 10MB max
+	var lineCount int64
+	var errorCount int64
 
-		var lineCount int64
-		var errorCount int64
+	for scanner.Scan() {
+		line := scanner.Text()
+		lineCount++
 
-		for scanner.Scan() {
-			line := scanner.Text()
-			lineCount++
+		// Skip empty lines
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 
-			// Skip empty lines
-			if strings.TrimSpace(line) == "" {
-				continue
-			}
-
-			// Process line through pipeline if enabled
-			processedLine := line
-			if pipelineConfig != nil && pipelineConfig.Enabled {
-				processed, err := p.processLineWithPipeline(ctx, line, pipelineConfig, job.TenantID, job.DatasetID)
-				if err != nil {
-					log.Warnf("Pipeline processing failed for line %d: %v", lineCount, err)
-					errorCount++
-					// Use original line on pipeline failure
-					processedLine = line
-				} else {
-					processedLine = processed
-				}
-			}
-
-			// Write processed line to gzip stream
-			if _, err := gzipWriter.Write([]byte(processedLine + "\n")); err != nil {
-				processingErr = fmt.Errorf("failed to write line %d to gzip stream: %w", lineCount, err)
-				return
-			}
-
-			// Log progress every 10000 lines
-			if lineCount%10000 == 0 {
-				log.Debugf("Processed %d lines for %s", lineCount, outputKey)
+		// Process line through pipeline if enabled
+		processedLine := line
+		if pipelineConfig != nil && pipelineConfig.Enabled {
+			processed, err := p.processLineWithPipeline(ctx, line, pipelineConfig, job.TenantID, job.DatasetID)
+			if err != nil {
+				log.Warnf("Pipeline processing failed for line %d: %v", lineCount, err)
+				errorCount++
+				// Use original line on pipeline failure
+				processedLine = line
+			} else {
+				processedLine = processed
 			}
 		}
 
-		if err := scanner.Err(); err != nil {
-			processingErr = fmt.Errorf("scanner error at line %d: %w", lineCount, err)
-			return
-		}
+		// Add processed line to buffer
+		processedLines = append(processedLines, processedLine)
 
-		stats = domain.ProcessingStats{
-			InputRecords:  lineCount,
-			OutputRecords: lineCount - errorCount,
-			ErrorRecords:  errorCount,
+		// Log progress every 10000 lines
+		if lineCount%10000 == 0 {
+			log.Debugf("Processed %d lines for %s", lineCount, outputKey)
 		}
+	}
 
-		log.Infof("Finished processing %d lines for %s (%d errors)", lineCount, outputKey, errorCount)
-	}()
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanner error at line %d: %w", lineCount, err)
+	}
+
+	stats = domain.ProcessingStats{
+		InputRecords:   lineCount,
+		OutputRecords:  lineCount - errorCount,
+		ErrorRecords:   errorCount,
+		ProcessingTime: time.Since(startTime),
+	}
+
+	// Convert processed lines to compressed data
+	processedData := []byte(strings.Join(processedLines, "\n"))
+	if len(processedLines) > 0 {
+		processedData = append(processedData, '\n') // Add final newline
+	}
+	stats.OutputSize = int64(len(processedData))
+
+	// Compress the data
+	compressedData, err := p.compressData(processedData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compress processed data: %w", err)
+	}
+
+	log.Infof("Finished processing %d lines for %s (%d errors), compressed from %d to %d bytes",
+		lineCount, outputKey, errorCount, len(processedData), len(compressedData))
 
 	// Create metadata for the processed file
 	sourceMetadata, err := p.s3Client.GetSourceObjectMetadata(ctx, job.SourceFile.Key)
@@ -682,17 +677,12 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 		// Skip redundant fields: source-file-key, source-tenant
 	}
 
-	// Upload compressed stream to S3
-	log.Infof("Uploading compressed stream to S3: %s", outputKey)
-	err = p.s3Client.UploadProcessedFile(ctx, outputKey, pipeReader, processingMetadata)
+	// Upload compressed data to S3
+	log.Infof("Uploading compressed data to S3: %s (%d bytes)", outputKey, len(compressedData))
+	compressedReader := bytes.NewReader(compressedData)
+	err = p.s3Client.UploadProcessedFile(ctx, outputKey, compressedReader, processingMetadata)
 	if err != nil {
-		pipeReader.Close()
 		return nil, fmt.Errorf("failed to upload processed file: %w", err)
-	}
-
-	// Check for processing errors from the goroutine
-	if processingErr != nil {
-		return nil, processingErr
 	}
 
 	log.Infof("Successfully completed streaming processing for %s", outputKey)
