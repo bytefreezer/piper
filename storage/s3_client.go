@@ -335,6 +335,22 @@ func (sc *S3Client) GetSourceObject(ctx context.Context, key string) ([]byte, er
 	return data, nil
 }
 
+// GetSourceObjectStream returns a streaming reader for the source object (memory efficient)
+func (sc *S3Client) GetSourceObjectStream(ctx context.Context, key string) (io.ReadCloser, error) {
+	log.Debugf("Streaming object from source bucket: %s", key)
+
+	output, err := sc.sourceClient.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(sc.sourceBucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object %s from source bucket %s: %w", key, sc.sourceBucket, err)
+	}
+
+	log.Debugf("Successfully opened stream for %s", key)
+	return output.Body, nil
+}
+
 // PutDestinationObject uploads data to the destination bucket
 func (sc *S3Client) PutDestinationObject(ctx context.Context, key string, data []byte) error {
 	log.Debugf("Uploading object to destination bucket: %s", key)

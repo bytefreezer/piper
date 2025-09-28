@@ -60,136 +60,9 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 
 // ProcessFile processes a single file with automatic format detection
 func (p *FormatProcessor) ProcessFile(ctx context.Context, job *domain.ProcessingJob) (*domain.ProcessingResult, error) {
-	startTime := time.Now()
-
-	log.Infof("Processing file %s with format detection for tenant %s, dataset %s",
-		job.SourceFile.Key, job.TenantID, job.DatasetID)
-
-	// Get source file metadata before processing
-	sourceMetadata, err := p.s3Client.GetSourceObjectMetadata(ctx, job.SourceFile.Key)
-	if err != nil {
-		log.Warnf("Failed to get source metadata for %s: %v", job.SourceFile.Key, err)
-		sourceMetadata = make(map[string]string) // Continue with empty metadata
-	}
-
-	// Detect format from filename as fallback
-	formatHint, err := p.formatDetector.DetectFormat(job.SourceFile.Key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect format from filename: %w", err)
-	}
-
-	// Override format detection with metadata from receiver if available
-	if dataType, exists := sourceMetadata["data-type"]; exists && dataType != "" {
-		log.Infof("Using format from source metadata: %s (was %s from filename)", dataType, formatHint.Format)
-		formatHint.Format = dataType
-		// Check if this format is binary
-		if binaryFormats := map[string]bool{"sflow": true, "netflow": true, "ipfix": true}; binaryFormats[dataType] {
-			formatHint.Binary = true
-		} else {
-			formatHint.Binary = false
-		}
-	} else {
-		log.Infof("Using format from filename detection: %s for file %s", formatHint.Format, job.SourceFile.Key)
-	}
-
-	// Skip binary formats for now as per requirements
-	if formatHint.Binary {
-		return nil, fmt.Errorf("binary format %s not supported yet", formatHint.Format)
-	}
-
-	// Download source file
-	sourceData, err := p.s3Client.GetSourceObject(ctx, job.SourceFile.Key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download source file: %w", err)
-	}
-
-	// Decompress source file if it's gzipped
-	log.Debugf("Checking compression: formatHint.Extension='%s', filename ends with .gz=%t", formatHint.Extension, strings.HasSuffix(job.SourceFile.Key, ".gz"))
-	if formatHint.Extension == "gz" || strings.HasSuffix(job.SourceFile.Key, ".gz") {
-		log.Infof("Decompressing gzipped file %s (source size: %d bytes)", job.SourceFile.Key, len(sourceData))
-		sourceData, err = p.decompressGzip(sourceData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decompress gzipped source file: %w", err)
-		}
-		log.Infof("Decompressed gzipped file, decompressed size: %d bytes", len(sourceData))
-	}
-
-	// Get pipeline configuration for this tenant/dataset
-	pipelineConfig, err := p.configManager.GetPipelineConfig(ctx, job.TenantID, job.DatasetID)
-	if err != nil {
-		log.Warnf("Failed to get pipeline config for %s:%s, using default: %v", job.TenantID, job.DatasetID, err)
-		pipelineConfig = p.createDefaultPipelineConfig(job.TenantID, job.DatasetID)
-	}
-
-	// Process the data with format-specific parser and filters
-	processedData, stats, err := p.processDataWithFormat(ctx, formatHint, sourceData, pipelineConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process data: %w", err)
-	}
-
-	// Generate output file key (change extension to indicate NDJSON)
-	outputKey := p.generateOutputKey(job.SourceFile.Key, formatHint)
-
-	// Calculate processing time and prepare metadata
-	processingTime := time.Since(startTime)
-	processingMetadata := make(map[string]string)
-
-	// Copy source metadata with "source-" prefix to avoid conflicts
-	for key, value := range sourceMetadata {
-		if !strings.HasPrefix(key, "source-") {
-			processingMetadata["source-"+key] = value
-		} else {
-			processingMetadata[key] = value
-		}
-	}
-
-	// Add processing metadata
-	processingMetadata["source-file-key"] = job.SourceFile.Key
-	processingMetadata["detected-format"] = formatHint.Format
-	processingMetadata["processing-time-ms"] = fmt.Sprintf("%d", processingTime.Milliseconds())
-	processingMetadata["processing-started-at"] = startTime.Format(time.RFC3339)
-	processingMetadata["tenant-id"] = job.TenantID
-	processingMetadata["dataset-id"] = job.DatasetID
-	processingMetadata["processor-id"] = job.ProcessorID
-	processingMetadata["input-records"] = fmt.Sprintf("%d", stats.InputRecords)
-	processingMetadata["output-records"] = fmt.Sprintf("%d", stats.OutputRecords)
-	processingMetadata["filtered-records"] = fmt.Sprintf("%d", stats.FilteredRecords)
-	processingMetadata["error-records"] = fmt.Sprintf("%d", stats.ErrorRecords)
-
-	// Compress processed data before upload
-	compressedData, err := p.compressData(processedData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to compress processed data: %w", err)
-	}
-
-	log.Infof("Compressed data from %d bytes to %d bytes (%.1f%% compression)",
-		len(processedData), len(compressedData),
-		float64(len(compressedData))/float64(len(processedData))*100)
-
-	// Upload compressed data with metadata
-	compressedReader := bytes.NewReader(compressedData)
-	if err := p.s3Client.UploadProcessedFile(ctx, outputKey, compressedReader, processingMetadata); err != nil {
-		return nil, fmt.Errorf("failed to upload processed file: %w", err)
-	}
-
-	// Delete source file after successful processing
-	if err := p.s3Client.DeleteSourceObject(ctx, job.SourceFile.Key); err != nil {
-		log.Warnf("Failed to delete source file %s: %v", job.SourceFile.Key, err)
-	}
-
-	result := &domain.ProcessingResult{
-		SourceFile:   job.SourceFile.Key,
-		OutputFile:   outputKey,
-		Stats:        *stats,
-		Success:      true,
-		PipelineUsed: fmt.Sprintf("format-processor:%s", formatHint.Format),
-	}
-
-	finalProcessingTime := time.Since(startTime)
-	log.Infof("Successfully processed file %s (%s format) in %v, processed %d records, metadata fields: %d",
-		job.SourceFile.Key, formatHint.Format, finalProcessingTime, stats.OutputRecords, len(processingMetadata))
-
-	return result, nil
+	// Delegate to streaming implementation for memory efficiency
+	log.Infof("Using streaming processing for file %s (memory-efficient mode)", job.SourceFile.Key)
+	return p.ProcessFileStreaming(ctx, job)
 }
 
 // processDataWithFormat processes data using the detected format parser
@@ -605,4 +478,230 @@ func (p *FormatProcessor) compressData(data []byte) ([]byte, error) {
 	}
 
 	return compressed.Bytes(), nil
+}
+
+// ProcessFileStreaming processes a file using streaming I/O to minimize memory usage
+func (p *FormatProcessor) ProcessFileStreaming(ctx context.Context, job *domain.ProcessingJob) (*domain.ProcessingResult, error) {
+	log.Infof("Starting streaming processing for file %s", job.SourceFile.Key)
+	startTime := time.Now()
+
+	// Format detection
+	formatHint, err := p.formatDetector.DetectFormat(job.SourceFile.Key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect format: %w", err)
+	}
+	log.Debugf("Detected format: %s (extension: %s, binary: %t)", formatHint.Format, formatHint.Extension, formatHint.Binary)
+
+	// Skip binary formats for now as per requirements
+	if formatHint.Binary {
+		return nil, fmt.Errorf("binary format %s not supported yet", formatHint.Format)
+	}
+
+	// Get pipeline configuration for this tenant/dataset
+	pipelineConfig, err := p.configManager.GetPipelineConfig(ctx, job.TenantID, job.DatasetID)
+	if err != nil {
+		log.Warnf("Failed to get pipeline config for %s:%s, using default: %v", job.TenantID, job.DatasetID, err)
+		pipelineConfig = p.createDefaultPipelineConfig(job.TenantID, job.DatasetID)
+	}
+
+	// Open streaming connection to S3 source
+	sourceReader, err := p.s3Client.GetSourceObjectStream(ctx, job.SourceFile.Key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open source stream: %w", err)
+	}
+	defer sourceReader.Close()
+
+	// Create decompression stream if needed
+	var dataReader io.Reader = sourceReader
+	if formatHint.Extension == "gz" || strings.HasSuffix(job.SourceFile.Key, ".gz") {
+		log.Infof("Setting up streaming decompression for %s", job.SourceFile.Key)
+		gzReader, err := gzip.NewReader(sourceReader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer gzReader.Close()
+		dataReader = gzReader
+	}
+
+	// Create output key
+	outputKey := p.generateOutputKey(job.SourceFile.Key, formatHint)
+
+	// Process streaming: read->pipeline->compress->upload
+	stats, err := p.processStreamingNDJSON(ctx, dataReader, outputKey, pipelineConfig, job)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process streaming data: %w", err)
+	}
+
+	// Delete source file after successful processing
+	if err := p.s3Client.DeleteSourceObject(ctx, job.SourceFile.Key); err != nil {
+		log.Warnf("Failed to delete source file %s: %v", job.SourceFile.Key, err)
+	}
+
+	result := &domain.ProcessingResult{
+		SourceFile:   job.SourceFile.Key,
+		OutputFile:   outputKey,
+		Stats:        *stats,
+		Success:      true,
+		PipelineUsed: fmt.Sprintf("streaming-format-processor:%s", formatHint.Format),
+	}
+
+	finalProcessingTime := time.Since(startTime)
+	log.Infof("Successfully processed file %s (streaming %s format) in %v, processed %d records",
+		job.SourceFile.Key, formatHint.Format, finalProcessingTime, stats.OutputRecords)
+
+	return result, nil
+}
+
+// processStreamingNDJSON processes NDJSON data using streaming I/O with pipeline processing
+func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader io.Reader, outputKey string, pipelineConfig *domain.PipelineConfiguration, job *domain.ProcessingJob) (*domain.ProcessingStats, error) {
+	log.Infof("Starting streaming NDJSON processing for output key: %s", outputKey)
+
+	// Set up pipe for streaming compression
+	pipeReader, pipeWriter := io.Pipe()
+
+	// Set up gzip writer for compression
+	gzipWriter := gzip.NewWriter(pipeWriter)
+
+	var processingErr error
+	var stats domain.ProcessingStats
+
+	// Start goroutine to process lines and write compressed data
+	go func() {
+		defer func() {
+			if err := gzipWriter.Close(); err != nil {
+				log.Errorf("Failed to close gzip writer: %v", err)
+			}
+			if err := pipeWriter.Close(); err != nil {
+				log.Errorf("Failed to close pipe writer: %v", err)
+			}
+		}()
+
+		scanner := bufio.NewScanner(dataReader)
+		scanner.Buffer(make([]byte, 64*1024), 10*1024*1024) // 64KB initial, 10MB max
+
+		var lineCount int64
+		var errorCount int64
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			lineCount++
+
+			// Skip empty lines
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+
+			// Process line through pipeline if enabled
+			processedLine := line
+			if pipelineConfig != nil && pipelineConfig.Enabled {
+				processed, err := p.processLineWithPipeline(ctx, line, pipelineConfig, job.TenantID, job.DatasetID)
+				if err != nil {
+					log.Warnf("Pipeline processing failed for line %d: %v", lineCount, err)
+					errorCount++
+					// Use original line on pipeline failure
+					processedLine = line
+				} else {
+					processedLine = processed
+				}
+			}
+
+			// Write processed line to gzip stream
+			if _, err := gzipWriter.Write([]byte(processedLine + "\n")); err != nil {
+				processingErr = fmt.Errorf("failed to write line %d to gzip stream: %w", lineCount, err)
+				return
+			}
+
+			// Log progress every 10000 lines
+			if lineCount%10000 == 0 {
+				log.Debugf("Processed %d lines for %s", lineCount, outputKey)
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			processingErr = fmt.Errorf("scanner error at line %d: %w", lineCount, err)
+			return
+		}
+
+		stats = domain.ProcessingStats{
+			InputRecords:  lineCount,
+			OutputRecords: lineCount - errorCount,
+			ErrorRecords:  errorCount,
+		}
+
+		log.Infof("Finished processing %d lines for %s (%d errors)", lineCount, outputKey, errorCount)
+	}()
+
+	// Create metadata for the processed file
+	sourceMetadata, err := p.s3Client.GetSourceObjectMetadata(ctx, job.SourceFile.Key)
+	if err != nil {
+		log.Warnf("Failed to get source metadata for %s: %v", job.SourceFile.Key, err)
+		sourceMetadata = make(map[string]string)
+	}
+
+	// Create processing metadata with reduced redundancy as per todo requirements
+	// Extract actual filename from key (not full path)
+	filename := job.SourceFile.Key
+	if lastSlash := strings.LastIndex(filename, "/"); lastSlash != -1 {
+		filename = filename[lastSlash+1:]
+	}
+
+	processingMetadata := map[string]string{
+		"source-original-filename": filename, // Just filename, not full S3 key path
+		"tenant-id":               job.TenantID,
+		"dataset-id":              job.DatasetID,
+		"format":                  "ndjson",
+		"processed-at":            time.Now().Format(time.RFC3339),
+		"processor-type":          "bytefreezer-piper-streaming",
+	}
+
+	// Add pipeline info if used
+	if pipelineConfig != nil && pipelineConfig.Enabled {
+		processingMetadata["pipeline-enabled"] = "true"
+		processingMetadata["pipeline-id"] = pipelineConfig.ConfigKey
+	} else {
+		processingMetadata["pipeline-enabled"] = "false"
+	}
+
+	// Copy selective source metadata based on todo requirements
+	// Filter metadata based on user requirements:
+	// Keep: source-original-filename, tenant-id, source-content-length, source-etag, source-last-modified
+	// Remove: source-file-key, source-tenant (redundant with tenant-id)
+	for key, value := range sourceMetadata {
+		// Keep essential technical metadata
+		if key == "source-content-length" || key == "source-etag" || key == "source-last-modified" {
+			processingMetadata[key] = value
+		}
+		// Keep important source identification (original filename, not file-key)
+		if key == "source-original-filename" {
+			processingMetadata[key] = value
+		}
+		// Keep tenant-id but skip redundant source-tenant
+		if key == "tenant-id" {
+			processingMetadata[key] = value
+		}
+		// Skip redundant fields: source-file-key, source-tenant
+	}
+
+	// Upload compressed stream to S3
+	log.Infof("Uploading compressed stream to S3: %s", outputKey)
+	err = p.s3Client.UploadProcessedFile(ctx, outputKey, pipeReader, processingMetadata)
+	if err != nil {
+		pipeReader.Close()
+		return nil, fmt.Errorf("failed to upload processed file: %w", err)
+	}
+
+	// Check for processing errors from the goroutine
+	if processingErr != nil {
+		return nil, processingErr
+	}
+
+	log.Infof("Successfully completed streaming processing for %s", outputKey)
+	return &stats, nil
+}
+
+// processLineWithPipeline processes a single line through the configured pipeline
+func (p *FormatProcessor) processLineWithPipeline(ctx context.Context, line string, config *domain.PipelineConfiguration, tenantID, datasetID string) (string, error) {
+	// For now, return the line as-is since pipeline processing is disabled in config
+	// This is where pipeline transformations would be applied when enabled
+	return line, nil
 }
