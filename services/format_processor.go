@@ -647,6 +647,8 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 		"format":                  "ndjson",
 		"processed-at":            time.Now().Format(time.RFC3339),
 		"processor-type":          "bytefreezer-piper-streaming",
+		"input-records":           fmt.Sprintf("%d", stats.InputRecords),
+		"output-records":          fmt.Sprintf("%d", stats.OutputRecords),
 	}
 
 	// Add pipeline info if used
@@ -659,7 +661,7 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 
 	// Copy selective source metadata based on todo requirements
 	// Filter metadata based on user requirements:
-	// Keep: source-original-filename, tenant-id, source-content-length, source-etag, source-last-modified
+	// Keep: source-original-filename, tenant-id, source-content-length, source-etag, source-last-modified, source-line-count
 	// Remove: source-file-key, source-tenant (redundant with tenant-id)
 	for key, value := range sourceMetadata {
 		// Keep essential technical metadata
@@ -672,6 +674,10 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 		}
 		// Keep tenant-id but skip redundant source-tenant
 		if key == "tenant-id" {
+			processingMetadata[key] = value
+		}
+		// Keep source line count to track discrepancies
+		if key == "source-line-count" {
 			processingMetadata[key] = value
 		}
 		// Skip redundant fields: source-file-key, source-tenant
