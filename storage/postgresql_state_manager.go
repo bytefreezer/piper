@@ -233,7 +233,7 @@ func (sm *PostgreSQLStateManager) AcquireFileLockWithTTL(ctx context.Context, fi
 			job_id = EXCLUDED.job_id,
 			lock_timestamp = NOW(),
 			ttl = EXCLUDED.ttl,
-			lock_version = file_locks.lock_version + 1`
+			lock_version = ` + sm.buildTableName("piper_file_locks") + `.lock_version + 1`
 
 	_, err = tx.ExecContext(ctx, upsertSQL, fileKey, processorType, processorID, jobID, lockTTL)
 	if err != nil {

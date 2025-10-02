@@ -22,6 +22,11 @@
   - Maintains TTL-based cleanup as safety fallback
 - **Improved Restart Behavior**: File processing can resume immediately after service restart instead of waiting for TTL expiration
 
+### Bug Fixes
+- **Fixed PostgreSQL Table References**: Corrected SQL query that referenced old `file_locks` table name instead of new `piper_file_locks` table
+  - Resolves error: "missing FROM-clause entry for table 'file_locks'"
+  - Ensures proper lock acquisition and file processing functionality
+
 ## Version 1.0.1 - 2025-09-27
 
 ### Breaking Changes
