@@ -1,5 +1,16 @@
 # ByteFreezer Piper Release Notes
 
+## Version 1.0.2 - 2025-10-02
+
+### Database Schema Changes
+- **PostgreSQL Table Naming**: Updated all PostgreSQL tables to use `piper_` prefix for better component separation
+  - `file_locks` → `piper_file_locks`
+  - `job_records` → `piper_job_records`
+  - `pipeline_configurations` → `piper_pipeline_configurations`
+  - `tenants_cache` → `piper_tenants_cache`
+  - All indexes updated with corresponding `piper_` prefixes
+  - **Migration**: Existing installations will automatically create new tables with prefixed names
+
 ## Version 1.0.1 - 2025-09-27
 
 ### Breaking Changes

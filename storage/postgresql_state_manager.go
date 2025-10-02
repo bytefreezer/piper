@@ -78,7 +78,7 @@ func (sm *PostgreSQLStateManager) initTables() error {
 
 	// Create file locks table
 	lockTableSQL := `
-		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("file_locks") + ` (
+		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("piper_file_locks") + ` (
 			file_key VARCHAR(512) PRIMARY KEY,
 			processor_type VARCHAR(50) NOT NULL,
 			processor_id VARCHAR(100) NOT NULL,
@@ -89,12 +89,12 @@ func (sm *PostgreSQLStateManager) initTables() error {
 		)`
 
 	if _, err := sm.db.ExecContext(ctx, lockTableSQL); err != nil {
-		return fmt.Errorf("failed to create file_locks table: %w", err)
+		return fmt.Errorf("failed to create piper_file_locks table: %w", err)
 	}
 
 	// Create job records table
 	jobTableSQL := `
-		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("job_records") + ` (
+		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("piper_job_records") + ` (
 			job_id VARCHAR(100) PRIMARY KEY,
 			tenant_id VARCHAR(100) NOT NULL,
 			dataset_id VARCHAR(100) NOT NULL,
@@ -122,12 +122,12 @@ func (sm *PostgreSQLStateManager) initTables() error {
 		)`
 
 	if _, err := sm.db.ExecContext(ctx, jobTableSQL); err != nil {
-		return fmt.Errorf("failed to create job_records table: %w", err)
+		return fmt.Errorf("failed to create piper_job_records table: %w", err)
 	}
 
 	// Create pipeline configurations cache table
 	pipelineTableSQL := `
-		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("pipeline_configurations") + ` (
+		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("piper_pipeline_configurations") + ` (
 			config_key VARCHAR(200) PRIMARY KEY,
 			tenant_id VARCHAR(100) NOT NULL,
 			dataset_id VARCHAR(100) NOT NULL,
@@ -142,12 +142,12 @@ func (sm *PostgreSQLStateManager) initTables() error {
 		)`
 
 	if _, err := sm.db.ExecContext(ctx, pipelineTableSQL); err != nil {
-		return fmt.Errorf("failed to create pipeline_configurations table: %w", err)
+		return fmt.Errorf("failed to create piper_pipeline_configurations table: %w", err)
 	}
 
 	// Create tenants cache table
 	tenantsTableSQL := `
-		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("tenants_cache") + ` (
+		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("piper_tenants_cache") + ` (
 			tenant_id VARCHAR(100) PRIMARY KEY,
 			name VARCHAR(200) NOT NULL,
 			datasets TEXT[] NOT NULL DEFAULT '{}',
@@ -159,19 +159,19 @@ func (sm *PostgreSQLStateManager) initTables() error {
 		)`
 
 	if _, err := sm.db.ExecContext(ctx, tenantsTableSQL); err != nil {
-		return fmt.Errorf("failed to create tenants_cache table: %w", err)
+		return fmt.Errorf("failed to create piper_tenants_cache table: %w", err)
 	}
 
 	// Create indexes for better performance
 	indexes := []string{
-		"CREATE INDEX IF NOT EXISTS idx_file_locks_ttl ON " + sm.buildTableName("file_locks") + " (ttl)",
-		"CREATE INDEX IF NOT EXISTS idx_job_records_status ON " + sm.buildTableName("job_records") + " (status)",
-		"CREATE INDEX IF NOT EXISTS idx_job_records_tenant_dataset ON " + sm.buildTableName("job_records") + " (tenant_id, dataset_id)",
-		"CREATE INDEX IF NOT EXISTS idx_job_records_created_at ON " + sm.buildTableName("job_records") + " (created_at)",
-		"CREATE INDEX IF NOT EXISTS idx_pipeline_configurations_tenant_dataset ON " + sm.buildTableName("pipeline_configurations") + " (tenant_id, dataset_id)",
-		"CREATE INDEX IF NOT EXISTS idx_pipeline_configurations_expires_at ON " + sm.buildTableName("pipeline_configurations") + " (expires_at)",
-		"CREATE INDEX IF NOT EXISTS idx_tenants_cache_expires_at ON " + sm.buildTableName("tenants_cache") + " (expires_at)",
-		"CREATE INDEX IF NOT EXISTS idx_tenants_cache_active ON " + sm.buildTableName("tenants_cache") + " (active)",
+		"CREATE INDEX IF NOT EXISTS idx_piper_file_locks_ttl ON " + sm.buildTableName("piper_file_locks") + " (ttl)",
+		"CREATE INDEX IF NOT EXISTS idx_piper_job_records_status ON " + sm.buildTableName("piper_job_records") + " (status)",
+		"CREATE INDEX IF NOT EXISTS idx_piper_job_records_tenant_dataset ON " + sm.buildTableName("piper_job_records") + " (tenant_id, dataset_id)",
+		"CREATE INDEX IF NOT EXISTS idx_piper_job_records_created_at ON " + sm.buildTableName("piper_job_records") + " (created_at)",
+		"CREATE INDEX IF NOT EXISTS idx_piper_pipeline_configurations_tenant_dataset ON " + sm.buildTableName("piper_pipeline_configurations") + " (tenant_id, dataset_id)",
+		"CREATE INDEX IF NOT EXISTS idx_piper_pipeline_configurations_expires_at ON " + sm.buildTableName("piper_pipeline_configurations") + " (expires_at)",
+		"CREATE INDEX IF NOT EXISTS idx_piper_tenants_cache_expires_at ON " + sm.buildTableName("piper_tenants_cache") + " (expires_at)",
+		"CREATE INDEX IF NOT EXISTS idx_piper_tenants_cache_active ON " + sm.buildTableName("piper_tenants_cache") + " (active)",
 	}
 
 	for _, indexSQL := range indexes {
@@ -201,7 +201,7 @@ func (sm *PostgreSQLStateManager) AcquireFileLockWithTTL(ctx context.Context, fi
 	var existingTTL time.Time
 	checkSQL := `
 		SELECT processor_id, ttl
-		FROM ` + sm.buildTableName("file_locks") + `
+		FROM ` + sm.buildTableName("piper_file_locks") + `
 		WHERE file_key = $1`
 
 	err = tx.QueryRowContext(ctx, checkSQL, fileKey).Scan(&existingProcessorID, &existingTTL)
@@ -224,7 +224,7 @@ func (sm *PostgreSQLStateManager) AcquireFileLockWithTTL(ctx context.Context, fi
 	lockTTL := time.Now().Add(ttl)
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	upsertSQL := `
-		INSERT INTO ` + sm.buildTableName("file_locks") + ` (file_key, processor_type, processor_id, job_id, lock_timestamp, ttl)
+		INSERT INTO ` + sm.buildTableName("piper_file_locks") + ` (file_key, processor_type, processor_id, job_id, lock_timestamp, ttl)
 		VALUES ($1, $2, $3, $4, NOW(), $5)
 		ON CONFLICT (file_key) DO UPDATE SET
 			processor_type = EXCLUDED.processor_type,
@@ -246,7 +246,7 @@ func (sm *PostgreSQLStateManager) AcquireFileLockWithTTL(ctx context.Context, fi
 func (sm *PostgreSQLStateManager) ReleaseFileLock(ctx context.Context, fileKey, processorID string) error {
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	deleteSQL := `
-		DELETE FROM ` + sm.buildTableName("file_locks") + `
+		DELETE FROM ` + sm.buildTableName("piper_file_locks") + `
 		WHERE file_key = $1 AND processor_id = $2`
 
 	result, err := sm.db.ExecContext(ctx, deleteSQL, fileKey, processorID)
@@ -272,7 +272,7 @@ func (sm *PostgreSQLStateManager) CreateJobRecord(ctx context.Context, job *doma
 
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	insertSQL := `
-		INSERT INTO ` + sm.buildTableName("job_records") + ` (
+		INSERT INTO ` + sm.buildTableName("piper_job_records") + ` (
 			job_id, tenant_id, dataset_id, processor_type, processor_id, status,
 			priority, retry_count, max_retries, created_at, updated_at, ttl,
 			source_files, file_size_bytes
@@ -294,7 +294,7 @@ func (sm *PostgreSQLStateManager) CreateJobRecord(ctx context.Context, job *doma
 func (sm *PostgreSQLStateManager) UpdateJobStatus(ctx context.Context, jobID string, status domain.JobStatus) error {
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	updateSQL := `
-		UPDATE ` + sm.buildTableName("job_records") + `
+		UPDATE ` + sm.buildTableName("piper_job_records") + `
 		SET status = $1, updated_at = NOW()
 		WHERE job_id = $2`
 
@@ -317,7 +317,7 @@ func (sm *PostgreSQLStateManager) GetJobsByStatus(ctx context.Context, status do
 			   source_files, output_files, record_count, processing_time_ms,
 			   file_size_bytes, COALESCE(error_message, ''), COALESCE(error_code, ''),
 			   COALESCE(pipeline_version, '')
-		FROM ` + sm.buildTableName("job_records") + `
+		FROM ` + sm.buildTableName("piper_job_records") + `
 		WHERE status = $1
 		ORDER BY created_at ASC
 		LIMIT $2`
@@ -362,7 +362,7 @@ func (sm *PostgreSQLStateManager) GetJobsByStatus(ctx context.Context, status do
 func (sm *PostgreSQLStateManager) CleanupExpiredLocks(ctx context.Context) error {
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	deleteSQL := `
-		DELETE FROM ` + sm.buildTableName("file_locks") + `
+		DELETE FROM ` + sm.buildTableName("piper_file_locks") + `
 		WHERE ttl < NOW()`
 
 	result, err := sm.db.ExecContext(ctx, deleteSQL)
@@ -384,7 +384,7 @@ func (sm *PostgreSQLStateManager) CachePipelineConfiguration(ctx context.Context
 
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	upsertSQL := `
-		INSERT INTO ` + sm.buildTableName("pipeline_configurations") + ` (
+		INSERT INTO ` + sm.buildTableName("piper_pipeline_configurations") + ` (
 			config_key, tenant_id, dataset_id, configuration, version,
 			enabled, created_at, updated_at, cached_at, expires_at, filter_count
 		) VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW(), NOW(), $6, $7)
@@ -409,7 +409,7 @@ func (sm *PostgreSQLStateManager) GetCachedPipelineConfiguration(ctx context.Con
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	querySQL := `
 		SELECT configuration, expires_at
-		FROM ` + sm.buildTableName("pipeline_configurations") + `
+		FROM ` + sm.buildTableName("piper_pipeline_configurations") + `
 		WHERE config_key = $1 AND enabled = true`
 
 	var configuration []byte
@@ -437,7 +437,7 @@ func (sm *PostgreSQLStateManager) CacheTenant(ctx context.Context, tenantID, nam
 
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	upsertSQL := `
-		INSERT INTO ` + sm.buildTableName("tenants_cache") + ` (
+		INSERT INTO ` + sm.buildTableName("piper_tenants_cache") + ` (
 			tenant_id, name, datasets, active, created_at, updated_at, cached_at, expires_at
 		) VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW(), $5)
 		ON CONFLICT (tenant_id) DO UPDATE SET
@@ -461,7 +461,7 @@ func (sm *PostgreSQLStateManager) GetCachedTenants(ctx context.Context) ([]map[s
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	querySQL := `
 		SELECT tenant_id, name, datasets, active, created_at, updated_at, cached_at, expires_at
-		FROM ` + sm.buildTableName("tenants_cache") + `
+		FROM ` + sm.buildTableName("piper_tenants_cache") + `
 		WHERE active = true AND expires_at > NOW()
 		ORDER BY tenant_id`
 
@@ -502,7 +502,7 @@ func (sm *PostgreSQLStateManager) GetCachedPipelineList(ctx context.Context) ([]
 	querySQL := `
 		SELECT config_key, tenant_id, dataset_id, version, enabled,
 			   created_at, updated_at, cached_at, expires_at, filter_count
-		FROM ` + sm.buildTableName("pipeline_configurations") + `
+		FROM ` + sm.buildTableName("piper_pipeline_configurations") + `
 		WHERE enabled = true
 		ORDER BY tenant_id, dataset_id`
 
@@ -547,7 +547,7 @@ func (sm *PostgreSQLStateManager) CleanupExpiredCache(ctx context.Context) error
 	// Clean up expired pipeline configurations
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	deletePipelineSQL := `
-		DELETE FROM ` + sm.buildTableName("pipeline_configurations") + `
+		DELETE FROM ` + sm.buildTableName("piper_pipeline_configurations") + `
 		WHERE expires_at < NOW()`
 
 	result, err := sm.db.ExecContext(ctx, deletePipelineSQL)
@@ -562,7 +562,7 @@ func (sm *PostgreSQLStateManager) CleanupExpiredCache(ctx context.Context) error
 	// Clean up expired tenants
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	deleteTenantsSQL := `
-		DELETE FROM ` + sm.buildTableName("tenants_cache") + `
+		DELETE FROM ` + sm.buildTableName("piper_tenants_cache") + `
 		WHERE expires_at < NOW()`
 
 	result, err = sm.db.ExecContext(ctx, deleteTenantsSQL)
