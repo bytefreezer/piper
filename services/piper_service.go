@@ -124,6 +124,12 @@ func (s *PiperService) Start(ctx context.Context) error {
 		log.Warnf("Failed to send service start alert: %v", err)
 	}
 
+	// Cleanup stale locks from previous instances on startup
+	log.Infof("Cleaning up stale locks from previous instances")
+	if err := s.stateManager.CleanupStaleLocksOnStartup(ctx, s.cfg.App.InstanceID); err != nil {
+		log.Errorf("Failed to cleanup stale locks on startup: %v", err)
+	}
+
 	// Start discovery goroutine
 	s.wg.Add(1)
 	go s.discoveryLoop(ctx)

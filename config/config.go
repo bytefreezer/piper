@@ -212,50 +212,61 @@ func LoadConfig(configPath string) (*Config, error) {
 	return &config, nil
 }
 
-// generateInstanceID generates a dynamic instance ID based on IP address with fallbacks
+// generateInstanceID generates a unique instance ID based on IP address, PID, and timestamp
 func generateInstanceID() string {
+	pid := os.Getpid()
+	timestamp := time.Now().Unix()
+
 	// Try to get the first non-loopback IP address
-	interfaces, err := net.Interfaces()
-	if err == nil {
-		for _, iface := range interfaces {
-			if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-				continue
-			}
-
-			addrs, err := iface.Addrs()
-			if err != nil {
-				continue
-			}
-
-			for _, addr := range addrs {
-				var ip net.IP
-				switch v := addr.(type) {
-				case *net.IPNet:
-					ip = v.IP
-				case *net.IPAddr:
-					ip = v.IP
-				}
-
-				if ip == nil || ip.IsLoopback() || ip.To4() == nil {
-					continue
-				}
-
-				// Format IP as piper-192-168-1-100
-				ipStr := ip.String()
-				ipFormatted := strings.ReplaceAll(ipStr, ".", "-")
-				return fmt.Sprintf("piper-%s", ipFormatted)
-			}
-		}
+	if ip := getFirstNonLoopbackIP(); ip != "" {
+		ipFormatted := strings.ReplaceAll(ip, ".", "-")
+		return fmt.Sprintf("piper-%s-%d-%d", ipFormatted, pid, timestamp)
 	}
 
 	// Fallback to hostname
 	hostname, err := os.Hostname()
 	if err == nil && hostname != "" {
-		return fmt.Sprintf("piper-%s", hostname)
+		return fmt.Sprintf("piper-%s-%d-%d", hostname, pid, timestamp)
 	}
 
-	// Final fallback to static default
-	return "piper-default"
+	// Final fallback to static default with unique suffix
+	return fmt.Sprintf("piper-default-%d-%d", pid, timestamp)
+}
+
+// getFirstNonLoopbackIP extracts IP address logic for reuse
+func getFirstNonLoopbackIP() string {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			if ip == nil || ip.IsLoopback() || ip.To4() == nil {
+				continue
+			}
+
+			return ip.String()
+		}
+	}
+	return ""
 }
 
 // getDefaults returns a map of default configuration values

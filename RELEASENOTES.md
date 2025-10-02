@@ -11,6 +11,17 @@
   - All indexes updated with corresponding `piper_` prefixes
   - **Migration**: Existing installations will automatically create new tables with prefixed names
 
+### Lock Management Improvements
+- **Enhanced Instance ID Generation**: Instance IDs now include PID and timestamp for true uniqueness
+  - Format: `piper-{ip/hostname}-{pid}-{timestamp}`
+  - Example: `piper-192-168-1-100-12345-1759438349`
+  - Prevents lock conflicts between service restarts
+- **Startup Lock Cleanup**: Added automatic cleanup of stale locks from previous instances on startup
+  - Immediately cleans locks from previous processes with the same base instance ID
+  - Reduces lock wait time from 30 minutes to near-instant on restart
+  - Maintains TTL-based cleanup as safety fallback
+- **Improved Restart Behavior**: File processing can resume immediately after service restart instead of waiting for TTL expiration
+
 ## Version 1.0.1 - 2025-09-27
 
 ### Breaking Changes

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -376,6 +377,81 @@ func (sm *PostgreSQLStateManager) CleanupExpiredLocks(ctx context.Context) error
 	}
 
 	return nil
+}
+
+// CleanupStaleLocksOnStartup removes locks from previous instances of the same base processor
+func (sm *PostgreSQLStateManager) CleanupStaleLocksOnStartup(ctx context.Context, currentInstanceID string) error {
+	// Extract base instance ID (everything before the first hyphen after "piper-")
+	// Example: "piper-192-168-1-100-12345-1234567890" -> "piper-192-168-1-100"
+	baseID := extractBaseInstanceID(currentInstanceID)
+	if baseID == "" {
+		log.Warnf("Could not extract base ID from instance ID: %s", currentInstanceID)
+		return nil
+	}
+
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	deleteSQL := `
+		DELETE FROM ` + sm.buildTableName("piper_file_locks") + `
+		WHERE processor_id LIKE $1 AND processor_id != $2`
+
+	result, err := sm.db.ExecContext(ctx, deleteSQL, baseID+"-%", currentInstanceID)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup stale locks: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err == nil && rowsAffected > 0 {
+		log.Infof("Cleaned up %d stale locks from previous instances (base: %s)", rowsAffected, baseID)
+	}
+
+	return nil
+}
+
+// extractBaseInstanceID extracts the base instance ID without PID and timestamp
+// Example: "piper-192-168-1-100-12345-1234567890" -> "piper-192-168-1-100"
+// Example: "piper-hostname-12345-1234567890" -> "piper-hostname"
+func extractBaseInstanceID(instanceID string) string {
+	parts := strings.Split(instanceID, "-")
+	if len(parts) < 3 {
+		return ""
+	}
+
+	// Check if we have the expected format: piper-{base}-{pid}-{timestamp}
+	// The base part can contain hyphens (like IP addresses), so we need to find
+	// the last two numeric parts which should be PID and timestamp
+	if len(parts) >= 3 {
+		// Try to identify numeric suffix (PID-timestamp)
+		lastIdx := len(parts) - 1
+		secondLastIdx := len(parts) - 2
+
+		// Check if last two parts are numeric (PID and timestamp)
+		if isNumeric(parts[lastIdx]) && isNumeric(parts[secondLastIdx]) {
+			// Join everything except the last two numeric parts
+			baseparts := parts[:secondLastIdx]
+			return strings.Join(baseparts, "-")
+		}
+	}
+
+	// Fallback: assume only one hyphen separates base from suffix
+	// This handles cases like "piper-hostname-12345-1234567890"
+	if len(parts) >= 2 {
+		return strings.Join(parts[:len(parts)-2], "-")
+	}
+
+	return ""
+}
+
+// isNumeric checks if a string contains only digits
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // CachePipelineConfiguration caches a pipeline configuration
