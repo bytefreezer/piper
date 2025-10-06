@@ -225,17 +225,18 @@ func (sm *PostgreSQLStateManager) AcquireFileLockWithTTL(ctx context.Context, fi
 	lockTTL := time.Now().Add(ttl)
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	upsertSQL := `
-		INSERT INTO ` + sm.buildTableName("piper_file_locks") + ` (file_key, processor_type, processor_id, job_id, lock_timestamp, ttl)
-		VALUES ($1, $2, $3, $4, NOW(), $5)
+		INSERT INTO ` + sm.buildTableName("piper_file_locks") + ` (file_key, processor_type, processor_id, job_id, lock_timestamp, ttl, instance_id)
+		VALUES ($1, $2, $3, $4, NOW(), $5, $6)
 		ON CONFLICT (file_key) DO UPDATE SET
 			processor_type = EXCLUDED.processor_type,
 			processor_id = EXCLUDED.processor_id,
 			job_id = EXCLUDED.job_id,
 			lock_timestamp = NOW(),
 			ttl = EXCLUDED.ttl,
+			instance_id = EXCLUDED.instance_id,
 			lock_version = ` + sm.buildTableName("piper_file_locks") + `.lock_version + 1`
 
-	_, err = tx.ExecContext(ctx, upsertSQL, fileKey, processorType, processorID, jobID, lockTTL)
+	_, err = tx.ExecContext(ctx, upsertSQL, fileKey, processorType, processorID, jobID, lockTTL, processorID)
 	if err != nil {
 		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
@@ -276,13 +277,13 @@ func (sm *PostgreSQLStateManager) CreateJobRecord(ctx context.Context, job *doma
 		INSERT INTO ` + sm.buildTableName("piper_job_records") + ` (
 			job_id, tenant_id, dataset_id, processor_type, processor_id, status,
 			priority, retry_count, max_retries, created_at, updated_at, ttl,
-			source_files, file_size_bytes
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
+			source_files, file_size_bytes, instance_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
 
 	_, err := sm.db.ExecContext(ctx, insertSQL,
 		job.JobID, job.TenantID, job.DatasetID, job.ProcessorType, job.ProcessorID, string(job.Status),
 		job.Priority, job.RetryCount, job.MaxRetries, job.CreatedAt, job.UpdatedAt, jobTTL,
-		pq.Array(job.SourceFiles), job.FileSize)
+		pq.Array(job.SourceFiles), job.FileSize, job.ProcessorID)
 
 	if err != nil {
 		return fmt.Errorf("failed to create job record: %w", err)
@@ -455,24 +456,25 @@ func isNumeric(s string) bool {
 }
 
 // CachePipelineConfiguration caches a pipeline configuration
-func (sm *PostgreSQLStateManager) CachePipelineConfiguration(ctx context.Context, configKey, tenantID, datasetID, version string, configuration []byte, filterCount int) error {
+func (sm *PostgreSQLStateManager) CachePipelineConfiguration(ctx context.Context, configKey, tenantID, datasetID, version string, configuration []byte, filterCount int, instanceID string) error {
 	expiresAt := time.Now().Add(5 * time.Minute) // 5 minute cache
 
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	upsertSQL := `
 		INSERT INTO ` + sm.buildTableName("piper_pipeline_configurations") + ` (
 			config_key, tenant_id, dataset_id, configuration, version,
-			enabled, created_at, updated_at, cached_at, expires_at, filter_count
-		) VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW(), NOW(), $6, $7)
+			enabled, created_at, updated_at, cached_at, expires_at, filter_count, instance_id
+		) VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW(), NOW(), $6, $7, $8)
 		ON CONFLICT (config_key) DO UPDATE SET
 			configuration = EXCLUDED.configuration,
 			version = EXCLUDED.version,
 			updated_at = NOW(),
 			cached_at = NOW(),
 			expires_at = EXCLUDED.expires_at,
-			filter_count = EXCLUDED.filter_count`
+			filter_count = EXCLUDED.filter_count,
+			instance_id = EXCLUDED.instance_id`
 
-	_, err := sm.db.ExecContext(ctx, upsertSQL, configKey, tenantID, datasetID, configuration, version, expiresAt, filterCount)
+	_, err := sm.db.ExecContext(ctx, upsertSQL, configKey, tenantID, datasetID, configuration, version, expiresAt, filterCount, instanceID)
 	if err != nil {
 		return fmt.Errorf("failed to cache pipeline configuration: %w", err)
 	}
@@ -508,23 +510,24 @@ func (sm *PostgreSQLStateManager) GetCachedPipelineConfiguration(ctx context.Con
 }
 
 // CacheTenant caches tenant information
-func (sm *PostgreSQLStateManager) CacheTenant(ctx context.Context, tenantID, name string, datasets []string, active bool) error {
+func (sm *PostgreSQLStateManager) CacheTenant(ctx context.Context, tenantID, name string, datasets []string, active bool, instanceID string) error {
 	expiresAt := time.Now().Add(10 * time.Minute) // 10 minute cache for tenants
 
 	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
 	upsertSQL := `
 		INSERT INTO ` + sm.buildTableName("piper_tenants_cache") + ` (
-			tenant_id, name, datasets, active, created_at, updated_at, cached_at, expires_at
-		) VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW(), $5)
+			tenant_id, name, datasets, active, created_at, updated_at, cached_at, expires_at, instance_id
+		) VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW(), $5, $6)
 		ON CONFLICT (tenant_id) DO UPDATE SET
 			name = EXCLUDED.name,
 			datasets = EXCLUDED.datasets,
 			active = EXCLUDED.active,
 			updated_at = NOW(),
 			cached_at = NOW(),
-			expires_at = EXCLUDED.expires_at`
+			expires_at = EXCLUDED.expires_at,
+			instance_id = EXCLUDED.instance_id`
 
-	_, err := sm.db.ExecContext(ctx, upsertSQL, tenantID, name, pq.Array(datasets), active, expiresAt)
+	_, err := sm.db.ExecContext(ctx, upsertSQL, tenantID, name, pq.Array(datasets), active, expiresAt, instanceID)
 	if err != nil {
 		return fmt.Errorf("failed to cache tenant: %w", err)
 	}

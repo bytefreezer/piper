@@ -24,7 +24,7 @@ func NewConfigManager(cfg *config.Config, stateManager *storage.PostgreSQLStateM
 	pipelineClient := pipeline.NewPipelineClient(cfg)
 
 	// Initialize pipeline database for local caching
-	pipelineDatabase := pipeline.NewPipelineDatabase(pipelineClient, stateManager)
+	pipelineDatabase := pipeline.NewPipelineDatabase(pipelineClient, stateManager, cfg.App.InstanceID)
 
 	return &ConfigManager{
 		cfg:              cfg,

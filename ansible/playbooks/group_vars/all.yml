@@ -85,11 +85,21 @@ config:
 
   # Pipeline configuration
   pipeline:
-    controller_endpoint: "http://bytefreezer-control:8080"
+    controller_endpoint: ""  # Deprecated - use control_service instead
     config_refresh_interval: "5m"
     geoip_database_path: "/opt/geoip"
     geoip_city_database: "GeoLite2-City.mmdb"
     geoip_country_database: "GeoLite2-Country.mmdb"
+    enable_geoip: false
+
+  # Control Service configuration (replaces dev mode and legacy controller)
+  control_service:
+    enabled: true
+    base_url: "{{ bytefreezer_control_url | default('http://192.168.86.103:8082') }}"
+    api_key: "{{ bytefreezer_control_api_key | default('') }}"
+    timeout_seconds: 30
+    account_id: "{{ bytefreezer_control_account_id | default('dev-account') }}"
+    tenant_id: "{{ bytefreezer_control_tenant_id | default('') }}"
 
   # Parser configuration for log parsing (Logstash-style)
   parsers:
@@ -149,7 +159,7 @@ config:
     enabled: false
 
   # Development mode (set to true for dev environment)
-  dev: true
+  dev: false  # Disabled - using Control Service (see control_service above)
 
 # Download configuration
 download:
@@ -165,3 +175,8 @@ docker:
 remove:
   cache_dir: "{{ bytefreezer_piper_remove_cache_dir | default(false) }}"
   spool_dir: "{{ bytefreezer_piper_remove_spool_dir | default(false) }}"
+
+# AWX Survey Variables (Override via job template surveys)
+force_reinstall: "{{ force_reinstall | default(false) }}"
+skip_validation: "{{ skip_validation | default(false) }}"
+enable_debug_logging: "{{ enable_debug_logging | default(false) }}"

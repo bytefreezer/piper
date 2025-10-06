@@ -56,12 +56,21 @@ processing:
 
 # Pipeline configuration
 pipeline:
-  controller_endpoint: ""  # Use database cache instead of API calls
+  controller_endpoint: ""  # Deprecated - use control_service instead
   config_refresh_interval: "5m"
   geoip_database_path: "/tmp/geoip"
   geoip_city_database: "GeoLite2-City.mmdb"
   geoip_country_database: "GeoLite2-Country.mmdb"
   enable_geoip: false
+
+# Control Service configuration (replaces dev mode)
+control_service:
+  enabled: true
+  base_url: "http://192.168.86.103:8082"
+  api_key: ""  # Add API key if authentication is enabled
+  timeout_seconds: 30
+  account_id: "dev-account"  # The account created by populate_fake_data_simple.go
+  tenant_id: ""  # Optional - leave empty to fetch all tenants
 
 # Parser configuration for log parsing (Logstash-style)
 parsers:
@@ -155,4 +164,4 @@ housekeeping:
   intervalseconds: 300  # 5 minutes
 
 # Development mode
-dev: true  # Use fake control responses for testing
+dev: false  # Disabled - using Control Service instead (see control_service config above)

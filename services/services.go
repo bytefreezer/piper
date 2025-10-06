@@ -31,7 +31,7 @@ func NewServices(conf *config.Config) *Services {
 	pipelineClient := pipeline.NewPipelineClient(conf)
 
 	// Create pipeline database
-	pipelineDatabase := pipeline.NewPipelineDatabase(pipelineClient, stateManager)
+	pipelineDatabase := pipeline.NewPipelineDatabase(pipelineClient, stateManager, conf.App.InstanceID)
 
 	// Create piper service
 	piperService, err := NewPiperService(conf)

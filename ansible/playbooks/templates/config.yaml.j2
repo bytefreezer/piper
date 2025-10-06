@@ -58,11 +58,21 @@ processing:
 
 # Pipeline configuration
 pipeline:
-  controller_endpoint: {{ config.pipeline.controller_endpoint }}
+  controller_endpoint: "{{ config.pipeline.controller_endpoint }}"
   config_refresh_interval: {{ config.pipeline.config_refresh_interval }}
   geoip_database_path: {{ config.pipeline.geoip_database_path }}
   geoip_city_database: {{ config.pipeline.geoip_city_database }}
   geoip_country_database: {{ config.pipeline.geoip_country_database }}
+  enable_geoip: {{ config.pipeline.enable_geoip | lower }}
+
+# Control Service configuration (replaces dev mode and legacy controller)
+control_service:
+  enabled: {{ config.control_service.enabled | lower }}
+  base_url: {{ config.control_service.base_url }}
+  api_key: "{{ config.control_service.api_key }}"
+  timeout_seconds: {{ config.control_service.timeout_seconds }}
+  account_id: {{ config.control_service.account_id }}
+  tenant_id: "{{ config.control_service.tenant_id }}"
 
 # Parser configuration for log parsing (Logstash-style)
 parsers:

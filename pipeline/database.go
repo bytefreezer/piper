@@ -35,15 +35,19 @@ type PipelineDatabase struct {
 	cacheHits   int64
 	cacheMisses int64
 	statsMutex  sync.RWMutex
+
+	// Instance tracking
+	instanceID string
 }
 
 // NewPipelineDatabase creates a new pipeline database
-func NewPipelineDatabase(client *PipelineClient, stateManager *storage.PostgreSQLStateManager) *PipelineDatabase {
+func NewPipelineDatabase(client *PipelineClient, stateManager *storage.PostgreSQLStateManager, instanceID string) *PipelineDatabase {
 	return &PipelineDatabase{
 		pipelines:    make(map[string]*domain.PipelineConfiguration),
 		tenants:      make(map[string]TenantInfo),
 		client:       client,
 		stateManager: stateManager,
+		instanceID:   instanceID,
 		isHealthy:    false,
 	}
 }
@@ -65,7 +69,7 @@ func (pdb *PipelineDatabase) UpdateDatabase(ctx context.Context) error {
 	newTenants := make(map[string]TenantInfo)
 	for _, tenant := range tenants {
 		// Cache in PostgreSQL
-		if err := pdb.stateManager.CacheTenant(ctx, tenant.TenantID, tenant.Name, tenant.Datasets, tenant.Active); err != nil {
+		if err := pdb.stateManager.CacheTenant(ctx, tenant.TenantID, tenant.Name, tenant.Datasets, tenant.Active, pdb.instanceID); err != nil {
 			log.Warnf("Failed to cache tenant %s in database: %v", tenant.TenantID, err)
 		}
 
@@ -104,7 +108,7 @@ func (pdb *PipelineDatabase) UpdateDatabase(ctx context.Context) error {
 			}
 
 			filterCount := len(pipelineResp.Configuration.Filters)
-			if err := pdb.stateManager.CachePipelineConfiguration(ctx, configKey, tenant.TenantID, datasetID, pipelineResp.Version, configJSON, filterCount); err != nil {
+			if err := pdb.stateManager.CachePipelineConfiguration(ctx, configKey, tenant.TenantID, datasetID, pipelineResp.Version, configJSON, filterCount, pdb.instanceID); err != nil {
 				log.Warnf("Failed to cache pipeline config %s in database: %v", configKey, err)
 			}
 
