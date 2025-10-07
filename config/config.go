@@ -25,6 +25,7 @@ type Config struct {
 	PostgreSQL       PostgreSQL       `koanf:"postgresql"`
 	Processing       Processing       `koanf:"processing"`
 	Pipeline         Pipeline         `koanf:"pipeline"`
+	ControlService   ControlService   `koanf:"control_service"`
 	Monitoring       Monitoring       `koanf:"monitoring"`
 	Secrets          Secrets          `koanf:"secrets"`
 	Housekeeping     Housekeeping     `koanf:"housekeeping"`
@@ -109,6 +110,17 @@ type Pipeline struct {
 	GeoIPDatabasePath     string        `koanf:"geoip_database_path"`
 	GeoIPCityDatabase     string        `koanf:"geoip_city_database"`
 	GeoIPCountryDatabase  string        `koanf:"geoip_country_database"`
+	EnableGeoIP           bool          `koanf:"enable_geoip"`
+}
+
+// ControlService represents Control Service configuration
+type ControlService struct {
+	Enabled        bool   `koanf:"enabled"`
+	BaseURL        string `koanf:"base_url"`
+	APIKey         string `koanf:"api_key"`
+	TimeoutSeconds int    `koanf:"timeout_seconds"`
+	AccountID      string `koanf:"account_id"`
+	TenantID       string `koanf:"tenant_id"`
 }
 
 // Monitoring represents monitoring and observability configuration
@@ -300,6 +312,14 @@ func getDefaults() map[string]interface{} {
 		"pipeline.geoip_database_path":     "/opt/geoip",
 		"pipeline.geoip_city_database":     "GeoLite2-City.mmdb",
 		"pipeline.geoip_country_database":  "GeoLite2-Country.mmdb",
+		"pipeline.enable_geoip":            false,
+
+		"control_service.enabled":         false,
+		"control_service.base_url":        "",
+		"control_service.api_key":         "",
+		"control_service.timeout_seconds": 30,
+		"control_service.account_id":      "",
+		"control_service.tenant_id":       "",
 
 		"monitoring.metrics_port":   9090,
 		"monitoring.log_level":      "info",

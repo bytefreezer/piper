@@ -22,6 +22,13 @@
   - Maintains TTL-based cleanup as safety fallback
 - **Improved Restart Behavior**: File processing can resume immediately after service restart instead of waiting for TTL expiration
 
+### Configuration Updates
+- **Added Control Service Configuration**: Added native support for `control_service` configuration block
+  - Follows same pattern as other ByteFreezer components for consistency
+  - Supports `enabled`, `base_url`, `api_key`, `timeout_seconds`, `account_id`, `tenant_id` settings
+  - Replaces legacy `pipeline.controller_endpoint` for proper control service integration
+  - Default configuration has `control_service.enabled: false` to maintain backward compatibility
+
 ### Bug Fixes
 - **Fixed PostgreSQL Table References**: Corrected SQL query that referenced old `file_locks` table name instead of new `piper_file_locks` table
   - Resolves error: "missing FROM-clause entry for table 'file_locks'"
