@@ -105,6 +105,8 @@ func createS3Client(region, accessKey, secretKey, endpoint string, useSSL bool) 
 		client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 			o.BaseEndpoint = aws.String(endpointURL)
 			o.UsePathStyle = true
+			// Disable checksum validation for MinIO compatibility
+			o.DisableS3ExpressSessionAuth = aws.Bool(true)
 		})
 	} else {
 		// Standard AWS S3

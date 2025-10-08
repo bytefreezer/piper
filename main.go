@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	stdlog "log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -45,6 +47,9 @@ func Run() error {
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
+
+	// Suppress AWS SDK warnings about checksums (MinIO compatibility)
+	stdlog.SetOutput(io.Discard)
 
 	// Initialize logger
 	log.Infof("Starting bytefreezer-piper version %s", version)
