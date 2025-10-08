@@ -364,13 +364,57 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 
 		log.Debugf("Fetched %d tenants for account %s", len(tenantsResp.Items), account.ID)
 
-		// Convert to TenantInfo
+		// Convert to TenantInfo and fetch datasets for each tenant
 		for _, tenant := range tenantsResp.Items {
 			if !tenant.Active {
 				continue
 			}
+
+			// Fetch datasets for this tenant
+			datasetsURL := fmt.Sprintf("%s/api/v1/tenants/%s/datasets?limit=1000",
+				sdm.config.ControlService.BaseURL, tenant.ID)
+			datasetReq, err := http.NewRequestWithContext(ctx, "GET", datasetsURL, nil)
+			if err != nil {
+				log.Warnf("Failed to create datasets request for tenant %s: %v", tenant.ID, err)
+				continue
+			}
+
+			if sdm.config.ControlService.APIKey != "" {
+				datasetReq.Header.Set("X-API-Key", sdm.config.ControlService.APIKey)
+			}
+
+			datasetResp, err := sdm.httpClient.Do(datasetReq)
+			if err != nil {
+				log.Warnf("Failed to fetch datasets for tenant %s: %v", tenant.ID, err)
+				continue
+			}
+
+			var datasetsResp struct {
+				Items []struct {
+					ID     string `json:"id"`
+					Active bool   `json:"active"`
+				} `json:"items"`
+			}
+			if err := json.NewDecoder(datasetResp.Body).Decode(&datasetsResp); err != nil {
+				datasetResp.Body.Close()
+				log.Warnf("Failed to decode datasets for tenant %s: %v", tenant.ID, err)
+				continue
+			}
+			datasetResp.Body.Close()
+
+			// Extract active dataset IDs
+			datasets := make([]string, 0)
+			for _, ds := range datasetsResp.Items {
+				if ds.Active {
+					datasets = append(datasets, ds.ID)
+				}
+			}
+
+			log.Debugf("Fetched %d datasets for tenant %s: %v", len(datasets), tenant.ID, datasets)
+
 			allTenants = append(allTenants, TenantInfo{
 				TenantID: tenant.ID,
+				Datasets: datasets,
 				Active:   true,
 			})
 		}
