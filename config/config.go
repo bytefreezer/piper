@@ -119,8 +119,6 @@ type ControlService struct {
 	BaseURL        string `koanf:"base_url"`
 	APIKey         string `koanf:"api_key"`
 	TimeoutSeconds int    `koanf:"timeout_seconds"`
-	AccountID      string `koanf:"account_id"`
-	TenantID       string `koanf:"tenant_id"`
 }
 
 // Monitoring represents monitoring and observability configuration
@@ -318,8 +316,6 @@ func getDefaults() map[string]interface{} {
 		"control_service.base_url":        "",
 		"control_service.api_key":         "",
 		"control_service.timeout_seconds": 30,
-		"control_service.account_id":      "",
-		"control_service.tenant_id":       "",
 
 		"monitoring.metrics_port":   9090,
 		"monitoring.log_level":      "info",

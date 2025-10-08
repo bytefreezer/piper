@@ -280,35 +280,104 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 		return sdm.getFakeTenants(), nil
 	}
 
-	if sdm.config.Pipeline.ControllerEndpoint == "" {
-		// If no control service is configured, return empty list
-		log.Warnf("No controller endpoint configured, no tenants will be processed")
+	// Check if Control Service is configured
+	if !sdm.config.ControlService.Enabled || sdm.config.ControlService.BaseURL == "" {
+		log.Warnf("Control Service not configured, no tenants will be processed")
 		return []TenantInfo{}, nil
 	}
 
-	url := fmt.Sprintf("%s/api/v2/tenants", sdm.config.Pipeline.ControllerEndpoint)
+	log.Infof("Fetching tenants from Control Service: %s", sdm.config.ControlService.BaseURL)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	// First, fetch all accounts
+	accountsURL := fmt.Sprintf("%s/api/v1/accounts?limit=1000", sdm.config.ControlService.BaseURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", accountsURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create accounts request: %w", err)
+	}
+
+	// Add API key if configured
+	if sdm.config.ControlService.APIKey != "" {
+		req.Header.Set("X-API-Key", sdm.config.ControlService.APIKey)
 	}
 
 	resp, err := sdm.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call control service: %w", err)
+		return nil, fmt.Errorf("failed to call control service for accounts: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("control service returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("control service returned status %d for accounts", resp.StatusCode)
 	}
 
-	var tenants []TenantInfo
-	if err := json.NewDecoder(resp.Body).Decode(&tenants); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	var accountsResp struct {
+		Items []struct {
+			ID     string `json:"id"`
+			Name   string `json:"name"`
+			Active bool   `json:"active"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&accountsResp); err != nil {
+		return nil, fmt.Errorf("failed to decode accounts response: %w", err)
 	}
 
-	return tenants, nil
+	log.Infof("Fetched %d accounts from Control Service", len(accountsResp.Items))
+
+	// Fetch tenants for each account
+	allTenants := make([]TenantInfo, 0)
+	for _, account := range accountsResp.Items {
+		if !account.Active {
+			continue
+		}
+
+		tenantsURL := fmt.Sprintf("%s/api/v1/accounts/%s/tenants?limit=1000",
+			sdm.config.ControlService.BaseURL, account.ID)
+		req, err := http.NewRequestWithContext(ctx, "GET", tenantsURL, nil)
+		if err != nil {
+			log.Warnf("Failed to create tenants request for account %s: %v", account.ID, err)
+			continue
+		}
+
+		if sdm.config.ControlService.APIKey != "" {
+			req.Header.Set("X-API-Key", sdm.config.ControlService.APIKey)
+		}
+
+		resp, err := sdm.httpClient.Do(req)
+		if err != nil {
+			log.Warnf("Failed to fetch tenants for account %s: %v", account.ID, err)
+			continue
+		}
+
+		var tenantsResp struct {
+			Items []struct {
+				ID     string `json:"id"`
+				Name   string `json:"name"`
+				Active bool   `json:"active"`
+			} `json:"items"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&tenantsResp); err != nil {
+			resp.Body.Close()
+			log.Warnf("Failed to decode tenants for account %s: %v", account.ID, err)
+			continue
+		}
+		resp.Body.Close()
+
+		log.Debugf("Fetched %d tenants for account %s", len(tenantsResp.Items), account.ID)
+
+		// Convert to TenantInfo
+		for _, tenant := range tenantsResp.Items {
+			if !tenant.Active {
+				continue
+			}
+			allTenants = append(allTenants, TenantInfo{
+				TenantID: tenant.ID,
+				Active:   true,
+			})
+		}
+	}
+
+	log.Infof("Total tenants fetched from Control Service: %d", len(allTenants))
+	return allTenants, nil
 }
 
 // discoverFilesForTenant discovers files for a specific tenant

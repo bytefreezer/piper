@@ -67,10 +67,8 @@ pipeline:
 control_service:
   enabled: true
   base_url: "http://192.168.86.103:8082"
-  api_key: ""  # Add API key if authentication is enabled
+  api_key: "key122345"  # Add API key if authentication is enabled
   timeout_seconds: 30
-  account_id: "dev-account"  # The account created by populate_fake_data_simple.go
-  tenant_id: ""  # Optional - leave empty to fetch all tenants
 
 # Parser configuration for log parsing (Logstash-style)
 parsers:
