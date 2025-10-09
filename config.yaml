@@ -161,5 +161,12 @@ housekeeping:
   enabled: true
   intervalseconds: 300  # 5 minutes
 
+# Health reporting configuration
+health_reporting:
+  enabled: true  # Enable health reporting to control service
+  control_url: "http://192.168.86.103:8082"  # Control service URL
+  report_interval: "30s"  # How often to send health reports
+  timeout_seconds: 10  # HTTP timeout for health requests
+
 # Development mode
 dev: false  # Disabled - using Control Service instead (see control_service config above)

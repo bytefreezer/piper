@@ -161,6 +161,15 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 		log.Fatalf("Failed to start piper service: %v", err)
 	}
 
+	// Start health reporting if enabled
+	if svc.Services.HealthReporter != nil {
+		if err := svc.Services.HealthReporter.Start(svc.ctx); err != nil {
+			log.Errorf("Failed to start health reporter: %v", err)
+		} else {
+			log.Info("Health reporter started successfully")
+		}
+	}
+
 
 	baseInterval := time.Duration(svc.Config.Housekeeping.IntervalSeconds) * time.Second
 	if baseInterval <= 0 {
@@ -205,6 +214,13 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 			}
 
 			svc.HttpApi.Stop()
+
+			// Stop health reporting
+			if svc.Services.HealthReporter != nil {
+				svc.Services.HealthReporter.Stop()
+				log.Info("Health reporter stopped")
+			}
+
 			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeout)
 			defer shutdownCancel()
 			svc.Services.PiperService.Stop(shutdownCtx)

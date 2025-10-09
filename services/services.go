@@ -5,6 +5,7 @@ import (
 
 	"github.com/n0needt0/go-goodies/log"
 
+	"github.com/n0needt0/bytefreezer-control/health"
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
 	"github.com/n0needt0/bytefreezer-piper/storage"
@@ -16,6 +17,7 @@ type Services struct {
 	PiperService     *PiperService
 	PipelineDatabase *pipeline.PipelineDatabase
 	StateManager     *storage.PostgreSQLStateManager
+	HealthReporter   *health.Reporter
 }
 
 // NewServices creates and initializes all services
@@ -39,12 +41,18 @@ func NewServices(conf *config.Config) *Services {
 		log.Fatalf("Failed to create piper service: %v", err)
 	}
 
-	return &Services{
+	// Create services struct first
+	services := &Services{
 		Config:           conf,
 		PiperService:     piperService,
 		PipelineDatabase: pipelineDatabase,
 		StateManager:     stateManager,
 	}
+
+	// Create health reporter (after services are initialized)
+	services.HealthReporter = CreateHealthReporter(services)
+
+	return services
 }
 
 // GetPipelineConfigAsInterface returns pipeline config as interface for API

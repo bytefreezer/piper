@@ -32,6 +32,7 @@ type Config struct {
 	DLQ              DLQ              `koanf:"dlq"`
 	SOC              SOC              `koanf:"soc"`
 	FailureThreshold FailureThreshold `koanf:"failure_threshold"`
+	HealthReporting  HealthReporting  `koanf:"health_reporting"`
 	Dev              bool             `koanf:"dev"`
 }
 
@@ -169,6 +170,14 @@ type FailureThreshold struct {
 	WindowSize       int     `koanf:"window_size"`
 	CheckInterval    string  `koanf:"check_interval"`
 	CooldownPeriod   string  `koanf:"cooldown_period"`
+}
+
+// HealthReporting represents health reporting configuration
+type HealthReporting struct {
+	Enabled         bool          `koanf:"enabled"`
+	ControlURL      string        `koanf:"control_url"`
+	ReportInterval  time.Duration `koanf:"report_interval"`
+	TimeoutSeconds  int           `koanf:"timeout_seconds"`
 }
 
 // LoadConfig loads configuration from file and environment variables
@@ -343,6 +352,11 @@ func getDefaults() map[string]interface{} {
 		"failure_threshold.window_size":       100,
 		"failure_threshold.check_interval":    "5m",
 		"failure_threshold.cooldown_period":   "30m",
+
+		"health_reporting.enabled":         false,
+		"health_reporting.control_url":     "http://192.168.86.103:8082",
+		"health_reporting.report_interval": "30s",
+		"health_reporting.timeout_seconds": 10,
 
 		"app.dev": false,
 	}
