@@ -161,6 +161,14 @@ config:
   # Development mode (set to true for dev environment)
   dev: false  # Disabled - using Control Service (see control_service above)
 
+  # Health reporting configuration for service registration and monitoring
+  health_reporting:
+    enabled: true
+    control_url: "{{ bytefreezer_control_url | default('http://192.168.86.103:8082') }}"
+    report_interval: "30s"
+    timeout_seconds: 10
+    register_on_startup: true
+
 # Download configuration
 download:
   url: "https://github.com/{{ github_repo }}/releases/{{ 'latest/download' if version == 'latest' else 'download/' + version }}/bytefreezer-piper-linux-amd64.tar.gz"
