@@ -174,10 +174,11 @@ type FailureThreshold struct {
 
 // HealthReporting represents health reporting configuration
 type HealthReporting struct {
-	Enabled         bool          `koanf:"enabled"`
-	ControlURL      string        `koanf:"control_url"`
-	ReportInterval  time.Duration `koanf:"report_interval"`
-	TimeoutSeconds  int           `koanf:"timeout_seconds"`
+	Enabled           bool          `koanf:"enabled"`
+	ControlURL        string        `koanf:"control_url"`
+	ReportInterval    time.Duration `koanf:"report_interval"`
+	TimeoutSeconds    int           `koanf:"timeout_seconds"`
+	RegisterOnStartup bool          `koanf:"register_on_startup"`
 }
 
 // LoadConfig loads configuration from file and environment variables
