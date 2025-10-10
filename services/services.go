@@ -2,10 +2,11 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/n0needt0/go-goodies/log"
 
-	"github.com/n0needt0/bytefreezer-control/health"
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
 	"github.com/n0needt0/bytefreezer-piper/storage"
@@ -17,7 +18,7 @@ type Services struct {
 	PiperService     *PiperService
 	PipelineDatabase *pipeline.PipelineDatabase
 	StateManager     *storage.PostgreSQLStateManager
-	HealthReporter   *health.Reporter
+	HealthReporter   *HealthReportingService
 }
 
 // NewServices creates and initializes all services
@@ -50,7 +51,32 @@ func NewServices(conf *config.Config) *Services {
 	}
 
 	// Create health reporter (after services are initialized)
-	services.HealthReporter = CreateHealthReporter(services)
+	if conf.HealthReporting.Enabled {
+		// Parse report interval
+		reportInterval, err := time.ParseDuration(conf.HealthReporting.ReportInterval)
+		if err != nil {
+			log.Warnf("Failed to parse health reporting interval '%s', using default 30s: %v", conf.HealthReporting.ReportInterval, err)
+			reportInterval = 30 * time.Second
+		}
+
+		// Parse timeout
+		timeout := time.Duration(conf.HealthReporting.TimeoutSeconds) * time.Second
+
+		// Create instance API URL
+		instanceAPI := fmt.Sprintf("http://localhost:%d", conf.Server.ApiPort)
+
+		// Create health reporting service
+		services.HealthReporter = NewHealthReportingService(
+			conf.HealthReporting.ControlURL,
+			"bytefreezer-piper",
+			instanceAPI,
+			reportInterval,
+			timeout,
+		)
+		log.Info("Health reporting service initialized")
+	} else {
+		log.Info("Health reporting disabled")
+	}
 
 	return services
 }

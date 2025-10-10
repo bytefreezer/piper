@@ -163,11 +163,8 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 
 	// Start health reporting if enabled
 	if svc.Services.HealthReporter != nil {
-		if err := svc.Services.HealthReporter.Start(svc.ctx); err != nil {
-			log.Errorf("Failed to start health reporter: %v", err)
-		} else {
-			log.Info("Health reporter started successfully")
-		}
+		svc.Services.HealthReporter.Start()
+		log.Info("Health reporter started successfully")
 	}
 
 

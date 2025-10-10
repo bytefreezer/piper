@@ -174,11 +174,11 @@ type FailureThreshold struct {
 
 // HealthReporting represents health reporting configuration
 type HealthReporting struct {
-	Enabled           bool          `koanf:"enabled"`
-	ControlURL        string        `koanf:"control_url"`
-	ReportInterval    time.Duration `koanf:"report_interval"`
-	TimeoutSeconds    int           `koanf:"timeout_seconds"`
-	RegisterOnStartup bool          `koanf:"register_on_startup"`
+	Enabled           bool   `koanf:"enabled"`
+	ControlURL        string `koanf:"control_url"`
+	ReportInterval    string `koanf:"report_interval"`
+	TimeoutSeconds    int    `koanf:"timeout_seconds"`
+	RegisterOnStartup bool   `koanf:"register_on_startup"`
 }
 
 // LoadConfig loads configuration from file and environment variables
@@ -354,10 +354,11 @@ func getDefaults() map[string]interface{} {
 		"failure_threshold.check_interval":    "5m",
 		"failure_threshold.cooldown_period":   "30m",
 
-		"health_reporting.enabled":         false,
-		"health_reporting.control_url":     "http://192.168.86.103:8082",
-		"health_reporting.report_interval": "30s",
-		"health_reporting.timeout_seconds": 10,
+		"health_reporting.enabled":              false,
+		"health_reporting.control_url":          "http://192.168.86.103:8082",
+		"health_reporting.report_interval":      "30s",
+		"health_reporting.timeout_seconds":      10,
+		"health_reporting.register_on_startup":  true,
 
 		"app.dev": false,
 	}

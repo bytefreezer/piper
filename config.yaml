@@ -167,6 +167,7 @@ health_reporting:
   control_url: "http://192.168.86.103:8082"  # Control service URL
   report_interval: "30s"  # How often to send health reports
   timeout_seconds: 10  # HTTP timeout for health requests
+  register_on_startup: true  # Register service instance on startup
 
 # Development mode
 dev: false  # Disabled - using Control Service instead (see control_service config above)
