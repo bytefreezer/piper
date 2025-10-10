@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/n0needt0/go-goodies/log"
@@ -62,8 +63,15 @@ func NewServices(conf *config.Config) *Services {
 		// Parse timeout
 		timeout := time.Duration(conf.HealthReporting.TimeoutSeconds) * time.Second
 
-		// Create instance API URL
-		instanceAPI := fmt.Sprintf("http://localhost:%d", conf.Server.ApiPort)
+		// Get actual hostname
+		hostname, err := os.Hostname()
+		if err != nil {
+			log.Warnf("Failed to get hostname, using 'localhost': %v", err)
+			hostname = "localhost"
+		}
+
+		// Create instance API URL without protocol
+		instanceAPI := fmt.Sprintf("%s:%d", hostname, conf.Server.ApiPort)
 
 		// Create health reporting service
 		services.HealthReporter = NewHealthReportingService(
