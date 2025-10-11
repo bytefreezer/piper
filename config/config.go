@@ -176,7 +176,7 @@ type FailureThreshold struct {
 type HealthReporting struct {
 	Enabled           bool   `koanf:"enabled"`
 	ControlURL        string `koanf:"control_url"`
-	ReportInterval    string `koanf:"report_interval"`
+	ReportInterval    int    `koanf:"report_interval"` // Interval in seconds
 	TimeoutSeconds    int    `koanf:"timeout_seconds"`
 	RegisterOnStartup bool   `koanf:"register_on_startup"`
 }
@@ -356,7 +356,7 @@ func getDefaults() map[string]interface{} {
 
 		"health_reporting.enabled":              false,
 		"health_reporting.control_url":          "http://192.168.86.103:8082",
-		"health_reporting.report_interval":      "30s",
+		"health_reporting.report_interval":      30,
 		"health_reporting.timeout_seconds":      10,
 		"health_reporting.register_on_startup":  true,
 

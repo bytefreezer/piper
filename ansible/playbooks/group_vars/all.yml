@@ -165,7 +165,7 @@ config:
   health_reporting:
     enabled: true
     control_url: "{{ bytefreezer_control_url | default('http://192.168.86.103:8082') }}"
-    report_interval: "30s"
+    report_interval: 30
     timeout_seconds: 10
     register_on_startup: true
 

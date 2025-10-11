@@ -54,9 +54,9 @@ func NewServices(conf *config.Config) *Services {
 	// Create health reporter (after services are initialized)
 	if conf.HealthReporting.Enabled {
 		// Parse report interval
-		reportInterval, err := time.ParseDuration(conf.HealthReporting.ReportInterval)
-		if err != nil {
-			log.Warnf("Failed to parse health reporting interval '%s', using default 30s: %v", conf.HealthReporting.ReportInterval, err)
+		reportInterval := time.Duration(conf.HealthReporting.ReportInterval) * time.Second
+		if reportInterval <= 0 {
+			log.Warnf("Invalid health reporting interval %d, using default 30s", conf.HealthReporting.ReportInterval)
 			reportInterval = 30 * time.Second
 		}
 
