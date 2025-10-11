@@ -96,6 +96,11 @@ type PostgreSQL struct {
 	Password string `koanf:"password"`
 	SSLMode  string `koanf:"ssl_mode"`
 	Schema   string `koanf:"schema"`
+	// Connection pool settings
+	MaxOpenConns    int           `koanf:"max_open_conns"`     // Maximum number of open connections (0 = unlimited)
+	MaxIdleConns    int           `koanf:"max_idle_conns"`     // Maximum number of idle connections
+	ConnMaxLifetime time.Duration `koanf:"conn_max_lifetime"`  // Maximum connection lifetime
+	ConnMaxIdleTime time.Duration `koanf:"conn_max_idle_time"` // Maximum connection idle time
 }
 
 // Processing represents processing engine configuration
@@ -312,6 +317,12 @@ func getDefaults() map[string]interface{} {
 		"s3_geoip.region":      "us-east-1",
 		"s3_geoip.endpoint":    "192.168.86.125:9000",
 		"s3_geoip.ssl":         false,
+
+		// PostgreSQL connection pool defaults
+		"postgresql.max_open_conns":     25,      // Enough for 10 workers + overhead
+		"postgresql.max_idle_conns":     10,      // Match concurrent job count
+		"postgresql.conn_max_lifetime":  "5m",    // Rotate connections every 5 minutes
+		"postgresql.conn_max_idle_time": "5m",    // Close idle connections after 5 minutes
 
 		"processing.max_concurrent_jobs": 10,
 		"processing.job_timeout":         "10m",

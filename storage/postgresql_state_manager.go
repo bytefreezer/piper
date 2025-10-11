@@ -31,6 +31,24 @@ func NewPostgreSQLStateManager(cfg *config.PostgreSQL) (*PostgreSQLStateManager,
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
+	// Configure connection pool
+	if cfg.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(cfg.MaxOpenConns)
+		log.Infof("PostgreSQL: Set MaxOpenConns to %d", cfg.MaxOpenConns)
+	}
+	if cfg.MaxIdleConns > 0 {
+		db.SetMaxIdleConns(cfg.MaxIdleConns)
+		log.Infof("PostgreSQL: Set MaxIdleConns to %d", cfg.MaxIdleConns)
+	}
+	if cfg.ConnMaxLifetime > 0 {
+		db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+		log.Infof("PostgreSQL: Set ConnMaxLifetime to %s", cfg.ConnMaxLifetime)
+	}
+	if cfg.ConnMaxIdleTime > 0 {
+		db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
+		log.Infof("PostgreSQL: Set ConnMaxIdleTime to %s", cfg.ConnMaxIdleTime)
+	}
+
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}

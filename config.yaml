@@ -48,6 +48,11 @@ postgresql:
   password: "bytefreezer123"
   ssl_mode: "disable"
   schema: "public"
+  # Connection pool settings (prevents "context deadline exceeded" errors)
+  max_open_conns: 25       # Maximum open connections (enough for 10 workers + overhead)
+  max_idle_conns: 10       # Maximum idle connections (matches max_concurrent_jobs)
+  conn_max_lifetime: "5m"  # Rotate connections every 5 minutes
+  conn_max_idle_time: "5m" # Close idle connections after 5 minutes
 
 # Processing engine configuration
 processing:
