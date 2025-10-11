@@ -22,7 +22,6 @@ type HealthReportingService struct {
 	httpClient     *http.Client
 	enabled        bool
 	stopChan       chan bool
-	startTime      time.Time
 }
 
 // ServiceRegistrationRequest represents a service registration request
@@ -30,9 +29,7 @@ type ServiceRegistrationRequest struct {
 	ServiceType   string                 `json:"service_type"`
 	InstanceID    string                 `json:"instance_id,omitempty"`
 	InstanceAPI   string                 `json:"instance_api"`
-	Status        string                 `json:"status"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
-	Metrics       map[string]interface{} `json:"metrics,omitempty"`
 }
 
 // ServiceRegistrationResponse represents a service registration response
@@ -45,12 +42,10 @@ type ServiceRegistrationResponse struct {
 
 // HealthReportRequest represents a health report request
 type HealthReportRequest struct {
-	ServiceType   string                 `json:"service_type"`
-	InstanceID    string                 `json:"instance_id"`
-	InstanceAPI   string                 `json:"instance_api"`
-	Status        string                 `json:"status"`
-	Configuration map[string]interface{} `json:"configuration,omitempty"`
-	Metrics       map[string]interface{} `json:"metrics,omitempty"`
+	ServiceName string                 `json:"service_name"`
+	ServiceID   string                 `json:"service_id"`
+	Healthy     bool                   `json:"healthy"`
+	Metrics     map[string]interface{} `json:"metrics,omitempty"`
 }
 
 // HealthReportResponse represents a health report response
@@ -77,9 +72,8 @@ func NewHealthReportingService(controlURL, serviceType, instanceAPI string, repo
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-		enabled:   true,
-		stopChan:  make(chan bool),
-		startTime: time.Now(),
+		enabled:  true,
+		stopChan: make(chan bool),
 	}
 }
 
@@ -115,43 +109,14 @@ func (h *HealthReportingService) RegisterService() error {
 		return nil
 	}
 
-	// Generate comprehensive configuration data
-	configuration := map[string]interface{}{
-		"service_type":    h.serviceType,
-		"version":         "1.0.0", // TODO: Get from config
-		"instance_api":    h.instanceAPI,
-		"report_interval": h.reportInterval.String(),
-		"timeout":         h.timeout.String(),
-		"processing": map[string]interface{}{
-			"max_concurrent_jobs": 10, // TODO: Get from config
-			"job_timeout":         "10m",
-			"retry_attempts":      3,
-			"buffer_size":         1000,
-		},
-		"pipeline": map[string]interface{}{
-			"enable_geoip":            false,
-			"config_refresh_interval": "5m",
-		},
-		"s3_processing": map[string]interface{}{
-			"source_bucket":      "intake",
-			"destination_bucket": "piper",
-		},
-		"capabilities": []string{
-			"log_parsing",
-			"geoip_enrichment",
-			"format_transformation",
-			"s3_processing",
-			"pipeline_orchestration",
-		},
-	}
-
 	registrationReq := ServiceRegistrationRequest{
-		ServiceType:   h.serviceType,
-		InstanceID:    h.instanceID,
-		InstanceAPI:   h.instanceAPI,
-		Status:        "Healthy",
-		Configuration: configuration,
-		Metrics:       h.generateMetrics(),
+		ServiceType: h.serviceType,
+		InstanceID:  h.instanceID,
+		InstanceAPI: h.instanceAPI,
+		Configuration: map[string]interface{}{
+			"service_type": h.serviceType,
+			"version":      "1.0.0", // TODO: Get from config
+		},
 	}
 
 	reqBody, err := json.Marshal(registrationReq)
@@ -160,7 +125,7 @@ func (h *HealthReportingService) RegisterService() error {
 	}
 
 	resp, err := h.httpClient.Post(
-		h.controlURL+"/api/v1/services/report",
+		h.controlURL+"/api/v1/health/register",
 		"application/json",
 		bytes.NewBuffer(reqBody),
 	)
@@ -182,7 +147,7 @@ func (h *HealthReportingService) RegisterService() error {
 		return fmt.Errorf("service registration failed: %s", registrationResp.Message)
 	}
 
-	log.Infof("Successfully registered service %s with instance ID %s", h.serviceType, h.instanceID)
+	log.Infof("Successfully registered service %s with instance ID %s", h.serviceType, registrationResp.InstanceID)
 	return nil
 }
 
@@ -192,57 +157,11 @@ func (h *HealthReportingService) SendHealthReport(healthy bool, metrics map[stri
 		return nil
 	}
 
-	status := "Healthy"
-	if !healthy {
-		status = "Unhealthy"
-	}
-
-	// Generate comprehensive configuration data for each report
-	configuration := map[string]interface{}{
-		"service_type":    h.serviceType,
-		"version":         "1.0.0", // TODO: Get from config
-		"instance_api":    h.instanceAPI,
-		"report_interval": h.reportInterval.String(),
-		"timeout":         h.timeout.String(),
-		"processing": map[string]interface{}{
-			"max_concurrent_jobs": 10, // TODO: Get from config
-			"job_timeout":         "10m",
-			"retry_attempts":      3,
-			"buffer_size":         1000,
-		},
-		"pipeline": map[string]interface{}{
-			"enable_geoip":            false,
-			"config_refresh_interval": "5m",
-		},
-		"s3_processing": map[string]interface{}{
-			"source_bucket":      "intake",
-			"destination_bucket": "piper",
-		},
-		"capabilities": []string{
-			"log_parsing",
-			"geoip_enrichment",
-			"format_transformation",
-			"s3_processing",
-			"pipeline_orchestration",
-		},
-		"last_report": time.Now().UTC().Format(time.RFC3339),
-	}
-
-	// Merge provided metrics with generated metrics
-	allMetrics := h.generateMetrics()
-	if metrics != nil {
-		for k, v := range metrics {
-			allMetrics[k] = v
-		}
-	}
-
 	healthReq := HealthReportRequest{
-		ServiceType:   h.serviceType,
-		InstanceID:    h.instanceID,
-		InstanceAPI:   h.instanceAPI,
-		Status:        status,
-		Configuration: configuration,
-		Metrics:       allMetrics,
+		ServiceName: h.serviceType,
+		ServiceID:   h.instanceID,
+		Healthy:     healthy,
+		Metrics:     metrics,
 	}
 
 	reqBody, err := json.Marshal(healthReq)
@@ -264,7 +183,7 @@ func (h *HealthReportingService) SendHealthReport(healthy bool, metrics map[stri
 		return fmt.Errorf("health report failed with status %d", resp.StatusCode)
 	}
 
-	log.Debugf("Successfully sent health report for %s (status: %s)", h.serviceType, status)
+	log.Debugf("Successfully sent health report for %s (healthy: %v)", h.serviceType, healthy)
 	return nil
 }
 
@@ -294,9 +213,9 @@ func (h *HealthReportingService) reportingLoop() {
 func (h *HealthReportingService) isServiceHealthy() bool {
 	// Basic health check - service is healthy if we can execute this function
 	// In a real implementation, this would check:
-	// - S3 connectivity (source and destination buckets)
-	// - PostgreSQL connectivity
-	// - Pipeline processing status
+	// - UDP listener health
+	// - Receiver connectivity
+	// - Spooling directory availability
 	// - Memory usage
 	// - Disk space
 	return true
@@ -304,20 +223,11 @@ func (h *HealthReportingService) isServiceHealthy() bool {
 
 // generateMetrics generates basic service metrics
 func (h *HealthReportingService) generateMetrics() map[string]interface{} {
-	uptime := time.Since(h.startTime)
 	return map[string]interface{}{
-		"timestamp":         time.Now().Unix(),
-		"service_type":      h.serviceType,
-		"instance_id":       h.instanceID,
-		"uptime_seconds":    uptime.Seconds(),
-		"uptime_formatted":  uptime.String(),
-		"version":           "1.0.0", // TODO: Get from config
-		"last_health_check": time.Now().UTC().Format(time.RFC3339),
-		"report_interval":   h.reportInterval.String(),
-		"processing_stats": map[string]interface{}{
-			"jobs_processed": 0, // TODO: Get from actual stats
-			"files_processed": 0, // TODO: Get from actual stats
-			"bytes_processed": 0, // TODO: Get from actual stats
-		},
+		"timestamp":    time.Now().Unix(),
+		"service_type": h.serviceType,
+		"instance_id":  h.instanceID,
+		"uptime":       time.Since(time.Now()).Seconds(), // TODO: Track actual uptime
+		"version":      "1.0.0",                          // TODO: Get from config
 	}
 }
