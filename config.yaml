@@ -17,6 +17,7 @@ s3_source:
   secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
   endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
   ssl: false
+  use_iam_role: false
 
 # S3 destination configuration (processed data output for bytefreezer-packer)
 s3_destination:
@@ -26,6 +27,7 @@ s3_destination:
   secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
   endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
   ssl: false
+  use_iam_role: false
 
 # S3 GeoIP configuration (GeoIP database updates)
 s3_geoip:
@@ -35,6 +37,7 @@ s3_geoip:
   secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
   endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
   ssl: false
+  use_iam_role: false
 
 # PostgreSQL configuration for state management
 postgresql:

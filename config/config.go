@@ -60,6 +60,7 @@ type S3Source struct {
 	SecretName   string        `koanf:"secret_name"`
 	Endpoint     string        `koanf:"endpoint"`
 	SSL          bool          `koanf:"ssl"`
+	UseIamRole   bool          `koanf:"use_iam_role"`
 }
 
 // S3Dest represents configuration for writing processed data to S3
@@ -71,6 +72,7 @@ type S3Dest struct {
 	SecretName string `koanf:"secret_name"`
 	Endpoint   string `koanf:"endpoint"`
 	SSL        bool   `koanf:"ssl"`
+	UseIamRole bool   `koanf:"use_iam_role"`
 }
 
 // S3GeoIP represents configuration for GeoIP database updates from S3
@@ -82,6 +84,7 @@ type S3GeoIP struct {
 	SecretName string `koanf:"secret_name"`
 	Endpoint   string `koanf:"endpoint"`
 	SSL        bool   `koanf:"ssl"`
+	UseIamRole bool   `koanf:"use_iam_role"`
 }
 
 // PostgreSQL represents PostgreSQL configuration for state management

@@ -19,6 +19,7 @@ s3_source:
   ssl: {{ config.s3_source.ssl | lower }}
   access_key: {{ config.s3_source.access_key }}
   secret_key: {{ config.s3_source.secret_key }}
+  use_iam_role: {{ config.s3_source.use_iam_role | default(false) | lower }}
 
 # S3 destination configuration (piper bucket for bytefreezer-packer)
 s3_destination:
@@ -28,6 +29,7 @@ s3_destination:
   ssl: {{ config.s3_destination.ssl | lower }}
   access_key: {{ config.s3_destination.access_key }}
   secret_key: {{ config.s3_destination.secret_key }}
+  use_iam_role: {{ config.s3_destination.use_iam_role | default(false) | lower }}
 
 # S3 GeoIP configuration (GeoIP database updates)
 s3_geoip:
@@ -37,6 +39,7 @@ s3_geoip:
   ssl: {{ config.s3_geoip.ssl | lower }}
   access_key: {{ config.s3_geoip.access_key }}
   secret_key: {{ config.s3_geoip.secret_key }}
+  use_iam_role: {{ config.s3_geoip.use_iam_role | default(false) | lower }}
 
 # PostgreSQL configuration for state management
 postgresql:

@@ -36,6 +36,7 @@ func NewS3Client(sourceConfig *config.S3Source, destConfig *config.S3Dest) (*S3C
 		sourceConfig.SecretKey,
 		sourceConfig.Endpoint,
 		sourceConfig.SSL,
+		sourceConfig.UseIamRole,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create source S3 client: %w", err)
@@ -48,6 +49,7 @@ func NewS3Client(sourceConfig *config.S3Source, destConfig *config.S3Dest) (*S3C
 		destConfig.SecretKey,
 		destConfig.Endpoint,
 		destConfig.SSL,
+		destConfig.UseIamRole,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create destination S3 client: %w", err)
@@ -64,12 +66,17 @@ func NewS3Client(sourceConfig *config.S3Source, destConfig *config.S3Dest) (*S3C
 }
 
 // createS3Client creates an S3 client with the given configuration
-func createS3Client(region, accessKey, secretKey, endpoint string, useSSL bool) (*s3.Client, error) {
+func createS3Client(region, accessKey, secretKey, endpoint string, useSSL bool, useIamRole bool) (*s3.Client, error) {
 	var awsCfg aws.Config
 	var err error
 
-	if accessKey != "" && secretKey != "" {
-		// Use static credentials
+	if useIamRole {
+		// Use default credential chain (IAM role, instance profile, etc.)
+		awsCfg, err = awsconfig.LoadDefaultConfig(context.Background(),
+			awsconfig.WithRegion(region),
+		)
+	} else {
+		// Use static credentials (access key + secret key)
 		awsCfg, err = awsconfig.LoadDefaultConfig(context.Background(),
 			awsconfig.WithRegion(region),
 			awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -77,11 +84,6 @@ func createS3Client(region, accessKey, secretKey, endpoint string, useSSL bool) 
 				secretKey,
 				"",
 			)),
-		)
-	} else {
-		// Use default credential chain
-		awsCfg, err = awsconfig.LoadDefaultConfig(context.Background(),
-			awsconfig.WithRegion(region),
 		)
 	}
 

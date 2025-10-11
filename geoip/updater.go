@@ -39,12 +39,14 @@ func NewUpdater(cfg *config.Config) (*Updater, error) {
 		s3Config.S3ForcePathStyle = aws.Bool(true)
 	}
 
-	if cfg.S3GeoIP.AccessKey != "" && cfg.S3GeoIP.SecretKey != "" {
+	if !cfg.S3GeoIP.UseIamRole {
+		// Use static credentials (access key + secret key)
 		s3Config.Credentials = credentials.NewStaticCredentials(
 			cfg.S3GeoIP.AccessKey,
 			cfg.S3GeoIP.SecretKey,
 			"")
 	}
+	// If UseIamRole is true, credentials will use default credential chain (IAM role)
 
 	sess, err := session.NewSession(s3Config)
 	if err != nil {
