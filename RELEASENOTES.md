@@ -1,5 +1,77 @@
 # ByteFreezer Piper Release Notes
 
+## Version 1.0.4 - 2025-10-11
+
+### Health Monitoring Enhancements
+
+#### 📊 Comprehensive Configuration Reporting
+- **Full Configuration Export**: Health reports now include complete service configuration with masked sensitive data
+- **Sensitive Data Masking**: Passwords, API keys, and secrets are masked showing only first 2 and last 2 characters (e.g., "pa****rd")
+- **Comprehensive Metrics**: Health reports include all configuration sections (s3_source, s3_destination, s3_geoip, postgresql, processing, pipeline, control_service, monitoring, housekeeping, dlq, soc, failure_threshold)
+- **Service Capabilities**: Reports include service capability list for better service discovery
+
+#### 🔧 Configuration Sections Reported
+- **Service Info**: service_type, version, instance_id, instance_api, report_interval, timeout
+- **API**: port configuration
+- **S3 Source**: bucket_name, region, poll_interval, endpoint, ssl, access_key (masked), secret_key (masked)
+- **S3 Destination**: bucket_name, region, endpoint, ssl, access_key (masked), secret_key (masked)
+- **S3 GeoIP**: bucket_name, region, endpoint, ssl, access_key (masked), secret_key (masked)
+- **PostgreSQL**: enabled status, host, port, database, username, password (masked), ssl_mode, schema
+- **Processing**: max_concurrent_jobs, job_timeout, retry_attempts, retry_backoff, buffer_size
+- **Pipeline**: controller_endpoint, config_refresh_interval, geoip_database_path, enable_geoip
+- **Control Service**: enabled status, base_url, api_key (masked), timeout
+- **Monitoring**: metrics_port, log_level, enable_tracing, tracing_endpoint
+- **Housekeeping**: enabled status, interval_seconds
+- **DLQ**: all configuration with retry and cleanup settings
+- **SOC**: enabled status, endpoint, timeout
+- **Failure Threshold**: all monitoring thresholds and configuration
+- **Capabilities**: data_pipeline, format_parsing, data_filtering, s3_processing, geoip_enrichment, multi_format_support
+
+### Implementation Details
+- `services/health_reporting.go:25`: Added `config map[string]interface{}` field to HealthReportingService struct
+- `services/health_reporting.go:59`: Updated NewHealthReportingService() signature to accept config parameter
+- `services/health_reporting.go:118`: Modified RegisterService() to use full configuration data
+- `services/health_reporting.go:223-238`: Modified generateMetrics() to include configuration in metrics
+- `services/services.go:77`: Updated NewHealthReportingService call to pass configuration
+- `services/services.go:111-227`: Added buildHealthConfiguration() function with sensitive data masking
+
+### Benefits
+- **Better Visibility**: Control service can see full configuration of all piper instances
+- **Security**: Sensitive data (passwords, API keys, S3 credentials) are masked to prevent exposure
+- **Troubleshooting**: Configuration information helps diagnose issues across distributed instances
+- **Service Discovery**: Capabilities list enables dynamic service routing and orchestration
+- **Pipeline Monitoring**: Complete visibility into data pipeline configuration and processing capabilities
+
+---
+
+## Version 1.0.3 - 2025-10-11
+
+### Database Cleanup Enhancements
+- **TTL-Based Job Cleanup**: Added `CleanupExpiredJobRecords()` to prevent unbounded growth of `piper_job_records` table
+  - Automatically removes job records that have exceeded their TTL (Time To Live)
+  - Job records are set with 24-hour TTL during creation in `CreateJobRecord()`
+  - Simple cleanup: just deletes where `ttl < NOW()`
+  - Implementation: `storage/postgresql_state_manager.go:659-678`
+- **Consistent Pattern**: Uses same TTL pattern as other ByteFreezer components
+  - TTL set at record creation time (not configurable)
+  - Cleanup just deletes expired records
+  - No complex retention configuration needed
+
+### Performance Improvements
+- Reduces PostgreSQL storage usage by removing expired job records
+- Improves query performance on `piper_job_records` table
+- Prevents long-term accumulation of historical job data
+- Indexed TTL column for fast cleanup queries
+
+### Recommended Usage
+Run cleanup periodically from control service housekeeping:
+```go
+// Clean up all expired job records
+err := stateManager.CleanupExpiredJobRecords(ctx)
+```
+
+---
+
 ## Version 1.0.2 - 2025-10-02
 
 ### Database Schema Changes

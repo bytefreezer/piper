@@ -656,6 +656,27 @@ func (sm *PostgreSQLStateManager) CleanupExpiredCache(ctx context.Context) error
 	return nil
 }
 
+// CleanupExpiredJobRecords removes job records that have exceeded their TTL
+// This prevents unbounded table growth by removing old job records
+func (sm *PostgreSQLStateManager) CleanupExpiredJobRecords(ctx context.Context) error {
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	deleteJobsSQL := `
+		DELETE FROM ` + sm.buildTableName("piper_job_records") + `
+		WHERE ttl < NOW()`
+
+	result, err := sm.db.ExecContext(ctx, deleteJobsSQL)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup expired job records: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err == nil && rowsAffected > 0 {
+		log.Infof("Cleaned up %d expired job records", rowsAffected)
+	}
+
+	return nil
+}
+
 // Close closes the database connection
 func (sm *PostgreSQLStateManager) Close() error {
 	return sm.db.Close()
