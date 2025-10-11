@@ -51,7 +51,7 @@ postgresql:
 # Processing engine configuration
 processing:
   max_concurrent_jobs: {{ config.processing.max_concurrent_jobs }}
-  job_timeout: {{ config.processing.job_timeout }}
+  job_timeout_seconds: {{ config.processing.job_timeout_seconds }}
   retry_attempts: {{ config.processing.retry_attempts }}
   retry_backoff: {{ config.processing.retry_backoff }}
   buffer_size: {{ config.processing.buffer_size }}
@@ -81,7 +81,7 @@ parsers:
   settings:
     max_line_length: {{ config.parsers.settings.max_line_length }}
     buffer_size: {{ config.parsers.settings.buffer_size }}
-    parse_timeout: {{ config.parsers.settings.parse_timeout }}
+    parse_timeout_seconds: {{ config.parsers.settings.parse_timeout_seconds }}
     max_parse_errors: {{ config.parsers.settings.max_parse_errors }}
     grok_patterns_dir: {{ config.parsers.settings.grok_patterns_dir }}
   auto_tenant_parsers: {{ config.parsers.auto_tenant_parsers | lower }}

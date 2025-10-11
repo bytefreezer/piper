@@ -78,7 +78,7 @@ config:
   # Processing engine configuration
   processing:
     max_concurrent_jobs: 10
-    job_timeout: "10m"
+    job_timeout_seconds: 600  # 10 minutes
     retry_attempts: 3
     retry_backoff: "exponential"
     buffer_size: 1000
@@ -108,7 +108,7 @@ config:
     settings:
       max_line_length: 65536
       buffer_size: 4096
-      parse_timeout: "30s"
+      parse_timeout_seconds: 30
       max_parse_errors: 100
       grok_patterns_dir: "/opt/grok-patterns"
     auto_tenant_parsers: true
