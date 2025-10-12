@@ -106,7 +106,8 @@ type PostgreSQL struct {
 // Processing represents processing engine configuration
 type Processing struct {
 	MaxConcurrentJobs int           `koanf:"max_concurrent_jobs"`
-	JobTimeout        time.Duration `koanf:"job_timeout"`
+	JobTimeoutSeconds int           `koanf:"job_timeout_seconds"`
+	JobTimeout        time.Duration // Calculated from JobTimeoutSeconds
 	RetryAttempts     int           `koanf:"retry_attempts"`
 	RetryBackoff      string        `koanf:"retry_backoff"`
 	BufferSize        int           `koanf:"buffer_size"`
@@ -236,6 +237,7 @@ func LoadConfig(configPath string) (*Config, error) {
 	config.Housekeeping.Interval = time.Duration(config.Housekeeping.IntervalSeconds) * time.Second
 	config.DLQ.RetryInterval = time.Duration(config.DLQ.RetryIntervalSeconds) * time.Second
 	config.DLQ.CleanupInterval = time.Duration(config.DLQ.CleanupIntervalSeconds) * time.Second
+	config.Processing.JobTimeout = time.Duration(config.Processing.JobTimeoutSeconds) * time.Second
 
 	return &config, nil
 }
@@ -324,11 +326,11 @@ func getDefaults() map[string]interface{} {
 		"postgresql.conn_max_lifetime":  "5m",    // Rotate connections every 5 minutes
 		"postgresql.conn_max_idle_time": "5m",    // Close idle connections after 5 minutes
 
-		"processing.max_concurrent_jobs": 10,
-		"processing.job_timeout":         "10m",
-		"processing.retry_attempts":      3,
-		"processing.retry_backoff":       "exponential",
-		"processing.buffer_size":         1000,
+		"processing.max_concurrent_jobs":  10,
+		"processing.job_timeout_seconds":  600,  // 10 minutes
+		"processing.retry_attempts":       3,
+		"processing.retry_backoff":        "exponential",
+		"processing.buffer_size":          1000,
 
 		"pipeline.config_refresh_interval": "5m",
 		"pipeline.geoip_database_path":     "/opt/geoip",

@@ -50,6 +50,10 @@ postgresql:
   password: {{ config.postgresql.password }}
   ssl_mode: {{ config.postgresql.ssl_mode }}
   schema: {{ config.postgresql.schema }}
+  max_open_conns: {{ config.postgresql.max_open_conns | default(25) }}
+  max_idle_conns: {{ config.postgresql.max_idle_conns | default(10) }}
+  conn_max_lifetime: {{ config.postgresql.conn_max_lifetime | default('5m') }}
+  conn_max_idle_time: {{ config.postgresql.conn_max_idle_time | default('5m') }}
 
 # Processing engine configuration
 processing:
