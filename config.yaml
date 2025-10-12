@@ -169,10 +169,9 @@ housekeeping:
   enabled: true
   intervalseconds: 300  # 5 minutes
 
-# Health reporting configuration
+# Health reporting configuration (uses control_service.base_url)
 health_reporting:
   enabled: true  # Enable health reporting to control service
-  control_url: "http://192.168.86.103:8082"  # Control service URL
   report_interval: 30  # How often to send health reports (seconds)
   timeout_seconds: 10  # HTTP timeout for health requests
   register_on_startup: true  # Register service instance on startup

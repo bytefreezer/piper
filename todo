@@ -11,11 +11,16 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-looking at metadata after piper i see lot of redundant data, 
-please see what to keep from each pair, i prefixes as action, but im not sure if u use them.  based on what values are being used in code
+i see 2 definitions for control in config file.
+url should only be in control_service.
 
-delete: X-Amz-Meta-Source-File-Key: customer-1/ebpf-data/customer-1--ebpf-data--1759015887726516819--ndjson.gz
-keep: X-Amz-Meta-Source-Original-Filename	customer-1--ebpf-data--1759015887726516819--ndjson.gz
+health_reporting:
+control_url: "http://192.168.86.103:8082"  # Control service URL
 
-delete: X-Amz-Meta-Source-Tenant	customer-1
-keep: X-Amz-Meta-Tenant-Id	customer-1
+
+control_service:
+  enabled: true
+  base_url: "http://192.168.86.103:8082"
+
+
+

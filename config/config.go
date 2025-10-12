@@ -182,9 +182,9 @@ type FailureThreshold struct {
 }
 
 // HealthReporting represents health reporting configuration
+// Note: Uses control_service.base_url for the control service endpoint
 type HealthReporting struct {
 	Enabled           bool   `koanf:"enabled"`
-	ControlURL        string `koanf:"control_url"`
 	ReportInterval    int    `koanf:"report_interval"` // Interval in seconds
 	TimeoutSeconds    int    `koanf:"timeout_seconds"`
 	RegisterOnStartup bool   `koanf:"register_on_startup"`
@@ -371,7 +371,6 @@ func getDefaults() map[string]interface{} {
 		"failure_threshold.cooldown_period":   "30m",
 
 		"health_reporting.enabled":              false,
-		"health_reporting.control_url":          "http://192.168.86.103:8082",
 		"health_reporting.report_interval":      30,
 		"health_reporting.timeout_seconds":      10,
 		"health_reporting.register_on_startup":  true,

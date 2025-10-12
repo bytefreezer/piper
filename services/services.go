@@ -76,16 +76,16 @@ func NewServices(conf *config.Config) *Services {
 		// Build configuration data with masked sensitive fields
 		configuration := buildHealthConfiguration(conf, instanceAPI)
 
-		// Create health reporting service
+		// Create health reporting service (uses control_service.base_url)
 		services.HealthReporter = NewHealthReportingService(
-			conf.HealthReporting.ControlURL,
+			conf.ControlService.BaseURL,
 			"bytefreezer-piper",
 			instanceAPI,
 			reportInterval,
 			timeout,
 			configuration,
 		)
-		log.Info("Health reporting service initialized")
+		log.Infof("Health reporting service initialized (reporting to %s)", conf.ControlService.BaseURL)
 	} else {
 		log.Info("Health reporting disabled")
 	}

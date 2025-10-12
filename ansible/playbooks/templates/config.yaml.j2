@@ -146,10 +146,9 @@ housekeeping:
 soc:
   enabled: {{ config.soc.enabled | lower }}
 
-# Health reporting configuration
+# Health reporting configuration (uses control_service.base_url)
 health_reporting:
   enabled: {{ config.health_reporting.enabled | default(true) | lower }}
-  control_url: "{{ config.health_reporting.control_url | default('http://localhost:8082') }}"
   report_interval: {{ config.health_reporting.report_interval | default(30) }}
   timeout_seconds: {{ config.health_reporting.timeout_seconds | default(10) }}
   register_on_startup: {{ config.health_reporting.register_on_startup | default(true) | lower }}
