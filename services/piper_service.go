@@ -342,7 +342,7 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 		workerID, job.JobID, result.Stats.OutputRecords)
 }
 
-// cleanupLoop periodically cleans up expired locks
+// cleanupLoop periodically cleans up expired locks, cache, and job records
 func (s *PiperService) cleanupLoop(ctx context.Context) {
 	defer s.wg.Done()
 
@@ -361,10 +361,13 @@ func (s *PiperService) cleanupLoop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := s.stateManager.CleanupExpiredLocks(ctx); err != nil {
-				log.Errorf("Error during cleanup: %v", err)
+				log.Errorf("Error during lock cleanup: %v", err)
 			}
 			if err := s.stateManager.CleanupExpiredCache(ctx); err != nil {
 				log.Errorf("Error during cache cleanup: %v", err)
+			}
+			if err := s.stateManager.CleanupExpiredJobRecords(ctx); err != nil {
+				log.Errorf("Error during job records cleanup: %v", err)
 			}
 		}
 	}
