@@ -9,17 +9,19 @@ import (
 	"github.com/n0needt0/go-goodies/log"
 
 	"github.com/n0needt0/bytefreezer-piper/config"
+	"github.com/n0needt0/bytefreezer-piper/metrics"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
 	"github.com/n0needt0/bytefreezer-piper/storage"
 )
 
 // Services encapsulates all service dependencies following receiver pattern
 type Services struct {
-	Config           *config.Config
-	PiperService     *PiperService
-	PipelineDatabase *pipeline.PipelineDatabase
-	StateManager     *storage.PostgreSQLStateManager
-	HealthReporter   *HealthReportingService
+	Config               *config.Config
+	PiperService         *PiperService
+	PipelineDatabase     *pipeline.PipelineDatabase
+	StateManager         *storage.PostgreSQLStateManager
+	HealthReporter       *HealthReportingService
+	DatasetMetricsClient *metrics.DatasetMetricsClient
 }
 
 // NewServices creates and initializes all services
@@ -37,18 +39,28 @@ func NewServices(conf *config.Config) *Services {
 	// Create pipeline database
 	pipelineDatabase := pipeline.NewPipelineDatabase(pipelineClient, stateManager, conf.App.InstanceID)
 
+	// Create dataset metrics client
+	datasetMetricsClient := metrics.NewDatasetMetricsClient(
+		conf.ControlService.BaseURL,
+		conf.ControlService.TimeoutSeconds,
+		conf.ControlService.Enabled,
+	)
+	log.Infof("Dataset metrics client initialized (enabled: %v, endpoint: %s)",
+		conf.ControlService.Enabled, conf.ControlService.BaseURL)
+
 	// Create piper service
-	piperService, err := NewPiperService(conf)
+	piperService, err := NewPiperService(conf, datasetMetricsClient)
 	if err != nil {
 		log.Fatalf("Failed to create piper service: %v", err)
 	}
 
 	// Create services struct first
 	services := &Services{
-		Config:           conf,
-		PiperService:     piperService,
-		PipelineDatabase: pipelineDatabase,
-		StateManager:     stateManager,
+		Config:               conf,
+		PiperService:         piperService,
+		PipelineDatabase:     pipelineDatabase,
+		StateManager:         stateManager,
+		DatasetMetricsClient: datasetMetricsClient,
 	}
 
 	// Create health reporter (after services are initialized)

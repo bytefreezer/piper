@@ -11,29 +11,31 @@ import (
 	"github.com/n0needt0/bytefreezer-piper/alerts"
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/domain"
+	"github.com/n0needt0/bytefreezer-piper/metrics"
 	"github.com/n0needt0/bytefreezer-piper/storage"
 )
 
 // PiperService orchestrates the data processing pipeline
 type PiperService struct {
-	cfg              *config.Config
-	s3Client         *storage.S3Client
-	stateManager     *storage.PostgreSQLStateManager
-	discoveryManager *SimpleDiscoveryManager
-	processor        *FormatProcessor
-	configManager    *ConfigManager
-	socClient        *alerts.SOCAlertClient
-	failureMonitor   *alerts.FailureMonitor
-	running          bool
-	mutex            sync.RWMutex
-	workers          chan struct{}
-	jobQueue         chan *domain.ProcessingJob
-	stopChan         chan struct{}
-	wg               sync.WaitGroup
+	cfg                  *config.Config
+	s3Client             *storage.S3Client
+	stateManager         *storage.PostgreSQLStateManager
+	discoveryManager     *SimpleDiscoveryManager
+	processor            *FormatProcessor
+	configManager        *ConfigManager
+	socClient            *alerts.SOCAlertClient
+	failureMonitor       *alerts.FailureMonitor
+	datasetMetricsClient *metrics.DatasetMetricsClient
+	running              bool
+	mutex                sync.RWMutex
+	workers              chan struct{}
+	jobQueue             chan *domain.ProcessingJob
+	stopChan             chan struct{}
+	wg                   sync.WaitGroup
 }
 
 // NewPiperService creates a new piper service with pipeline processing
-func NewPiperService(cfg *config.Config) (*PiperService, error) {
+func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMetricsClient) (*PiperService, error) {
 	// Create S3 client
 	s3Client, err := storage.NewS3Client(&cfg.S3Source, &cfg.S3Dest)
 	if err != nil {
@@ -85,17 +87,18 @@ func NewPiperService(cfg *config.Config) (*PiperService, error) {
 	failureMonitor := alerts.NewFailureMonitor(failureConfig, socClient)
 
 	service := &PiperService{
-		cfg:              cfg,
-		s3Client:         s3Client,
-		stateManager:     stateManager,
-		discoveryManager: discoveryManager,
-		processor:        processor,
-		configManager:    configManager,
-		socClient:        socClient,
-		failureMonitor:   failureMonitor,
-		workers:          make(chan struct{}, cfg.Processing.MaxConcurrentJobs),
-		jobQueue:         make(chan *domain.ProcessingJob, cfg.Processing.BufferSize),
-		stopChan:         make(chan struct{}),
+		cfg:                  cfg,
+		s3Client:             s3Client,
+		stateManager:         stateManager,
+		discoveryManager:     discoveryManager,
+		processor:            processor,
+		configManager:        configManager,
+		socClient:            socClient,
+		failureMonitor:       failureMonitor,
+		datasetMetricsClient: datasetMetricsClient,
+		workers:              make(chan struct{}, cfg.Processing.MaxConcurrentJobs),
+		jobQueue:             make(chan *domain.ProcessingJob, cfg.Processing.BufferSize),
+		stopChan:             make(chan struct{}),
 	}
 
 	return service, nil
@@ -319,6 +322,32 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 
 	// Record success in failure monitor
 	s.failureMonitor.RecordProcessingResult(job.TenantID, job.DatasetID, true)
+
+	// Record dataset metrics asynchronously (non-blocking)
+	if s.datasetMetricsClient != nil {
+		go func(tenantID, datasetID string, stats domain.ProcessingStats) {
+			metricsCtx, metricsCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer metricsCancel()
+
+			// Record metrics with relevant statistics
+			err := s.datasetMetricsClient.RecordMetric(
+				metricsCtx,
+				tenantID,
+				datasetID,
+				stats.InputSize,                                 // inputBytes
+				stats.OutputSize,                                // outputBytes
+				stats.OutputRecords,                             // linesProcessed
+				stats.ErrorRecords,                              // errorCount
+				map[string]interface{}{
+					"filtered_records": stats.FilteredRecords,
+					"processing_time_ms": stats.ProcessingTime.Milliseconds(),
+				},
+			)
+			if err != nil {
+				log.Debugf("Failed to record dataset metrics for %s/%s: %v", tenantID, datasetID, err)
+			}
+		}(job.TenantID, job.DatasetID, result.Stats)
+	}
 
 	// Update job status to completed
 	if err := s.stateManager.UpdateJobStatus(jobCtx, job.JobID, domain.JobStatusCompleted); err != nil {
