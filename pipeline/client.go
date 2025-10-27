@@ -59,11 +59,6 @@ func NewPipelineClient(cfg *config.Config) *PipelineClient {
 	baseURL := cfg.ControlService.BaseURL
 	apiKey := cfg.ControlService.APIKey
 
-	// Fallback to deprecated controller endpoint if control service not configured
-	if baseURL == "" {
-		baseURL = cfg.Pipeline.ControllerEndpoint
-	}
-
 	return &PipelineClient{
 		config:     cfg,
 		httpClient: &http.Client{Timeout: 30 * time.Second},

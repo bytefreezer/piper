@@ -186,7 +186,6 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 			"buffer_size":         conf.Processing.BufferSize,
 		},
 		"pipeline": map[string]interface{}{
-			"controller_endpoint":     conf.Pipeline.ControllerEndpoint,
 			"config_refresh_interval": conf.Pipeline.ConfigRefreshInterval.String(),
 			"geoip_database_path":     conf.Pipeline.GeoIPDatabasePath,
 			"enable_geoip":            conf.Pipeline.EnableGeoIP,

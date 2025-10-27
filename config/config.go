@@ -115,7 +115,6 @@ type Processing struct {
 
 // Pipeline represents pipeline-specific configuration
 type Pipeline struct {
-	ControllerEndpoint    string        `koanf:"controller_endpoint"`
 	ConfigRefreshInterval time.Duration `koanf:"config_refresh_interval"`
 	GeoIPDatabasePath     string        `koanf:"geoip_database_path"`
 	GeoIPCityDatabase     string        `koanf:"geoip_city_database"`

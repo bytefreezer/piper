@@ -69,7 +69,6 @@ type ProcessingConfig struct {
 }
 
 type PipelineConfig struct {
-	ControllerEndpoint    string `json:"controller_endpoint"`
 	ConfigRefreshInterval string `json:"config_refresh_interval"`
 }
 
@@ -218,7 +217,6 @@ func (api *API) GetConfig() usecase.Interactor {
 
 		// Pipeline configuration
 		output.Pipeline = PipelineConfig{
-			ControllerEndpoint:    cfg.Pipeline.ControllerEndpoint,
 			ConfigRefreshInterval: cfg.Pipeline.ConfigRefreshInterval.String(),
 		}
 

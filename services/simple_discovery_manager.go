@@ -555,3 +555,76 @@ func (sdm *SimpleDiscoveryManager) getFakeTenants() []TenantInfo {
 		},
 	}
 }
+
+// parseS3Key parses an S3 key to extract metadata (supports multiple formats)
+func parseS3Key(s3Key string) (*domain.S3FileMetadata, error) {
+	metadata := &domain.S3FileMetadata{}
+
+	// Check for new format: customer-1--ebpf-data--timestamp--ndjson.gz
+	if strings.Contains(s3Key, "--") {
+		// Handle filename format: customer-1--ebpf-data--timestamp--ndjson.gz
+		lastSlash := strings.LastIndex(s3Key, "/")
+		filename := s3Key
+		if lastSlash != -1 {
+			filename = s3Key[lastSlash+1:]
+		}
+
+		parts := strings.Split(filename, "--")
+		if len(parts) >= 2 {
+			metadata.TenantID = parts[0]
+			metadata.DatasetID = parts[1]
+			metadata.Filename = filename
+		}
+
+		// Extract path components for tenant/dataset structure
+		pathParts := strings.Split(s3Key, "/")
+		if len(pathParts) >= 2 {
+			metadata.TenantID = pathParts[0]
+			metadata.DatasetID = pathParts[1]
+		}
+	} else {
+		// Handle traditional format: tenant=customer1/dataset=logs/file.ndjson.gz or customer-1/ebpf-data/file.ndjson.gz
+		parts := strings.Split(s3Key, "/")
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("invalid S3 key format: %s", s3Key)
+		}
+
+		// Check for key=value format
+		hasKeyValueFormat := false
+		for _, part := range parts {
+			if strings.HasPrefix(part, "tenant=") {
+				metadata.TenantID = strings.TrimPrefix(part, "tenant=")
+				hasKeyValueFormat = true
+			} else if strings.HasPrefix(part, "dataset=") {
+				metadata.DatasetID = strings.TrimPrefix(part, "dataset=")
+				hasKeyValueFormat = true
+			} else if strings.HasPrefix(part, "year=") {
+				metadata.Year = strings.TrimPrefix(part, "year=")
+			} else if strings.HasPrefix(part, "month=") {
+				metadata.Month = strings.TrimPrefix(part, "month=")
+			} else if strings.HasPrefix(part, "day=") {
+				metadata.Day = strings.TrimPrefix(part, "day=")
+			} else if strings.HasPrefix(part, "hour=") {
+				metadata.Hour = strings.TrimPrefix(part, "hour=")
+			}
+		}
+
+		// If no key=value format, assume simple path format: tenant/dataset/file
+		if !hasKeyValueFormat && len(parts) >= 2 {
+			metadata.TenantID = parts[0]
+			metadata.DatasetID = parts[1]
+		}
+
+		// Extract filename from the last part
+		if len(parts) > 0 {
+			metadata.Filename = parts[len(parts)-1]
+		}
+	}
+
+	// Validate required fields
+	if metadata.TenantID == "" || metadata.DatasetID == "" {
+		return nil, fmt.Errorf("missing required tenant_id or dataset_id in S3 key: %s", s3Key)
+	}
+
+	return metadata, nil
+}
