@@ -33,6 +33,7 @@ type Config struct {
 	SOC              SOC              `koanf:"soc"`
 	FailureThreshold FailureThreshold `koanf:"failure_threshold"`
 	HealthReporting  HealthReporting  `koanf:"health_reporting"`
+	ErrorTracking    ErrorTracking    `koanf:"error_tracking"`
 	Dev              bool             `koanf:"dev"`
 }
 
@@ -187,6 +188,12 @@ type HealthReporting struct {
 	ReportInterval    int    `koanf:"report_interval"` // Interval in seconds
 	TimeoutSeconds    int    `koanf:"timeout_seconds"`
 	RegisterOnStartup bool   `koanf:"register_on_startup"`
+}
+
+// ErrorTracking represents error tracking configuration
+// Note: Uses control_service.base_url for the control service endpoint
+type ErrorTracking struct {
+	Enabled bool `koanf:"enabled"`
 }
 
 // LoadConfig loads configuration from file and environment variables
@@ -373,6 +380,8 @@ func getDefaults() map[string]interface{} {
 		"health_reporting.report_interval":      30,
 		"health_reporting.timeout_seconds":      10,
 		"health_reporting.register_on_startup":  true,
+
+		"error_tracking.enabled": true,
 
 		"app.dev": false,
 	}

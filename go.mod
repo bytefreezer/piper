@@ -25,6 +25,7 @@ require (
 	github.com/swaggest/swgui v1.8.4
 	github.com/swaggest/usecase v1.3.1
 	go.opentelemetry.io/otel/metric v1.38.0
+	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -61,6 +62,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/vearutop/statigz v1.4.0 // indirect
 	go.opentelemetry.io/otel v1.38.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.3 // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/sys v0.35.0 // indirect

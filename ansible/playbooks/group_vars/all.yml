@@ -177,6 +177,11 @@ config:
     timeout_seconds: 10
     register_on_startup: true
 
+  # Error tracking configuration for centralized error monitoring
+  # Note: Uses control_service.base_url for the control service endpoint
+  error_tracking:
+    enabled: true  # Enable by default to collect errors from piper service
+
 # Download configuration
 download:
   url: "https://github.com/{{ github_repo }}/releases/{{ 'latest/download' if version == 'latest' else 'download/' + version }}/bytefreezer-piper-linux-amd64.tar.gz"

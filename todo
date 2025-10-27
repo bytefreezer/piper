@@ -11,16 +11,6 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-i see 2 definitions for control in config file.
-url should only be in control_service.
-
-health_reporting:
-control_url: "http://192.168.86.103:8082"  # Control service URL
-
-
-control_service:
-  enabled: true
-  base_url: "http://192.168.86.103:8082"
-
+we need to 
 
 

@@ -18,6 +18,7 @@ import (
 	"github.com/n0needt0/bytefreezer-piper/parsers"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
 	"github.com/n0needt0/bytefreezer-piper/storage"
+	"github.com/n0needt0/bytefreezer-piper/tracking"
 )
 
 // FormatProcessor processes files with automatic format detection
@@ -29,10 +30,11 @@ type FormatProcessor struct {
 	formatDetector *parsers.FormatDetector
 	filterRegistry pipeline.FilterRegistry
 	configManager  *ConfigManager
+	errorTracker   *tracking.ErrorTracker
 }
 
 // NewFormatProcessor creates a new format processor
-func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager *storage.PostgreSQLStateManager) (*FormatProcessor, error) {
+func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager *storage.PostgreSQLStateManager, errorTracker *tracking.ErrorTracker) (*FormatProcessor, error) {
 	// Create parser registry
 	parserRegistry := parsers.NewRegistry()
 
@@ -53,6 +55,7 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 		formatDetector: formatDetector,
 		filterRegistry: filterRegistry,
 		configManager:  configManager,
+		errorTracker:   errorTracker,
 	}
 
 	return processor, nil
@@ -507,6 +510,10 @@ func (p *FormatProcessor) ProcessFileStreaming(ctx context.Context, job *domain.
 	// Open streaming connection to S3 source
 	sourceReader, err := p.s3Client.GetSourceObjectStream(ctx, job.SourceFile.Key)
 	if err != nil {
+		// Track S3 stream error
+		if p.errorTracker != nil {
+			p.errorTracker.TrackS3Error(ctx, job.TenantID, job.DatasetID, "stream", job.SourceFile.Key, err)
+		}
 		return nil, fmt.Errorf("failed to open source stream: %w", err)
 	}
 	defer sourceReader.Close()
@@ -534,6 +541,10 @@ func (p *FormatProcessor) ProcessFileStreaming(ctx context.Context, job *domain.
 
 	// Delete source file after successful processing
 	if err := p.s3Client.DeleteSourceObject(ctx, job.SourceFile.Key); err != nil {
+		// Track S3 delete error
+		if p.errorTracker != nil {
+			p.errorTracker.TrackS3Error(ctx, job.TenantID, job.DatasetID, "delete", job.SourceFile.Key, err)
+		}
 		log.Warnf("Failed to delete source file %s: %v", job.SourceFile.Key, err)
 	}
 
@@ -583,6 +594,12 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 			if err != nil {
 				log.Warnf("Pipeline processing failed for line %d: %v", lineCount, err)
 				errorCount++
+
+				// Track pipeline processing error
+				if p.errorTracker != nil {
+					p.errorTracker.TrackPipelineError(ctx, job.TenantID, job.DatasetID, lineCount, err)
+				}
+
 				// Use original line on pipeline failure
 				processedLine = line
 			} else {
@@ -691,6 +708,10 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 	compressedReader := bytes.NewReader(compressedData)
 	err = p.s3Client.UploadProcessedFile(ctx, outputKey, compressedReader, processingMetadata)
 	if err != nil {
+		// Track S3 upload error
+		if p.errorTracker != nil {
+			p.errorTracker.TrackS3Error(ctx, job.TenantID, job.DatasetID, "upload", outputKey, err)
+		}
 		return nil, fmt.Errorf("failed to upload processed file: %w", err)
 	}
 

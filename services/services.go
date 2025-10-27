@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/n0needt0/go-goodies/log"
+	"go.uber.org/zap"
 
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/metrics"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
 	"github.com/n0needt0/bytefreezer-piper/storage"
+	"github.com/n0needt0/bytefreezer-piper/tracking"
 )
 
 // Services encapsulates all service dependencies following receiver pattern
@@ -22,6 +24,7 @@ type Services struct {
 	StateManager         *storage.PostgreSQLStateManager
 	HealthReporter       *HealthReportingService
 	DatasetMetricsClient *metrics.DatasetMetricsClient
+	ErrorTracker         *tracking.ErrorTracker
 }
 
 // NewServices creates and initializes all services
@@ -48,8 +51,24 @@ func NewServices(conf *config.Config) *Services {
 	log.Infof("Dataset metrics client initialized (enabled: %v, endpoint: %s)",
 		conf.ControlService.Enabled, conf.ControlService.BaseURL)
 
+	// Create error tracker if enabled
+	var errorTracker *tracking.ErrorTracker
+	if conf.ErrorTracking.Enabled && conf.ControlService.Enabled {
+		// Create a basic zap logger for error tracker
+		zapLogger, _ := zap.NewProduction()
+		errorTracker = tracking.NewErrorTracker(
+			conf.ControlService.BaseURL,
+			conf.ControlService.APIKey,
+			"bytefreezer-piper",
+			zapLogger,
+		)
+		log.Infof("Error tracker initialized (endpoint: %s)", conf.ControlService.BaseURL)
+	} else {
+		log.Info("Error tracking disabled")
+	}
+
 	// Create piper service
-	piperService, err := NewPiperService(conf, datasetMetricsClient)
+	piperService, err := NewPiperService(conf, datasetMetricsClient, errorTracker)
 	if err != nil {
 		log.Fatalf("Failed to create piper service: %v", err)
 	}
@@ -61,6 +80,7 @@ func NewServices(conf *config.Config) *Services {
 		PipelineDatabase:     pipelineDatabase,
 		StateManager:         stateManager,
 		DatasetMetricsClient: datasetMetricsClient,
+		ErrorTracker:         errorTracker,
 	}
 
 	// Create health reporter (after services are initialized)
