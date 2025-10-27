@@ -615,13 +615,16 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 	if len(processedLines) > 0 {
 		processedData = append(processedData, '\n') // Add final newline
 	}
-	stats.OutputSize = int64(len(processedData))
 
 	// Compress the data
 	compressedData, err := p.compressData(processedData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress processed data: %w", err)
 	}
+
+	// Set OutputSize to the COMPRESSED size that will be uploaded to S3
+	// This ensures metrics reflect the actual bytes stored on S3 (matching packer's input)
+	stats.OutputSize = int64(len(compressedData))
 
 	log.Infof("Finished processing %d lines for %s (%d errors), compressed from %d to %d bytes",
 		lineCount, outputKey, errorCount, len(processedData), len(compressedData))
