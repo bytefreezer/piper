@@ -108,11 +108,12 @@ func NewServices(conf *config.Config) *Services {
 		// Build configuration data with masked sensitive fields
 		configuration := buildHealthConfiguration(conf, instanceAPI)
 
-		// Create health reporting service (uses control_service.base_url)
+		// Create health reporting service (uses control_service.base_url and api_key)
 		services.HealthReporter = NewHealthReportingService(
 			conf.ControlService.BaseURL,
 			"bytefreezer-piper",
 			instanceAPI,
+			conf.ControlService.APIKey, // Pass API key for Bearer token authentication
 			reportInterval,
 			timeout,
 			configuration,

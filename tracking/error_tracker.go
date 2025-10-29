@@ -232,7 +232,7 @@ func (t *ErrorTracker) shouldSampleLocally(errorHash string) bool {
 
 // sendError sends error data to the control service
 func (t *ErrorTracker) sendError(ctx context.Context, jsonData []byte) error {
-	url := fmt.Sprintf("%s/api/v2/errors/track", t.controlURL)
+	url := fmt.Sprintf("%s/api/v1/errors/track", t.controlURL)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {

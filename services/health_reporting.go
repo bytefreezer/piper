@@ -20,6 +20,7 @@ type HealthReportingService struct {
 	reportInterval time.Duration
 	timeout        time.Duration
 	httpClient     *http.Client
+	apiKey         string // Bearer token for authentication
 	enabled        bool
 	stopChan       chan bool
 	config         map[string]interface{} // Full configuration data to report
@@ -59,7 +60,7 @@ type HealthReportResponse struct {
 }
 
 // NewHealthReportingService creates a new health reporting service
-func NewHealthReportingService(controlURL, serviceType, instanceAPI string, reportInterval, timeout time.Duration, config map[string]interface{}) *HealthReportingService {
+func NewHealthReportingService(controlURL, serviceType, instanceAPI, apiKey string, reportInterval, timeout time.Duration, config map[string]interface{}) *HealthReportingService {
 	// Get hostname for instance ID
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -76,6 +77,7 @@ func NewHealthReportingService(controlURL, serviceType, instanceAPI string, repo
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
+		apiKey:   apiKey,
 		enabled:  true,
 		stopChan: make(chan bool),
 		config:   config,
@@ -127,11 +129,16 @@ func (h *HealthReportingService) RegisterService() error {
 		return fmt.Errorf("failed to marshal registration request: %w", err)
 	}
 
-	resp, err := h.httpClient.Post(
-		h.controlURL+"/api/v1/health/register",
-		"application/json",
-		bytes.NewBuffer(reqBody),
-	)
+	req, err := http.NewRequest("POST", h.controlURL+"/api/v1/health/register", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create registration request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if h.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+h.apiKey)
+	}
+
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to register service: %w", err)
 	}
@@ -174,11 +181,16 @@ func (h *HealthReportingService) SendHealthReport(healthy bool, configuration ma
 		return fmt.Errorf("failed to marshal health report: %w", err)
 	}
 
-	resp, err := h.httpClient.Post(
-		h.controlURL+"/api/v1/services/report",
-		"application/json",
-		bytes.NewBuffer(reqBody),
-	)
+	req, err := http.NewRequest("POST", h.controlURL+"/api/v1/services/report", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create health report request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if h.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+h.apiKey)
+	}
+
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send health report: %w", err)
 	}

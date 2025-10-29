@@ -366,7 +366,7 @@ func getDefaults() map[string]interface{} {
 		"dlq.max_age_days":             7,
 
 		"soc.enabled":  false,
-		"soc.endpoint": "http://bytefreezer-soc:8080/api/v2/alerts",
+		"soc.endpoint": "http://bytefreezer-soc:8080/api/v1/alerts",
 		"soc.timeout":  30,
 
 		"failure_threshold.enabled":           false,

@@ -74,7 +74,7 @@ pipeline:
 control_service:
   enabled: true
   base_url: "http://192.168.86.103:8082"
-  api_key: "key122345"  # Add API key if authentication is enabled
+  api_key: "966c5b3e-597c-4b2c-96fb-86d2ffc312fe"  # Service API key (GUID format)
   timeout_seconds: 30
 
 # Parser configuration for log parsing (Logstash-style)

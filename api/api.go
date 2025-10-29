@@ -55,14 +55,14 @@ func (api *API) NewRouter() *web.Service {
 	service.Wrap()
 
 	// Health check endpoint (test DB connection)
-	service.Get("/api/v2/health", api.HealthCheck())
+	service.Get("/api/v1/health", api.HealthCheck())
 
 	// Configuration endpoint
-	service.Get("/api/v2/config", api.GetConfig())
+	service.Get("/api/v1/config", api.GetConfig())
 
 	// Pipeline endpoints
-	service.Get("/api/v2/pipelines", api.GetPipelineList())
-	service.Get("/api/v2/pipelines/{tenantId}/{datasetId}", api.GetPipelineDetails())
+	service.Get("/api/v1/pipelines", api.GetPipelineList())
+	service.Get("/api/v1/pipelines/{tenantId}/{datasetId}", api.GetPipelineDetails())
 
 
 	// API documentation
