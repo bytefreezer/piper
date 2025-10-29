@@ -107,9 +107,9 @@ func (pc *PipelineClient) FetchTenants(ctx context.Context) ([]TenantInfo, error
 	req.Header.Set("User-Agent", fmt.Sprintf("%s/%s", pc.config.App.Name, pc.config.App.Version))
 	req.Header.Set("Accept", "application/json")
 
-	// Add API key authentication if configured
+	// Add Bearer token authentication if configured
 	if pc.apiKey != "" {
-		req.Header.Set("X-API-Key", pc.apiKey)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", pc.apiKey))
 	}
 
 	resp, err := pc.httpClient.Do(req)
@@ -264,9 +264,9 @@ func (pc *PipelineClient) FetchPipelineConfiguration(ctx context.Context, tenant
 	req.Header.Set("User-Agent", fmt.Sprintf("%s/%s", pc.config.App.Name, pc.config.App.Version))
 	req.Header.Set("Accept", "application/json")
 
-	// Add API key authentication if configured
+	// Add Bearer token authentication if configured
 	if pc.apiKey != "" {
-		req.Header.Set("X-API-Key", pc.apiKey)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", pc.apiKey))
 	}
 
 	resp, err := pc.httpClient.Do(req)
