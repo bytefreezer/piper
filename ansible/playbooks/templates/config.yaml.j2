@@ -76,10 +76,10 @@ pipeline:
 control_service:
   enabled: {{ config.control_service.enabled | lower }}
   base_url: {{ config.control_service.base_url }}
-  api_key: "{{ config.control_service.api_key }}"
+  api_key: "{{ config.control_service.api_key | default('bytefreezer-service-api-key-8f4a2d1b-3c5e-4f6a-9b8c-7d2e1f3a4b5c') }}"
   timeout_seconds: {{ config.control_service.timeout_seconds }}
-  account_id: {{ config.control_service.account_id }}
-  tenant_id: "{{ config.control_service.tenant_id }}"
+  account_id: {{ config.control_service.account_id | default('') }}
+  tenant_id: "{{ config.control_service.tenant_id | default('') }}"
 
 # Parser configuration for log parsing (Logstash-style)
 parsers:
