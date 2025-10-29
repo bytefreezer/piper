@@ -150,7 +150,7 @@ func (pc *PipelineClient) FetchTenants(ctx context.Context) ([]TenantInfo, error
 		req.Header.Set("Accept", "application/json")
 
 		if pc.apiKey != "" {
-			req.Header.Set("X-API-Key", pc.apiKey)
+			req.Header.Set("Authorization", "Bearer "+pc.apiKey)
 		}
 
 		resp, err := pc.httpClient.Do(req)
@@ -194,7 +194,7 @@ func (pc *PipelineClient) FetchTenants(ctx context.Context) ([]TenantInfo, error
 			req.Header.Set("Accept", "application/json")
 
 			if pc.apiKey != "" {
-				req.Header.Set("X-API-Key", pc.apiKey)
+				req.Header.Set("Authorization", "Bearer "+pc.apiKey)
 			}
 
 			resp, err := pc.httpClient.Do(req)

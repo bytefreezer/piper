@@ -295,9 +295,9 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 		return nil, fmt.Errorf("failed to create accounts request: %w", err)
 	}
 
-	// Add API key if configured
+	// Add API key if configured (use Bearer token format)
 	if sdm.config.ControlService.APIKey != "" {
-		req.Header.Set("X-API-Key", sdm.config.ControlService.APIKey)
+		req.Header.Set("Authorization", "Bearer "+sdm.config.ControlService.APIKey)
 	}
 
 	resp, err := sdm.httpClient.Do(req)
@@ -339,7 +339,7 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 		}
 
 		if sdm.config.ControlService.APIKey != "" {
-			req.Header.Set("X-API-Key", sdm.config.ControlService.APIKey)
+			req.Header.Set("Authorization", "Bearer "+sdm.config.ControlService.APIKey)
 		}
 
 		resp, err := sdm.httpClient.Do(req)
@@ -380,7 +380,7 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 			}
 
 			if sdm.config.ControlService.APIKey != "" {
-				datasetReq.Header.Set("X-API-Key", sdm.config.ControlService.APIKey)
+				datasetReq.Header.Set("Authorization", "Bearer "+sdm.config.ControlService.APIKey)
 			}
 
 			datasetResp, err := sdm.httpClient.Do(datasetReq)
