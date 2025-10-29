@@ -109,10 +109,13 @@ func createS3Client(region, accessKey, secretKey, endpoint string, useSSL bool, 
 			o.UsePathStyle = true
 			// Disable checksum validation for MinIO compatibility
 			o.DisableS3ExpressSessionAuth = aws.Bool(true)
+			o.DisableLogOutputChecksumValidationSkipped = true // Suppress MinIO checksum warnings
 		})
 	} else {
 		// Standard AWS S3
-		client = s3.NewFromConfig(awsCfg)
+		client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			o.DisableLogOutputChecksumValidationSkipped = true // Suppress checksum warnings for AWS S3 too
+		})
 	}
 
 	return client, nil

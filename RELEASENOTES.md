@@ -1,8 +1,19 @@
 # ByteFreezer Piper - Release Notes
 
-## 2025-10-29 - Authentication Fixes (Control Service API & Dataset Metrics)
+## 2025-10-29 - Authentication Fixes & AWS SDK Warning Suppression
 
 ### Bug Fixes
+
+#### 🔇 AWS SDK Checksum Warning Suppression
+- **Issue**: AWS SDK v2 logging checksum validation warnings when using MinIO
+  - Warning: "WARN Response has no supported checksum. Not validating response payload."
+  - Occurs on every S3 operation, clutters logs
+- **Fix**: Added `DisableLogOutputChecksumValidationSkipped` flag to S3 client options
+  - Applied to both MinIO endpoint and standard AWS S3 configurations
+  - Completely suppresses checksum validation warnings
+- **Impact**: Clean logs without AWS SDK warnings
+- **Files Changed**:
+  - `storage/s3_client.go:112,117` (added flag to both client configurations)
 
 #### 🔧 Dataset Metrics Recording Authentication
 - **Issue**: Dataset metrics recording to control service was failing with 401 Unauthorized errors
