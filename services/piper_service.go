@@ -13,7 +13,6 @@ import (
 	"github.com/n0needt0/bytefreezer-piper/domain"
 	"github.com/n0needt0/bytefreezer-piper/metrics"
 	"github.com/n0needt0/bytefreezer-piper/storage"
-	"github.com/n0needt0/bytefreezer-piper/tracking"
 )
 
 // PiperService orchestrates the data processing pipeline
@@ -36,7 +35,7 @@ type PiperService struct {
 }
 
 // NewPiperService creates a new piper service with pipeline processing
-func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMetricsClient, errorTracker *tracking.ErrorTracker) (*PiperService, error) {
+func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMetricsClient) (*PiperService, error) {
 	// Create S3 client
 	s3Client, err := storage.NewS3Client(&cfg.S3Source, &cfg.S3Dest)
 	if err != nil {
@@ -53,7 +52,7 @@ func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMe
 	discoveryManager := NewSimpleDiscoveryManager(cfg, s3Client, stateManager)
 
 	// Create format processor
-	processor, err := NewFormatProcessor(cfg, s3Client, stateManager, errorTracker)
+	processor, err := NewFormatProcessor(cfg, s3Client, stateManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create format processor: %w", err)
 	}
