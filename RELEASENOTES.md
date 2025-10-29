@@ -1,5 +1,24 @@
 # ByteFreezer Piper - Release Notes
 
+## 2025-10-29 - Authentication Fixes (Control Service API & Dataset Metrics)
+
+### Bug Fixes
+
+#### 🔧 Dataset Metrics Recording Authentication
+- **Issue**: Dataset metrics recording to control service was failing with 401 Unauthorized errors
+  - `DatasetMetricsClient` was not sending Authorization header with API key
+  - Error logged: "Dataset metrics recording failed with status 401 for {tenant}/{dataset}"
+  - Control service requires `Authorization: Bearer <api_key>` for dataset metrics endpoint
+- **Fix**: Added API key authentication to dataset metrics client
+  - Added `apiKey` field to `DatasetMetricsClient` struct
+  - Updated `NewDatasetMetricsClient()` to accept `apiKey` parameter
+  - Modified HTTP request creation to include Authorization header
+  - Now uses `control_service.api_key` from configuration
+- **Impact**: Dataset metrics successfully recorded to control service
+- **Files Changed**:
+  - `metrics/dataset_metrics.go:17,40,94-96` (added apiKey field and Authorization header)
+  - `services/services.go:45` (pass API key to client constructor)
+
 ## 2025-10-29 - Control Service Authentication Fix
 
 ### Bug Fixes

@@ -42,6 +42,7 @@ func NewServices(conf *config.Config) *Services {
 	// Create dataset metrics client
 	datasetMetricsClient := metrics.NewDatasetMetricsClient(
 		conf.ControlService.BaseURL,
+		conf.ControlService.APIKey,
 		conf.ControlService.TimeoutSeconds,
 		conf.ControlService.Enabled,
 	)
