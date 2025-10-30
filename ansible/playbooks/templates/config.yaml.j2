@@ -153,5 +153,9 @@ health_reporting:
   timeout_seconds: {{ config.health_reporting.timeout_seconds | default(10) }}
   register_on_startup: {{ config.health_reporting.register_on_startup | default(true) | lower }}
 
+# Error tracking configuration
+error_tracking:
+  enabled: {{ config.error_tracking.enabled | default(true) | lower }}
+
 # Development mode
 dev: {{ config.dev | lower }}
