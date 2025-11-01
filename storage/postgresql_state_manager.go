@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -142,6 +143,41 @@ func (sm *PostgreSQLStateManager) initTables() error {
 
 	if _, err := sm.db.ExecContext(ctx, jobTableSQL); err != nil {
 		return fmt.Errorf("failed to create piper_job_records table: %w", err)
+	}
+
+	// Create transformation jobs table
+	transformationJobsTableSQL := `
+		CREATE TABLE IF NOT EXISTS ` + sm.buildTableName("transformation_jobs") + ` (
+			job_id VARCHAR(100) PRIMARY KEY,
+			tenant_id VARCHAR(100) NOT NULL,
+			dataset_id VARCHAR(100) NOT NULL,
+			job_type VARCHAR(20) NOT NULL,
+			status VARCHAR(20) NOT NULL,
+			processor_id VARCHAR(100) NULL,
+			request JSONB NOT NULL,
+			result JSONB NULL,
+			error_message TEXT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			started_at TIMESTAMP NULL,
+			completed_at TIMESTAMP NULL,
+			ttl TIMESTAMP NOT NULL
+		)`
+
+	if _, err := sm.db.ExecContext(ctx, transformationJobsTableSQL); err != nil {
+		return fmt.Errorf("failed to create transformation_jobs table: %w", err)
+	}
+
+	// Create indexes for transformation jobs table
+	transformationJobsIndexes := []string{
+		`CREATE INDEX IF NOT EXISTS idx_transformation_jobs_status ON ` + sm.buildTableName("transformation_jobs") + ` (status, created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_transformation_jobs_tenant_dataset ON ` + sm.buildTableName("transformation_jobs") + ` (tenant_id, dataset_id, created_at DESC)`,
+	}
+
+	for _, indexSQL := range transformationJobsIndexes {
+		if _, err := sm.db.ExecContext(ctx, indexSQL); err != nil {
+			return fmt.Errorf("failed to create transformation_jobs index: %w", err)
+		}
 	}
 
 	// Create pipeline configurations cache table
@@ -690,6 +726,302 @@ func (sm *PostgreSQLStateManager) CleanupExpiredJobRecords(ctx context.Context) 
 	rowsAffected, err := result.RowsAffected()
 	if err == nil && rowsAffected > 0 {
 		log.Infof("Cleaned up %d expired job records", rowsAffected)
+	}
+
+	return nil
+}
+
+// CreateTransformationJob creates a new transformation job
+func (sm *PostgreSQLStateManager) CreateTransformationJob(ctx context.Context, job *domain.TransformationJob) error {
+	requestJSON, err := json.Marshal(job.Request)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	insertSQL := `
+		INSERT INTO ` + sm.buildTableName("transformation_jobs") + `
+		(job_id, tenant_id, dataset_id, job_type, status, request, created_at, updated_at, ttl)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+
+	_, err = sm.db.ExecContext(ctx, insertSQL,
+		job.JobID, job.TenantID, job.DatasetID, job.JobType, job.Status,
+		requestJSON, job.CreatedAt, job.UpdatedAt, job.TTL)
+
+	if err != nil {
+		return fmt.Errorf("failed to create transformation job: %w", err)
+	}
+
+	return nil
+}
+
+// ClaimTransformationJob atomically claims a pending job using SELECT FOR UPDATE
+func (sm *PostgreSQLStateManager) ClaimTransformationJob(ctx context.Context, processorID string, jobTypes []domain.TransformationJobType) (*domain.TransformationJob, error) {
+	tx, err := sm.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Build job types array for SQL
+	jobTypeStrs := make([]string, len(jobTypes))
+	for i, jt := range jobTypes {
+		jobTypeStrs[i] = string(jt)
+	}
+
+	// Find and lock a pending job
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	selectSQL := `
+		SELECT job_id, tenant_id, dataset_id, job_type, status, processor_id,
+		       request, result, error_message, created_at, updated_at,
+		       started_at, completed_at, ttl
+		FROM ` + sm.buildTableName("transformation_jobs") + `
+		WHERE status = $1
+		  AND ttl > NOW()
+		  AND job_type = ANY($2)
+		ORDER BY created_at ASC
+		LIMIT 1
+		FOR UPDATE SKIP LOCKED`
+
+	var job domain.TransformationJob
+	var processorIDNull sql.NullString
+	var requestJSON, resultJSON []byte
+	var errorMsg sql.NullString
+	var startedAt, completedAt sql.NullTime
+
+	err = tx.QueryRowContext(ctx, selectSQL, domain.JobStatusPending, pq.Array(jobTypeStrs)).Scan(
+		&job.JobID, &job.TenantID, &job.DatasetID, &job.JobType, &job.Status,
+		&processorIDNull, &requestJSON, &resultJSON, &errorMsg,
+		&job.CreatedAt, &job.UpdatedAt, &startedAt, &completedAt, &job.TTL)
+
+	if err == sql.ErrNoRows {
+		return nil, nil // No jobs available
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to select job: %w", err)
+	}
+
+	// Unmarshal request
+	if err := json.Unmarshal(requestJSON, &job.Request); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
+	}
+
+	// Unmarshal result if present
+	if len(resultJSON) > 0 {
+		if err := json.Unmarshal(resultJSON, &job.Result); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal result: %w", err)
+		}
+	}
+
+	if errorMsg.Valid {
+		job.ErrorMsg = errorMsg.String
+	}
+	if startedAt.Valid {
+		job.StartedAt = &startedAt.Time
+	}
+	if completedAt.Valid {
+		job.CompletedAt = &completedAt.Time
+	}
+
+	// Update job to processing status
+	now := time.Now()
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	updateSQL := `
+		UPDATE ` + sm.buildTableName("transformation_jobs") + `
+		SET status = $1, processor_id = $2, started_at = $3, updated_at = $4
+		WHERE job_id = $5`
+
+	_, err = tx.ExecContext(ctx, updateSQL, domain.JobStatusProcessing, processorID, now, now, job.JobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update job status: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	job.Status = domain.JobStatusProcessing
+	job.ProcessorID = processorID
+	job.StartedAt = &now
+	job.UpdatedAt = now
+
+	return &job, nil
+}
+
+// UpdateTransformationJob updates a transformation job's status and result
+func (sm *PostgreSQLStateManager) UpdateTransformationJob(ctx context.Context, job *domain.TransformationJob) error {
+	var resultJSON []byte
+	var err error
+	if job.Result != nil {
+		resultJSON, err = json.Marshal(job.Result)
+		if err != nil {
+			return fmt.Errorf("failed to marshal result: %w", err)
+		}
+	}
+
+	now := time.Now()
+	job.UpdatedAt = now
+
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	updateSQL := `
+		UPDATE ` + sm.buildTableName("transformation_jobs") + `
+		SET status = $1, result = $2, error_message = $3, updated_at = $4, completed_at = $5
+		WHERE job_id = $6`
+
+	var completedAt *time.Time
+	if job.Status == domain.JobStatusCompleted || job.Status == domain.JobStatusFailed {
+		completedAt = &now
+		job.CompletedAt = completedAt
+	}
+
+	_, err = sm.db.ExecContext(ctx, updateSQL,
+		job.Status, resultJSON, job.ErrorMsg, now, completedAt, job.JobID)
+
+	if err != nil {
+		return fmt.Errorf("failed to update transformation job: %w", err)
+	}
+
+	return nil
+}
+
+// GetTransformationJob retrieves a transformation job by ID
+func (sm *PostgreSQLStateManager) GetTransformationJob(ctx context.Context, jobID string) (*domain.TransformationJob, error) {
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	selectSQL := `
+		SELECT job_id, tenant_id, dataset_id, job_type, status, processor_id,
+		       request, result, error_message, created_at, updated_at,
+		       started_at, completed_at, ttl
+		FROM ` + sm.buildTableName("transformation_jobs") + `
+		WHERE job_id = $1`
+
+	var job domain.TransformationJob
+	var processorIDNull sql.NullString
+	var requestJSON, resultJSON []byte
+	var errorMsg sql.NullString
+	var startedAt, completedAt sql.NullTime
+
+	err := sm.db.QueryRowContext(ctx, selectSQL, jobID).Scan(
+		&job.JobID, &job.TenantID, &job.DatasetID, &job.JobType, &job.Status,
+		&processorIDNull, &requestJSON, &resultJSON, &errorMsg,
+		&job.CreatedAt, &job.UpdatedAt, &startedAt, &completedAt, &job.TTL)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("job not found: %s", jobID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job: %w", err)
+	}
+
+	// Unmarshal request
+	if err := json.Unmarshal(requestJSON, &job.Request); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
+	}
+
+	// Unmarshal result if present
+	if len(resultJSON) > 0 {
+		if err := json.Unmarshal(resultJSON, &job.Result); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal result: %w", err)
+		}
+	}
+
+	if processorIDNull.Valid {
+		job.ProcessorID = processorIDNull.String
+	}
+	if errorMsg.Valid {
+		job.ErrorMsg = errorMsg.String
+	}
+	if startedAt.Valid {
+		job.StartedAt = &startedAt.Time
+	}
+	if completedAt.Valid {
+		job.CompletedAt = &completedAt.Time
+	}
+
+	return &job, nil
+}
+
+// ListPendingTransformationJobs lists pending jobs (for monitoring/debugging)
+func (sm *PostgreSQLStateManager) ListPendingTransformationJobs(ctx context.Context, limit int) ([]*domain.TransformationJob, error) {
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	selectSQL := `
+		SELECT job_id, tenant_id, dataset_id, job_type, status, processor_id,
+		       request, result, error_message, created_at, updated_at,
+		       started_at, completed_at, ttl
+		FROM ` + sm.buildTableName("transformation_jobs") + `
+		WHERE status = $1 AND ttl > NOW()
+		ORDER BY created_at ASC
+		LIMIT $2`
+
+	rows, err := sm.db.QueryContext(ctx, selectSQL, domain.JobStatusPending, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*domain.TransformationJob
+	for rows.Next() {
+		var job domain.TransformationJob
+		var processorIDNull sql.NullString
+		var requestJSON, resultJSON []byte
+		var errorMsg sql.NullString
+		var startedAt, completedAt sql.NullTime
+
+		err := rows.Scan(
+			&job.JobID, &job.TenantID, &job.DatasetID, &job.JobType, &job.Status,
+			&processorIDNull, &requestJSON, &resultJSON, &errorMsg,
+			&job.JobID, &job.TenantID, &job.DatasetID, &job.JobType, &job.Status,
+			&processorIDNull, &requestJSON, &resultJSON, &errorMsg,
+			&job.CreatedAt, &job.UpdatedAt, &startedAt, &completedAt, &job.TTL)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan job: %w", err)
+		}
+
+		// Unmarshal request
+		if err := json.Unmarshal(requestJSON, &job.Request); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal request: %w", err)
+		}
+
+		if len(resultJSON) > 0 {
+			if err := json.Unmarshal(resultJSON, &job.Result); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal result: %w", err)
+			}
+		}
+
+		if processorIDNull.Valid {
+			job.ProcessorID = processorIDNull.String
+		}
+		if errorMsg.Valid {
+			job.ErrorMsg = errorMsg.String
+		}
+		if startedAt.Valid {
+			job.StartedAt = &startedAt.Time
+		}
+		if completedAt.Valid {
+			job.CompletedAt = &completedAt.Time
+		}
+
+		jobs = append(jobs, &job)
+	}
+
+	return jobs, rows.Err()
+}
+
+// CleanupExpiredTransformationJobs removes transformation jobs that have exceeded their TTL
+func (sm *PostgreSQLStateManager) CleanupExpiredTransformationJobs(ctx context.Context) error {
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	deleteSQL := `
+		DELETE FROM ` + sm.buildTableName("transformation_jobs") + `
+		WHERE ttl < NOW()`
+
+	result, err := sm.db.ExecContext(ctx, deleteSQL)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup expired transformation jobs: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err == nil && rowsAffected > 0 {
+		log.Infof("Cleaned up %d expired transformation jobs", rowsAffected)
 	}
 
 	return nil

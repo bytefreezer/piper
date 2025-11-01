@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -644,28 +645,130 @@ func (f *UppercaseKeysFilter) uppercaseArrayKeys(arr []interface{}) []interface{
 	return result
 }
 
-// NewJSONParseFilter creates a JSON parse filter
-func NewJSONParseFilter(config map[string]interface{}) (Filter, error) {
-	// TODO: Implement JSON parsing filter
-	return nil, fmt.Errorf("json_parse filter not yet implemented")
+// RegexReplaceFilter performs regex-based find and replace on field values
+type RegexReplaceFilter struct {
+	sourceField string
+	targetField string
+	pattern     *regexp.Regexp
+	replacement string
+	global      bool
 }
 
 // NewRegexReplaceFilter creates a regex replace filter
 func NewRegexReplaceFilter(config map[string]interface{}) (Filter, error) {
-	// TODO: Implement regex replace filter
-	return nil, fmt.Errorf("regex_replace filter not yet implemented")
+	sourceField, ok := config["source_field"].(string)
+	if !ok || sourceField == "" {
+		sourceField = "message" // Default field
+	}
+
+	targetField, ok := config["target_field"].(string)
+	if !ok || targetField == "" {
+		targetField = sourceField // Default to overwriting source field
+	}
+
+	patternStr, ok := config["pattern"].(string)
+	if !ok || patternStr == "" {
+		return nil, fmt.Errorf("regex_replace filter requires 'pattern' parameter")
+	}
+
+	replacement, ok := config["replacement"].(string)
+	if !ok {
+		replacement = "" // Default to empty string
+	}
+
+	global := true
+	if globalVal, ok := config["global"].(bool); ok {
+		global = globalVal
+	}
+
+	// Compile the regex pattern
+	pattern, err := regexp.Compile(patternStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid regex pattern '%s': %w", patternStr, err)
+	}
+
+	return &RegexReplaceFilter{
+		sourceField: sourceField,
+		targetField: targetField,
+		pattern:     pattern,
+		replacement: replacement,
+		global:      global,
+	}, nil
+}
+
+// Type returns the filter type
+func (f *RegexReplaceFilter) Type() string {
+	return "regex_replace"
+}
+
+// Validate validates the filter configuration
+func (f *RegexReplaceFilter) Validate(config map[string]interface{}) error {
+	if _, ok := config["pattern"].(string); !ok {
+		return fmt.Errorf("'pattern' parameter is required and must be a string")
+	}
+	return nil
+}
+
+// Apply applies the filter to a record
+func (f *RegexReplaceFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*FilterResult, error) {
+	start := time.Now()
+
+	// Get source field value
+	sourceValue, exists := record[f.sourceField]
+	if !exists {
+		return &FilterResult{
+			Record:   record,
+			Skip:     false,
+			Applied:  false,
+			Duration: time.Since(start),
+		}, nil
+	}
+
+	// Convert to string
+	sourceStr, ok := sourceValue.(string)
+	if !ok {
+		sourceStr = fmt.Sprintf("%v", sourceValue)
+	}
+
+	// Perform replacement
+	var result string
+	if f.global {
+		// Replace all occurrences
+		result = f.pattern.ReplaceAllString(sourceStr, f.replacement)
+	} else {
+		// Replace only first occurrence
+		loc := f.pattern.FindStringIndex(sourceStr)
+		if loc != nil {
+			result = sourceStr[:loc[0]] + f.replacement + sourceStr[loc[1]:]
+		} else {
+			result = sourceStr
+		}
+	}
+
+	// Set the target field
+	record[f.targetField] = result
+
+	return &FilterResult{
+		Record:   record,
+		Skip:     false,
+		Applied:  true,
+		Duration: time.Since(start),
+	}, nil
+}
+
+// NewJSONParseFilter creates a JSON parse filter (not implemented - use NDJSON format instead)
+func NewJSONParseFilter(config map[string]interface{}) (Filter, error) {
+	return nil, fmt.Errorf("json_parse filter not implemented - bytefreezer-piper only supports NDJSON format")
 }
 
 // NewDateParseFilter creates a date parse filter
 func NewDateParseFilter(config map[string]interface{}) (Filter, error) {
-	// TODO: Implement date parsing filter
-	return nil, fmt.Errorf("date_parse filter not yet implemented")
+	return NewDateParseFilterComplete(config)
 }
 
 // NewGeoIPFilter creates a GeoIP filter
 func NewGeoIPFilter(config map[string]interface{}) (Filter, error) {
-	// TODO: Implement GeoIP filter
-	return nil, fmt.Errorf("geoip filter not yet implemented")
+	return NewGeoIPFilterComplete(config)
 }
 
 // interpolateVariables replaces template variables in a string

@@ -20,6 +20,14 @@ type Services interface {
 	GetPipelineConfigAsInterface(ctx context.Context, tenantID, datasetID string) (interface{}, error)
 	GetCacheStats() map[string]interface{}
 	GetCachedPipelineList(ctx context.Context) ([]map[string]interface{}, error)
+
+	// Transformation testing methods
+	GetSchemaAndSamples(ctx context.Context, tenantID, datasetID string, count int) ([]SchemaField, []TransformationSample, int, error)
+	TestTransformation(ctx context.Context, tenantID, datasetID string, filters []FilterConfig, samples []TransformationSample) ([]TransformationResult, error)
+	ValidateFreshData(ctx context.Context, tenantID, datasetID string, filters []FilterConfig, count int) ([]TransformationResult, string, int, error)
+	ActivateTransformation(ctx context.Context, tenantID, datasetID string, filters []FilterConfig, enabled bool) (string, error)
+	GetTransformationStats(ctx context.Context, tenantID, datasetID string) (TransformationStats, error)
+	PreviewTransformation(ctx context.Context, tenantID, datasetID string, count int) ([]TransformationResult, bool, int, string, error)
 }
 
 type API struct {
@@ -46,7 +54,7 @@ func (api *API) NewRouter() *web.Service {
 	// Configure OpenAPI schema
 	service.OpenAPISchema().SetTitle("ByteFreezer Piper API")
 	service.OpenAPISchema().SetDescription("ByteFreezer Piper API for pipeline management and monitoring")
-	service.OpenAPISchema().SetVersion("v2.0.0")
+	service.OpenAPISchema().SetVersion("v1.0.0")
 
 	// Apply defaults for decoder factory
 	service.DecoderFactory.ApplyDefaults = true
@@ -64,13 +72,20 @@ func (api *API) NewRouter() *web.Service {
 	service.Get("/api/v1/pipelines", api.GetPipelineList())
 	service.Get("/api/v1/pipelines/{tenantId}/{datasetId}", api.GetPipelineDetails())
 
+	// Transformation testing endpoints
+	service.Get("/api/v1/transformations/{tenantId}/{datasetId}/schema", api.GetSchema())
+	service.Post("/api/v1/transformations/test", api.TestTransformation())
+	service.Post("/api/v1/transformations/validate", api.ValidateFreshData())
+	service.Post("/api/v1/transformations/activate", api.ActivateTransformation())
+	service.Get("/api/v1/transformations/{tenantId}/{datasetId}/stats", api.GetTransformationStats())
+	service.Get("/api/v1/transformations/{tenantId}/{datasetId}/preview", api.PreviewTransformation())
 
 	// API documentation
-	service.Docs("/v2/docs", swgui.New)
+	service.Docs("/docs", swgui.New)
 
 	// Root redirect to documentation
 	service.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/v2/docs", http.StatusFound)
+		http.Redirect(w, r, "/docs", http.StatusFound)
 	})
 
 	return service

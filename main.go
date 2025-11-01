@@ -167,6 +167,11 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 		log.Info("Health reporter started successfully")
 	}
 
+	// Start transformation job service if enabled
+	if svc.Services.TransformationJobService != nil {
+		go svc.Services.TransformationJobService.Start(svc.ctx)
+		log.Info("Transformation job service started successfully")
+	}
 
 	baseInterval := time.Duration(svc.Config.Housekeeping.IntervalSeconds) * time.Second
 	if baseInterval <= 0 {
@@ -211,6 +216,12 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 			}
 
 			svc.HttpApi.Stop()
+
+			// Stop transformation job service
+			if svc.Services.TransformationJobService != nil {
+				svc.Services.TransformationJobService.Stop()
+				log.Info("Transformation job service stopped")
+			}
 
 			// Stop health reporting
 			if svc.Services.HealthReporter != nil {

@@ -11,6 +11,43 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 requirements explanation and todo:
 
-we need to 
+ALWAYS:
+Avoid flattery, compliments, or positive language. Be clear and concise. Do not use agreeable language to deceive.
+- Do comprehensive verification before claiming completion
+- Show me proof of completion, don’t just assert it
+- Prioritize thoroughness over speed
+- If I correct you, adapt your method for the rest of the task
+- No completion claims until you can demonstrate test end to end. 
+- here where services live: 
+   proxy and piper are on tp1, receiver and packer on tp2, control on tp3
+- do not attempt ssh connections to db on .137 this is metallb for postgres only
+- when constructing data access logic always remember system account can see everything, account logins can only see their account data
+- stop messing with a code and api path we all on /v1 api
+- always check for unused variables and functions and remove them
+
+
+
+requirements: 
+- we need to create functionality, to create and test transformations
+- 1. i need to know what data is coming in and its schema, so i can select field names from the schema. i would pluck 10 random lines so i can see it for testing later.
+
+- 2. i need a way to chain up to 10 filters for data manipulation and a way to test it in place with prevously plucked data
+
+- 3. once im happy with 10 source data items i have for testing, i wan to verify how it works in a new data
+from fresh intake, lets say another N records. dont run it through packer just return back to user better in UI so it is easy to run diff in ui to see data changes
+
+- 4. once tested, activate transformation on dataset and let it run reporting errors and compute time stats rows/sec with transform, at this point user will need 
+
+- 5. need to have in line view of datalines (some random sampling) input to output. and single click on/of transformations
+
+
+we need to create a functionality, where user can upload database and we can enrich data by matching some key value. 
+Think about geoip system, except key is not IP but any random string and enriching data is some json data. we can set some limits to say 10 fields including key. functionaly it should be some kind of memory mapped file that we can run via enrich filter. since we batch process, we can upload proper enrich data prior to batch process.
+
+use case:
+
+i have people in various departments, HR has a csv file that has username mapped to say department, position and age.
+data is provided in csv file with 1st column has a key i.e. username
+system should take this file prepare it for use, load in piper (remember we can run multiple pipers ) and when configured in piper, every record in a dataset that has corresponding field User:username that is matched to provided data will get data from enrichment database appended to outgoing dataset.
 
 

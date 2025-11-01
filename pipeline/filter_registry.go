@@ -117,6 +117,61 @@ func (r *DefaultFilterRegistry) registerBuiltInFilters() {
 		return NewUppercaseKeysFilter(config)
 	})
 
+	// Grok filter
+	r.Register("grok", func(config map[string]interface{}) (Filter, error) {
+		return NewGrokFilter(config)
+	})
+
+	// Mutate filter
+	r.Register("mutate", func(config map[string]interface{}) (Filter, error) {
+		return NewMutateFilter(config)
+	})
+
+	// Drop filter
+	r.Register("drop", func(config map[string]interface{}) (Filter, error) {
+		return NewDropFilter(config)
+	})
+
+	// KV filter
+	r.Register("kv", func(config map[string]interface{}) (Filter, error) {
+		return NewKVFilter(config)
+	})
+
+	// Split filter
+	r.Register("split", func(config map[string]interface{}) (Filter, error) {
+		return NewSplitFilter(config)
+	})
+
+	// UserAgent filter
+	r.Register("useragent", func(config map[string]interface{}) (Filter, error) {
+		return NewUserAgentFilter(config)
+	})
+
+	// DNS filter
+	r.Register("dns", func(config map[string]interface{}) (Filter, error) {
+		return NewDNSFilter(config)
+	})
+
+	// Fingerprint filter
+	r.Register("fingerprint", func(config map[string]interface{}) (Filter, error) {
+		return NewFingerprintFilter(config)
+	})
+
+	// Include filter
+	r.Register("include", func(config map[string]interface{}) (Filter, error) {
+		return NewIncludeFilter(config)
+	})
+
+	// Exclude filter
+	r.Register("exclude", func(config map[string]interface{}) (Filter, error) {
+		return NewExcludeFilter(config)
+	})
+
+	// Sample filter
+	r.Register("sample", func(config map[string]interface{}) (Filter, error) {
+		return NewSampleFilter(config)
+	})
+
 	// Parse filter will be registered externally to avoid import cycles
 }
 

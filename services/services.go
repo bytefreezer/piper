@@ -16,12 +16,13 @@ import (
 
 // Services encapsulates all service dependencies following receiver pattern
 type Services struct {
-	Config               *config.Config
-	PiperService         *PiperService
-	PipelineDatabase     *pipeline.PipelineDatabase
-	StateManager         *storage.PostgreSQLStateManager
-	HealthReporter       *HealthReportingService
-	DatasetMetricsClient *metrics.DatasetMetricsClient
+	Config                     *config.Config
+	PiperService               *PiperService
+	PipelineDatabase           *pipeline.PipelineDatabase
+	StateManager               *storage.PostgreSQLStateManager
+	HealthReporter             *HealthReportingService
+	DatasetMetricsClient       *metrics.DatasetMetricsClient
+	TransformationJobService   *TransformationJobService
 }
 
 // NewServices creates and initializes all services
@@ -62,6 +63,15 @@ func NewServices(conf *config.Config) *Services {
 		PipelineDatabase:     pipelineDatabase,
 		StateManager:         stateManager,
 		DatasetMetricsClient: datasetMetricsClient,
+	}
+
+	// Create transformation job service if state manager is available
+	if stateManager != nil {
+		pollInterval := 5 * time.Second // Poll for jobs every 5 seconds
+		services.TransformationJobService = NewTransformationJobService(services, conf.App.InstanceID, pollInterval)
+		log.Infof("Transformation job service initialized (instance: %s, poll interval: %v)", conf.App.InstanceID, pollInterval)
+	} else {
+		log.Warn("Transformation job service disabled - no state manager available")
 	}
 
 	// Create health reporter (after services are initialized)
