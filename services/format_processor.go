@@ -25,6 +25,7 @@ type FormatProcessor struct {
 	cfg            *config.Config
 	s3Client       *storage.S3Client
 	stateManager   *storage.PostgreSQLStateManager
+	sampleClient   *storage.DatasetSampleClient
 	parserRegistry parsers.ParserRegistry
 	formatDetector *parsers.FormatDetector
 	filterRegistry pipeline.FilterRegistry
@@ -45,10 +46,14 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 	// Create configuration manager
 	configManager := NewConfigManager(cfg, stateManager)
 
+	// Create dataset sample client for storing input/output samples
+	sampleClient := storage.NewDatasetSampleClient(stateManager)
+
 	processor := &FormatProcessor{
 		cfg:            cfg,
 		s3Client:       s3Client,
 		stateManager:   stateManager,
+		sampleClient:   sampleClient,
 		parserRegistry: parserRegistry,
 		formatDetector: formatDetector,
 		filterRegistry: filterRegistry,
@@ -269,6 +274,12 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 	var processedLines []string
 	lineNumber := int64(0)
 
+	// Collect samples for schema inference (keep first 10 input and output samples)
+	var inputSamples []storage.DatasetSample
+	var outputSamples []storage.DatasetSample
+	const maxSamples = 10
+	batchID := fmt.Sprintf("batch-%d", time.Now().Unix())
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.TrimSpace(line) == "" {
@@ -293,6 +304,26 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 		record["_processed_at"] = time.Now().UTC().Format(time.RFC3339)
 		record["_line_number"] = lineNumber
 
+		// Collect input sample (before filters)
+		if len(inputSamples) < maxSamples {
+			// Create a clean copy without internal metadata for sample
+			sampleData := make(map[string]interface{})
+			for k, v := range record {
+				if !strings.HasPrefix(k, "_") {
+					sampleData[k] = v
+				}
+			}
+			inputSamples = append(inputSamples, storage.DatasetSample{
+				TenantID:   formatHint.TenantID,
+				DatasetID:  formatHint.DatasetID,
+				SampleType: "input",
+				LineNumber: int(lineNumber),
+				SampleData: sampleData,
+				BatchID:    batchID,
+				CreatedAt:  time.Now(),
+			})
+		}
+
 		// Apply filters if enabled (pass-through if disabled)
 		if pipelineConfig.Enabled {
 			filteredRecord, skip, err := p.applyFilters(ctx, record, formatHint, lineNumber, pipelineConfig)
@@ -310,6 +341,26 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 			record = filteredRecord
 		}
 
+		// Collect output sample (after filters)
+		if len(outputSamples) < maxSamples {
+			// Create a clean copy without internal metadata for sample
+			sampleData := make(map[string]interface{})
+			for k, v := range record {
+				if !strings.HasPrefix(k, "_") {
+					sampleData[k] = v
+				}
+			}
+			outputSamples = append(outputSamples, storage.DatasetSample{
+				TenantID:   formatHint.TenantID,
+				DatasetID:  formatHint.DatasetID,
+				SampleType: "output",
+				LineNumber: int(lineNumber),
+				SampleData: sampleData,
+				BatchID:    batchID,
+				CreatedAt:  time.Now(),
+			})
+		}
+
 		// Convert back to NDJSON
 		processedJSON, err := sonic.Marshal(record)
 		if err != nil {
@@ -324,6 +375,27 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 
 	if err := scanner.Err(); err != nil {
 		return nil, nil, fmt.Errorf("error reading NDJSON data: %w", err)
+	}
+
+	// Store samples in database for schema inference
+	if p.sampleClient != nil && (len(inputSamples) > 0 || len(outputSamples) > 0) {
+		// Store input samples
+		if len(inputSamples) > 0 {
+			if err := p.sampleClient.UpsertSamples(ctx, formatHint.TenantID, formatHint.DatasetID, "input", inputSamples, maxSamples); err != nil {
+				log.Warnf("Failed to store input samples: %v", err)
+			} else {
+				log.Infof("Stored %d input samples for %s/%s", len(inputSamples), formatHint.TenantID, formatHint.DatasetID)
+			}
+		}
+
+		// Store output samples
+		if len(outputSamples) > 0 {
+			if err := p.sampleClient.UpsertSamples(ctx, formatHint.TenantID, formatHint.DatasetID, "output", outputSamples, maxSamples); err != nil {
+				log.Warnf("Failed to store output samples: %v", err)
+			} else {
+				log.Infof("Stored %d output samples for %s/%s", len(outputSamples), formatHint.TenantID, formatHint.DatasetID)
+			}
+		}
 	}
 
 	// Join processed lines as NDJSON

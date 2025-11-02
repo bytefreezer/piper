@@ -28,6 +28,29 @@ Avoid flattery, compliments, or positive language. Be clear and concise. Do not 
 
 
 requirements: 
+
+i do not like your approach to schema infering, it should be available in db... lets try this approach.
+
+0. on Configure Dataset ui: please update best practices: this is how process works.
+
+  1. Create input, activate, verify proxy accepts configuration
+  2. Configure output, activate, wait for data in target bucket
+  3. When dataset is active and schema is detected, Transform functionality becomes enabled 
+  4. Configure and activate transform steps, verify 
+  5. Activate transforms
+
+
+1. before user creates dataset, transformations button disabled
+2. user creates dataset input and output, and enables data flow.  
+3. we should monitor data schema on piper input and on piper output, randomly pullins 10 records on input and 10 records on output and stored locally in data base.
+4. when dataset data sample are available, transform functionality becomes available.
+5. the data samples polled in 4 can be used to to infer schema, syncronously
+6. data samples should be updated on each data batch process, time stamped and inserted into db
+
+
+
+
+===DO NOT READ BELOW===
 - we need to create functionality, to create and test transformations
 - 1. i need to know what data is coming in and its schema, so i can select field names from the schema. i would pluck 10 random lines so i can see it for testing later.
 

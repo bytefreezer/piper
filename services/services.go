@@ -20,6 +20,7 @@ type Services struct {
 	PiperService               *PiperService
 	PipelineDatabase           *pipeline.PipelineDatabase
 	StateManager               *storage.PostgreSQLStateManager
+	DatasetSampleClient        *storage.DatasetSampleClient
 	HealthReporter             *HealthReportingService
 	DatasetMetricsClient       *metrics.DatasetMetricsClient
 	TransformationJobService   *TransformationJobService
@@ -39,6 +40,14 @@ func NewServices(conf *config.Config) *Services {
 
 	// Create pipeline database
 	pipelineDatabase := pipeline.NewPipelineDatabase(pipelineClient, stateManager, conf.App.InstanceID)
+
+	// Create dataset sample client
+	datasetSampleClient := storage.NewDatasetSampleClient(stateManager)
+	if datasetSampleClient != nil {
+		log.Info("Dataset sample client initialized")
+	} else {
+		log.Warn("Dataset sample client disabled - no state manager available")
+	}
 
 	// Create dataset metrics client
 	datasetMetricsClient := metrics.NewDatasetMetricsClient(
@@ -62,6 +71,7 @@ func NewServices(conf *config.Config) *Services {
 		PiperService:         piperService,
 		PipelineDatabase:     pipelineDatabase,
 		StateManager:         stateManager,
+		DatasetSampleClient:  datasetSampleClient,
 		DatasetMetricsClient: datasetMetricsClient,
 	}
 
