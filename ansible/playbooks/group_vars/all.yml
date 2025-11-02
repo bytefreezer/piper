@@ -39,43 +39,43 @@ config:
 
   # S3 source configuration (raw data input from bytefreezer-receiver)
   s3_source:
-    bucket_name: "intake"
-    region: "us-east-1"
+    bucket_name: "{{ bytefreezer_s3_intake_bucket | default('intake') }}"
+    region: "{{ bytefreezer_s3_region | default('us-east-1') }}"
     poll_interval: "30s"
-    endpoint: "192.168.86.125:9000"
-    ssl: false
-    access_key: "AKIAQNXBAHUKIMJP26P6"
-    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+    endpoint: "{{ bytefreezer_s3_endpoint | default('192.168.86.125:9000') }}"
+    ssl: "{{ bytefreezer_s3_ssl | default(false) }}"
+    access_key: "{{ bytefreezer_s3_access_key | default('AKIAQNXBAHUKIMJP26P6') }}"
+    secret_key: "{{ bytefreezer_s3_secret_key | default('SECRET_KEY_AKIAQNXBAHUKIMJP26P6') }}"
     use_iam_role: false
 
   # S3 destination configuration (processed data output for bytefreezer-packer)
   s3_destination:
-    bucket_name: "piper"
-    region: "us-east-1"
-    endpoint: "192.168.86.125:9000"
-    ssl: false
-    access_key: "AKIAQNXBAHUKIMJP26P6"
-    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+    bucket_name: "{{ bytefreezer_s3_piper_bucket | default('piper') }}"
+    region: "{{ bytefreezer_s3_region | default('us-east-1') }}"
+    endpoint: "{{ bytefreezer_s3_endpoint | default('192.168.86.125:9000') }}"
+    ssl: "{{ bytefreezer_s3_ssl | default(false) }}"
+    access_key: "{{ bytefreezer_s3_access_key | default('AKIAQNXBAHUKIMJP26P6') }}"
+    secret_key: "{{ bytefreezer_s3_secret_key | default('SECRET_KEY_AKIAQNXBAHUKIMJP26P6') }}"
     use_iam_role: false
 
   # S3 GeoIP configuration (GeoIP database updates)
   s3_geoip:
-    bucket_name: "geoip"
-    region: "us-east-1"
-    endpoint: "192.168.86.125:9000"
-    ssl: false
-    access_key: "AKIAQNXBAHUKIMJP26P6"
-    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+    bucket_name: "{{ bytefreezer_s3_geoip_bucket | default('geoip') }}"
+    region: "{{ bytefreezer_s3_region | default('us-east-1') }}"
+    endpoint: "{{ bytefreezer_s3_endpoint | default('192.168.86.125:9000') }}"
+    ssl: "{{ bytefreezer_s3_ssl | default(false) }}"
+    access_key: "{{ bytefreezer_s3_access_key | default('AKIAQNXBAHUKIMJP26P6') }}"
+    secret_key: "{{ bytefreezer_s3_secret_key | default('SECRET_KEY_AKIAQNXBAHUKIMJP26P6') }}"
     use_iam_role: false
 
   # PostgreSQL configuration for state management
   postgresql:
-    host: "192.168.86.137"
-    port: 5432
-    database: "bytefreezer"
-    username: "bytefreezer"
-    password: "bytefreezer123"
-    ssl_mode: "disable"
+    host: "{{ bytefreezer_postgres_host | default('192.168.86.137') }}"
+    port: "{{ bytefreezer_postgres_port | default(5432) }}"
+    database: "{{ bytefreezer_postgres_database | default('bytefreezer') }}"
+    username: "{{ bytefreezer_postgres_username | default('bytefreezer') }}"
+    password: "{{ bytefreezer_postgres_password | default('bytefreezer123') }}"
+    ssl_mode: "{{ bytefreezer_postgres_ssl_mode | default('disable') }}"
     schema: "public"
     # Connection pool settings (prevents "context deadline exceeded" errors)
     max_open_conns: 25       # Maximum open connections (enough for 10 workers + overhead)
