@@ -50,27 +50,7 @@ func (c *DatasetSampleClient) UpsertSamples(ctx context.Context, tenantID, datas
 	}
 	defer tx.Rollback()
 
-	// Delete old samples for this tenant/dataset/type, keeping only the latest keepCount
-	deleteQuery := `
-		DELETE FROM dataset_samples
-		WHERE tenant_id = $1
-		  AND dataset_id = $2
-		  AND sample_type = $3
-		  AND id NOT IN (
-			SELECT id FROM dataset_samples
-			WHERE tenant_id = $1
-			  AND dataset_id = $2
-			  AND sample_type = $3
-			ORDER BY created_at DESC
-			LIMIT $4
-		  )
-	`
-	_, err = tx.ExecContext(ctx, deleteQuery, tenantID, datasetID, sampleType, keepCount)
-	if err != nil {
-		return fmt.Errorf("failed to delete old samples: %w", err)
-	}
-
-	// Insert new samples
+	// Insert new samples first
 	insertQuery := `
 		INSERT INTO dataset_samples (tenant_id, dataset_id, sample_type, line_number, sample_data, batch_id, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -96,6 +76,26 @@ func (c *DatasetSampleClient) UpsertSamples(ctx context.Context, tenantID, datas
 			log.Errorf("Failed to insert sample: %v", err)
 			continue
 		}
+	}
+
+	// Now delete old samples, keeping only the latest keepCount total (including newly inserted)
+	deleteQuery := `
+		DELETE FROM dataset_samples
+		WHERE tenant_id = $1
+		  AND dataset_id = $2
+		  AND sample_type = $3
+		  AND id NOT IN (
+			SELECT id FROM dataset_samples
+			WHERE tenant_id = $1
+			  AND dataset_id = $2
+			  AND sample_type = $3
+			ORDER BY created_at DESC
+			LIMIT $4
+		  )
+	`
+	_, err = tx.ExecContext(ctx, deleteQuery, tenantID, datasetID, sampleType, keepCount)
+	if err != nil {
+		return fmt.Errorf("failed to delete old samples: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -192,4 +192,64 @@ func (c *DatasetSampleClient) HasSamples(ctx context.Context, tenantID, datasetI
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// UpsertSchema stores or updates the computed schema for a dataset
+func (c *DatasetSampleClient) UpsertSchema(ctx context.Context, tenantID, datasetID, schemaType string, schema interface{}) error {
+	if c == nil || c.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	// Marshal schema to JSON
+	schemaJSON, err := sonic.Marshal(schema)
+	if err != nil {
+		return fmt.Errorf("failed to marshal schema: %w", err)
+	}
+
+	query := `
+		INSERT INTO dataset_schema (tenant_id, dataset_id, schema_type, schema_data, updated_at)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (tenant_id, dataset_id, schema_type)
+		DO UPDATE SET
+			schema_data = EXCLUDED.schema_data,
+			updated_at = EXCLUDED.updated_at
+	`
+
+	_, err = c.db.ExecContext(ctx, query,
+		tenantID,
+		datasetID,
+		schemaType,
+		schemaJSON,
+		time.Now(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upsert schema: %w", err)
+	}
+
+	log.Debugf("Upserted %s schema for %s/%s", schemaType, tenantID, datasetID)
+	return nil
+}
+
+// GetSchema retrieves the cached schema for a dataset
+func (c *DatasetSampleClient) GetSchema(ctx context.Context, tenantID, datasetID, schemaType string) ([]byte, error) {
+	if c == nil || c.db == nil {
+		return nil, fmt.Errorf("database not available")
+	}
+
+	query := `
+		SELECT schema_data
+		FROM dataset_schema
+		WHERE tenant_id = $1 AND dataset_id = $2 AND schema_type = $3
+	`
+
+	var schemaData []byte
+	err := c.db.QueryRowContext(ctx, query, tenantID, datasetID, schemaType).Scan(&schemaData)
+	if err == sql.ErrNoRows {
+		return nil, nil // No schema cached
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schema: %w", err)
+	}
+
+	return schemaData, nil
 }

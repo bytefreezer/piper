@@ -1,90 +1,65 @@
 package services
 
 import (
-	"bufio"
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
 	"math/rand"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/n0needt0/bytefreezer-piper/api"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
 	"github.com/n0needt0/go-goodies/log"
 )
 
-// GetSchemaAndSamples retrieves schema and sample data for a dataset
+// GetSchemaAndSamples retrieves schema and sample data for a dataset from database
 func (s *Services) GetSchemaAndSamples(ctx context.Context, tenantID, datasetID string, count int) ([]api.SchemaField, []api.TransformationSample, int, error) {
-	// Get latest file from S3 for this tenant/dataset
-	s3Client := s.PiperService.s3Client
-	prefix := fmt.Sprintf("%s/%s/", tenantID, datasetID)
+	if s.DatasetSampleClient == nil {
+		return nil, nil, 0, fmt.Errorf("dataset sample client not available")
+	}
 
-	// List objects
-	keys, err := s3Client.ListSourceObjects(ctx, prefix)
+	// Get input samples from database (these are the raw samples before transformation)
+	dbSamples, err := s.DatasetSampleClient.GetLatestSamples(ctx, tenantID, datasetID, "input", count)
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to list objects: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to get samples from database: %w", err)
 	}
 
-	if len(keys) == 0 {
-		return nil, nil, 0, fmt.Errorf("no data files found for %s/%s", tenantID, datasetID)
+	if len(dbSamples) == 0 {
+		return nil, nil, 0, fmt.Errorf("no samples found for %s/%s - please process some data first", tenantID, datasetID)
 	}
 
-	// Use the most recent file
-	latestFile := keys[0]
-
-	// Download file
-	object, err := s3Client.GetSourceObjectStream(ctx, latestFile)
-	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to get object: %w", err)
-	}
-	defer object.Close()
-
-	// Read and parse lines
-	scanner := bufio.NewScanner(object)
-	var allLines []string
-	lineNum := 0
-
-	for scanner.Scan() {
-		lineNum++
-		allLines = append(allLines, scanner.Text())
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, nil, 0, fmt.Errorf("error reading file: %w", err)
-	}
-
-	totalLines := len(allLines)
-	if totalLines == 0 {
-		return nil, nil, 0, fmt.Errorf("no lines found in file")
-	}
-
-	// Random sampling
-	samples := make([]api.TransformationSample, 0, count)
-	sampleIndices := getRandomIndices(totalLines, count)
-
-	for _, idx := range sampleIndices {
-		line := allLines[idx]
-
-		// Parse NDJSON
-		var parsedData map[string]interface{}
-		if err := sonic.Unmarshal([]byte(line), &parsedData); err != nil {
-			// If not JSON, create a simple structure
-			parsedData = map[string]interface{}{
-				"message": line,
-			}
+	// Convert database samples to API format
+	samples := make([]api.TransformationSample, 0, len(dbSamples))
+	for _, dbSample := range dbSamples {
+		// Marshal sample data back to JSON string for RawData
+		rawData, err := sonic.Marshal(dbSample.SampleData)
+		if err != nil {
+			log.Warnf("Failed to marshal sample data: %v", err)
+			continue
 		}
 
 		samples = append(samples, api.TransformationSample{
-			LineNumber: idx + 1,
-			RawData:    line,
-			ParsedData: parsedData,
+			LineNumber: dbSample.LineNumber,
+			RawData:    string(rawData),
+			ParsedData: dbSample.SampleData,
 		})
+	}
+
+	if len(samples) == 0 {
+		return nil, nil, 0, fmt.Errorf("no valid samples found")
 	}
 
 	// Build schema from samples
 	schema := buildSchema(samples)
 
-	return schema, samples, totalLines, nil
+	// Get total sample count (including both input and output)
+	totalCount, err := s.DatasetSampleClient.GetSampleCount(ctx, tenantID, datasetID)
+	if err != nil {
+		log.Warnf("Failed to get total sample count: %v", err)
+		totalCount = len(samples)
+	}
+
+	return schema, samples, totalCount, nil
 }
 
 // TestTransformation tests transformation filters on sample data
@@ -118,89 +93,62 @@ func (s *Services) TestTransformation(ctx context.Context, tenantID, datasetID s
 	return results, nil
 }
 
-// ValidateFreshData validates transformation on fresh data from S3
+// ValidateFreshData validates transformation on fresh data from database
 func (s *Services) ValidateFreshData(ctx context.Context, tenantID, datasetID string, filters []api.FilterConfig, count int) ([]api.TransformationResult, string, int, error) {
-	// Get latest file from S3
-	s3Client := s.PiperService.s3Client
-	prefix := fmt.Sprintf("%s/%s/", tenantID, datasetID)
+	if s.DatasetSampleClient == nil {
+		return nil, "", 0, fmt.Errorf("dataset sample client not available")
+	}
 
-	// List objects
-	keys, err := s3Client.ListSourceObjects(ctx, prefix)
+	// Get input samples from database (raw data before transformation)
+	dbSamples, err := s.DatasetSampleClient.GetLatestSamples(ctx, tenantID, datasetID, "input", count)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("failed to list objects: %w", err)
+		return nil, "", 0, fmt.Errorf("failed to get samples from database: %w", err)
 	}
 
-	if len(keys) == 0 {
-		return nil, "", 0, fmt.Errorf("no data files found for %s/%s", tenantID, datasetID)
+	if len(dbSamples) == 0 {
+		return nil, "", 0, fmt.Errorf("no samples found for %s/%s - please process some data first", tenantID, datasetID)
 	}
 
-	// Use the most recent file
-	latestFile := keys[0]
-	sourceFile := latestFile
-
-	// Download file
-	object, err := s3Client.GetSourceObjectStream(ctx, latestFile)
-	if err != nil {
-		return nil, "", 0, fmt.Errorf("failed to get object: %w", err)
-	}
-	defer object.Close()
-
-	// Read lines
-	scanner := bufio.NewScanner(object)
-	var allLines []string
-
-	for scanner.Scan() {
-		allLines = append(allLines, scanner.Text())
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, "", 0, fmt.Errorf("error reading file: %w", err)
-	}
-
-	totalLines := len(allLines)
-	if totalLines == 0 {
-		return nil, sourceFile, 0, fmt.Errorf("no lines found in file")
-	}
-
-	// Take first N lines (fresh data)
-	testCount := count
-	if testCount > totalLines {
-		testCount = totalLines
-	}
-
-	// Create samples from fresh data
-	samples := make([]api.TransformationSample, 0, testCount)
-	for i := 0; i < testCount; i++ {
-		line := allLines[i]
-
-		var parsedData map[string]interface{}
-		if err := sonic.Unmarshal([]byte(line), &parsedData); err != nil {
-			parsedData = map[string]interface{}{
-				"message": line,
-			}
+	// Convert database samples to API format
+	samples := make([]api.TransformationSample, 0, len(dbSamples))
+	for _, dbSample := range dbSamples {
+		// Marshal sample data back to JSON string for RawData
+		rawData, err := sonic.Marshal(dbSample.SampleData)
+		if err != nil {
+			log.Warnf("Failed to marshal sample data: %v", err)
+			continue
 		}
 
 		samples = append(samples, api.TransformationSample{
-			LineNumber: i + 1,
-			RawData:    line,
-			ParsedData: parsedData,
+			LineNumber: dbSample.LineNumber,
+			RawData:    string(rawData),
+			ParsedData: dbSample.SampleData,
 		})
 	}
 
-	// Test transformation
-	results, err := s.TestTransformation(ctx, tenantID, datasetID, filters, samples)
-	if err != nil {
-		return nil, sourceFile, totalLines, err
+	if len(samples) == 0 {
+		return nil, "", 0, fmt.Errorf("no valid samples found")
 	}
 
-	return results, sourceFile, totalLines, nil
+	// Get total sample count
+	totalCount, err := s.DatasetSampleClient.GetSampleCount(ctx, tenantID, datasetID)
+	if err != nil {
+		log.Warnf("Failed to get total sample count: %v", err)
+		totalCount = len(samples)
+	}
+
+	// Test transformation on samples
+	results, err := s.TestTransformation(ctx, tenantID, datasetID, filters, samples)
+	if err != nil {
+		return nil, "database", totalCount, err
+	}
+
+	sourceInfo := fmt.Sprintf("database (%d samples)", len(samples))
+	return results, sourceInfo, totalCount, nil
 }
 
 // ActivateTransformation activates or deactivates transformation for a dataset
 func (s *Services) ActivateTransformation(ctx context.Context, tenantID, datasetID string, filters []api.FilterConfig, enabled bool) (string, error) {
-	// TODO: Store transformation config in control service or database
-	// For now, we'll use the pipeline database cache
-
 	// Create pipeline configuration
 	pipelineConfig := map[string]interface{}{
 		"tenant_id":  tenantID,
@@ -219,8 +167,46 @@ func (s *Services) ActivateTransformation(ctx context.Context, tenantID, dataset
 
 	// Store in state manager if available
 	if s.StateManager != nil {
-		// For now, log that we would store it
 		log.Infof("Would store transformation config: %s", string(configJSON))
+	}
+
+	// Compute and cache schema from stored samples
+	if s.DatasetSampleClient != nil {
+		schema, _, _, err := s.GetSchemaAndSamples(ctx, tenantID, datasetID, 10)
+		if err != nil {
+			log.Warnf("Failed to compute schema for %s/%s: %v", tenantID, datasetID, err)
+		} else {
+			// Cache the input schema
+			if err := s.DatasetSampleClient.UpsertSchema(ctx, tenantID, datasetID, "input", schema); err != nil {
+				log.Errorf("Failed to cache input schema for %s/%s: %v", tenantID, datasetID, err)
+			} else {
+				log.Infof("Cached input schema for %s/%s (%d fields)", tenantID, datasetID, len(schema))
+			}
+
+			// Also compute and cache output schema if transformation is enabled
+			if enabled && len(filters) > 0 {
+				// Get output samples and compute output schema
+				dbSamples, err := s.DatasetSampleClient.GetLatestSamples(ctx, tenantID, datasetID, "output", 10)
+				if err == nil && len(dbSamples) > 0 {
+					// Convert to TransformationSample format
+					outputSamples := make([]api.TransformationSample, 0, len(dbSamples))
+					for _, dbSample := range dbSamples {
+						outputSamples = append(outputSamples, api.TransformationSample{
+							LineNumber: dbSample.LineNumber,
+							ParsedData: dbSample.SampleData,
+						})
+					}
+
+					// Build output schema
+					outputSchema := buildSchema(outputSamples)
+					if err := s.DatasetSampleClient.UpsertSchema(ctx, tenantID, datasetID, "output", outputSchema); err != nil {
+						log.Errorf("Failed to cache output schema for %s/%s: %v", tenantID, datasetID, err)
+					} else {
+						log.Infof("Cached output schema for %s/%s (%d fields)", tenantID, datasetID, len(outputSchema))
+					}
+				}
+			}
+		}
 	}
 
 	version := pipelineConfig["version"].(string)
