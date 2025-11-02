@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"io"
 	"strings"
@@ -145,7 +145,7 @@ func (p *FormatProcessor) processDataWithFormat(ctx context.Context, formatHint 
 		}
 
 		// Convert to NDJSON
-		processedJSON, err := json.Marshal(record)
+		processedJSON, err := sonic.Marshal(record)
 		if err != nil {
 			log.Warnf("Failed to marshal processed record: %v", err)
 			stats.ErrorRecords++
@@ -236,7 +236,7 @@ func (p *FormatProcessor) processCSVData(ctx context.Context, parser parsers.Par
 		}
 
 		// Convert to NDJSON
-		processedJSON, err := json.Marshal(record)
+		processedJSON, err := sonic.Marshal(record)
 		if err != nil {
 			log.Warnf("Failed to marshal CSV record: %v", err)
 			stats.ErrorRecords++
@@ -311,7 +311,7 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 		}
 
 		// Convert back to NDJSON
-		processedJSON, err := json.Marshal(record)
+		processedJSON, err := sonic.Marshal(record)
 		if err != nil {
 			log.Warnf("Failed to marshal processed record: %v", err)
 			stats.ErrorRecords++

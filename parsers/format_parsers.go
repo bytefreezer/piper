@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -369,7 +369,7 @@ func (p *RawTextParser) Parse(ctx context.Context, data []byte) (map[string]inte
 	// Try to detect if it looks like JSON
 	if strings.HasPrefix(line, "{") && strings.HasSuffix(line, "}") {
 		var jsonData map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &jsonData); err == nil {
+		if err := sonic.Unmarshal([]byte(line), &jsonData); err == nil {
 			result["detected_format"] = "json"
 			result["json_data"] = jsonData
 		}
@@ -476,10 +476,10 @@ func (p *SflowParser) parseRecord(record sflow.Record) map[string]interface{} {
 
 	// Convert record to JSON for generic parsing
 	// This is a simpler approach that handles all record types
-	recordJSON, err := json.Marshal(record)
+	recordJSON, err := sonic.Marshal(record)
 	if err == nil {
 		var recordMap map[string]interface{}
-		if json.Unmarshal(recordJSON, &recordMap) == nil {
+		if sonic.Unmarshal(recordJSON, &recordMap) == nil {
 			// Merge the record data
 			for k, v := range recordMap {
 				recordData[k] = v

@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"time"
 
@@ -152,12 +152,12 @@ func (s *TransformationJobService) executeTestJob(ctx context.Context, job *doma
 		Samples   []api.TransformationSample `json:"samples"`
 	}
 
-	requestJSON, err := json.Marshal(job.Request)
+	requestJSON, err := sonic.Marshal(job.Request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	if err := json.Unmarshal(requestJSON, &request); err != nil {
+	if err := sonic.Unmarshal(requestJSON, &request); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 	}
 
@@ -182,12 +182,12 @@ func (s *TransformationJobService) executeValidateJob(ctx context.Context, job *
 		Count     int                `json:"count"`
 	}
 
-	requestJSON, err := json.Marshal(job.Request)
+	requestJSON, err := sonic.Marshal(job.Request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	if err := json.Unmarshal(requestJSON, &request); err != nil {
+	if err := sonic.Unmarshal(requestJSON, &request); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 	}
 
@@ -214,12 +214,12 @@ func (s *TransformationJobService) executeActivateJob(ctx context.Context, job *
 		Enabled   bool               `json:"enabled"`
 	}
 
-	requestJSON, err := json.Marshal(job.Request)
+	requestJSON, err := sonic.Marshal(job.Request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	if err := json.Unmarshal(requestJSON, &request); err != nil {
+	if err := sonic.Unmarshal(requestJSON, &request); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 	}
 

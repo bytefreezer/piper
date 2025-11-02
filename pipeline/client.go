@@ -2,7 +2,7 @@ package pipeline
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"net/http"
 	"time"
@@ -127,7 +127,7 @@ func (pc *PipelineClient) FetchTenants(ctx context.Context) ([]TenantInfo, error
 		Total int               `json:"total"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&accountsResp); err != nil {
+	if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&accountsResp); err != nil {
 		return nil, fmt.Errorf("failed to decode accounts response: %w", err)
 	}
 
@@ -170,7 +170,7 @@ func (pc *PipelineClient) FetchTenants(ctx context.Context) ([]TenantInfo, error
 			Total int              `json:"total"`
 		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&tenantsResp); err != nil {
+		if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&tenantsResp); err != nil {
 			resp.Body.Close()
 			log.Warnf("Failed to decode tenants response for account %s: %v", account.ID, err)
 			continue
@@ -214,7 +214,7 @@ func (pc *PipelineClient) FetchTenants(ctx context.Context) ([]TenantInfo, error
 				Total int               `json:"total"`
 			}
 
-			if err := json.NewDecoder(resp.Body).Decode(&datasetsResp); err != nil {
+			if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&datasetsResp); err != nil {
 				resp.Body.Close()
 				log.Warnf("Failed to decode datasets response for tenant %s: %v", tenant.ID, err)
 				continue
@@ -285,7 +285,7 @@ func (pc *PipelineClient) FetchPipelineConfiguration(ctx context.Context, tenant
 	}
 
 	var dataset DatasetResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dataset); err != nil {
+	if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&dataset); err != nil {
 		return nil, fmt.Errorf("failed to decode dataset response: %w", err)
 	}
 

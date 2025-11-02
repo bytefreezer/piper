@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"regexp"
 	"strings"
@@ -382,7 +382,7 @@ func (f *JSONValidateFilter) Apply(ctx *FilterContext, record map[string]interfa
 
 	// Validate JSON by attempting to parse it
 	var parsedJSON interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &parsedJSON); err != nil {
+	if err := sonic.Unmarshal([]byte(jsonStr), &parsedJSON); err != nil {
 		if f.failOnInvalid {
 			// Skip this record (fail processing)
 			return &FilterResult{
@@ -469,7 +469,7 @@ func (f *JSONFlattenFilter) Apply(ctx *FilterContext, record map[string]interfac
 	// Convert to JSON object if it's a string
 	var jsonObj interface{}
 	if str, ok := sourceValue.(string); ok {
-		if err := json.Unmarshal([]byte(str), &jsonObj); err != nil {
+		if err := sonic.Unmarshal([]byte(str), &jsonObj); err != nil {
 			// Not valid JSON, skip flattening
 			return &FilterResult{
 				Record:   record,

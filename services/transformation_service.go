@@ -3,7 +3,7 @@ package services
 import (
 	"bufio"
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"math/rand"
 	"time"
@@ -67,7 +67,7 @@ func (s *Services) GetSchemaAndSamples(ctx context.Context, tenantID, datasetID 
 
 		// Parse NDJSON
 		var parsedData map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &parsedData); err != nil {
+		if err := sonic.Unmarshal([]byte(line), &parsedData); err != nil {
 			// If not JSON, create a simple structure
 			parsedData = map[string]interface{}{
 				"message": line,
@@ -174,7 +174,7 @@ func (s *Services) ValidateFreshData(ctx context.Context, tenantID, datasetID st
 		line := allLines[i]
 
 		var parsedData map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &parsedData); err != nil {
+		if err := sonic.Unmarshal([]byte(line), &parsedData); err != nil {
 			parsedData = map[string]interface{}{
 				"message": line,
 			}
@@ -212,7 +212,7 @@ func (s *Services) ActivateTransformation(ctx context.Context, tenantID, dataset
 	}
 
 	// Convert to JSON
-	configJSON, err := json.Marshal(pipelineConfig)
+	configJSON, err := sonic.Marshal(pipelineConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal config: %w", err)
 	}
@@ -261,7 +261,7 @@ func (s *Services) PreviewTransformation(ctx context.Context, tenantID, datasetI
 	}
 
 	// Convert to domain.PipelineConfiguration
-	configJSON, err := json.Marshal(pipelineConfigInterface)
+	configJSON, err := sonic.Marshal(pipelineConfigInterface)
 	if err != nil {
 		return nil, false, 0, "", fmt.Errorf("failed to marshal config: %w", err)
 	}
@@ -273,7 +273,7 @@ func (s *Services) PreviewTransformation(ctx context.Context, tenantID, datasetI
 			Enabled bool                   `json:"enabled"`
 		} `json:"filters"`
 	}
-	if err := json.Unmarshal(configJSON, &pipelineConfig); err != nil {
+	if err := sonic.Unmarshal(configJSON, &pipelineConfig); err != nil {
 		return nil, false, 0, "", fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 

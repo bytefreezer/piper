@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"regexp"
 	"strings"
@@ -733,7 +733,7 @@ func (sm *PostgreSQLStateManager) CleanupExpiredJobRecords(ctx context.Context) 
 
 // CreateTransformationJob creates a new transformation job
 func (sm *PostgreSQLStateManager) CreateTransformationJob(ctx context.Context, job *domain.TransformationJob) error {
-	requestJSON, err := json.Marshal(job.Request)
+	requestJSON, err := sonic.Marshal(job.Request)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
@@ -802,13 +802,13 @@ func (sm *PostgreSQLStateManager) ClaimTransformationJob(ctx context.Context, pr
 	}
 
 	// Unmarshal request
-	if err := json.Unmarshal(requestJSON, &job.Request); err != nil {
+	if err := sonic.Unmarshal(requestJSON, &job.Request); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 	}
 
 	// Unmarshal result if present
 	if len(resultJSON) > 0 {
-		if err := json.Unmarshal(resultJSON, &job.Result); err != nil {
+		if err := sonic.Unmarshal(resultJSON, &job.Result); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal result: %w", err)
 		}
 	}
@@ -853,7 +853,7 @@ func (sm *PostgreSQLStateManager) UpdateTransformationJob(ctx context.Context, j
 	var resultJSON []byte
 	var err error
 	if job.Result != nil {
-		resultJSON, err = json.Marshal(job.Result)
+		resultJSON, err = sonic.Marshal(job.Result)
 		if err != nil {
 			return fmt.Errorf("failed to marshal result: %w", err)
 		}
@@ -913,13 +913,13 @@ func (sm *PostgreSQLStateManager) GetTransformationJob(ctx context.Context, jobI
 	}
 
 	// Unmarshal request
-	if err := json.Unmarshal(requestJSON, &job.Request); err != nil {
+	if err := sonic.Unmarshal(requestJSON, &job.Request); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 	}
 
 	// Unmarshal result if present
 	if len(resultJSON) > 0 {
-		if err := json.Unmarshal(resultJSON, &job.Result); err != nil {
+		if err := sonic.Unmarshal(resultJSON, &job.Result); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal result: %w", err)
 		}
 	}
@@ -978,12 +978,12 @@ func (sm *PostgreSQLStateManager) ListPendingTransformationJobs(ctx context.Cont
 		}
 
 		// Unmarshal request
-		if err := json.Unmarshal(requestJSON, &job.Request); err != nil {
+		if err := sonic.Unmarshal(requestJSON, &job.Request); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 		}
 
 		if len(resultJSON) > 0 {
-			if err := json.Unmarshal(resultJSON, &job.Result); err != nil {
+			if err := sonic.Unmarshal(resultJSON, &job.Result); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal result: %w", err)
 			}
 		}

@@ -2,7 +2,7 @@ package parsers
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -23,7 +23,7 @@ func NewJSONParser(config map[string]interface{}) (Parser, error) {
 
 func (p *JSONParser) Parse(ctx context.Context, data []byte) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
+	if err := sonic.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 	return result, nil
@@ -61,7 +61,7 @@ func (p *NDJSONParser) Parse(ctx context.Context, data []byte) (map[string]inter
 
 	// First attempt: try parsing as-is (for well-formed NDJSON)
 	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &result); err == nil {
+	if err := sonic.Unmarshal([]byte(jsonStr), &result); err == nil {
 		return result, nil
 	}
 
@@ -77,7 +77,7 @@ func (p *NDJSONParser) Parse(ctx context.Context, data []byte) (map[string]inter
 		}, nil
 	}
 
-	if err := json.Unmarshal([]byte(fixedJSON), &result); err != nil {
+	if err := sonic.Unmarshal([]byte(fixedJSON), &result); err != nil {
 		// Return raw data as valid object - no strict validation
 		return map[string]interface{}{
 			"message": jsonStr,
@@ -126,7 +126,7 @@ func (p *NDJSONParser) reconstructJSONObject(input string) (string, error) {
 // isCompleteJSON checks if a string contains valid, complete JSON
 func (p *NDJSONParser) isCompleteJSON(s string) bool {
 	var temp map[string]interface{}
-	return json.Unmarshal([]byte(s), &temp) == nil
+	return sonic.Unmarshal([]byte(s), &temp) == nil
 }
 
 // min returns the minimum of two integers

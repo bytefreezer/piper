@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"net/http"
 	"strings"
@@ -317,7 +317,7 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 			Active bool   `json:"active"`
 		} `json:"items"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&accountsResp); err != nil {
+	if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&accountsResp); err != nil {
 		return nil, fmt.Errorf("failed to decode accounts response: %w", err)
 	}
 
@@ -355,7 +355,7 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 				Active bool   `json:"active"`
 			} `json:"items"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&tenantsResp); err != nil {
+		if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&tenantsResp); err != nil {
 			resp.Body.Close()
 			log.Warnf("Failed to decode tenants for account %s: %v", account.ID, err)
 			continue
@@ -395,7 +395,7 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 					Active bool   `json:"active"`
 				} `json:"items"`
 			}
-			if err := json.NewDecoder(datasetResp.Body).Decode(&datasetsResp); err != nil {
+			if err := sonic.ConfigDefault.NewDecoder(datasetResp.Body).Decode(&datasetsResp); err != nil {
 				datasetResp.Body.Close()
 				log.Warnf("Failed to decode datasets for tenant %s: %v", tenant.ID, err)
 				continue

@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"time"
 
@@ -420,6 +420,6 @@ func (api *API) PreviewTransformation() usecase.Interactor {
 
 // Helper function to convert filter configs to JSON for logging
 func filtersToJSON(filters []FilterConfig) string {
-	data, _ := json.Marshal(filters)
+	data, _ := sonic.Marshal(filters)
 	return string(data)
 }

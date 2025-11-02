@@ -2,7 +2,7 @@ package pipeline
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"sync"
 	"time"
@@ -101,7 +101,7 @@ func (pdb *PipelineDatabase) UpdateDatabase(ctx context.Context) error {
 			}
 
 			// Cache in PostgreSQL
-			configJSON, err := json.Marshal(pipelineResp.Configuration)
+			configJSON, err := sonic.Marshal(pipelineResp.Configuration)
 			if err != nil {
 				log.Warnf("Failed to marshal pipeline config for %s: %v", configKey, err)
 				continue
@@ -166,7 +166,7 @@ func (pdb *PipelineDatabase) GetPipelineConfiguration(ctx context.Context, tenan
 		log.Warnf("Failed to get cached pipeline config from database: %v", err)
 	} else if found {
 		var config domain.PipelineConfiguration
-		if err := json.Unmarshal(configJSON, &config); err != nil {
+		if err := sonic.Unmarshal(configJSON, &config); err != nil {
 			log.Warnf("Failed to unmarshal cached pipeline config: %v", err)
 		} else {
 			// Cache in memory for future requests
