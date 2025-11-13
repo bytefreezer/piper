@@ -1,0 +1,203 @@
+---
+# ByteFreezer Piper - Managed Deployment (Self-Contained Variables)
+# Managed deployment on tp1, tp2, tp3
+# This file contains ALL variables needed for managed deployment
+
+# GitHub repository
+github_repo: "n0needt0/bytefreezer-piper"
+version: "{{ bytefreezer_piper_version | default('latest') }}"
+
+# Service configuration
+service:
+  name: "bytefreezer-piper"
+  user: "root"
+  group: "root"
+
+# File paths
+paths:
+  binary_dir: "/usr/local/bin"
+  binary_path: "/usr/local/bin/bytefreezer-piper"
+  config_dir: "/etc/bytefreezer-piper"
+  config_path: "/etc/bytefreezer-piper/config.yaml"
+  log_dir: "/var/log/bytefreezer-piper"
+  cache_dir: "/var/cache/bytefreezer-piper"
+  spool_dir: "/var/spool/bytefreezer-piper"
+  service_path: "/etc/systemd/system/bytefreezer-piper.service"
+  logrotate_path: "/etc/logrotate.d/bytefreezer-piper"
+
+# Log rotation settings
+logrotate:
+  rotate_count: 7
+
+# Application configuration
+config:
+  app:
+    name: "bytefreezer-piper"
+    version: "1.0.0"
+    log_level: "info"
+
+  server:
+    api_port: 8082
+
+  # S3 source configuration (raw data input from bytefreezer-receiver)
+  s3_source:
+    bucket_name: "intake"
+    region: "us-east-1"
+    poll_interval: "30s"
+    endpoint: "192.168.86.125:9000"
+    ssl: false
+    access_key: "AKIAQNXBAHUKIMJP26P6"
+    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+    use_iam_role: false
+
+  # S3 destination configuration (processed data output for bytefreezer-packer)
+  s3_destination:
+    bucket_name: "piper"
+    region: "us-east-1"
+    endpoint: "192.168.86.125:9000"
+    ssl: false
+    access_key: "AKIAQNXBAHUKIMJP26P6"
+    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+    use_iam_role: false
+
+  # S3 GeoIP configuration (GeoIP database updates)
+  s3_geoip:
+    bucket_name: "geoip"
+    region: "us-east-1"
+    endpoint: "192.168.86.125:9000"
+    ssl: false
+    access_key: "AKIAQNXBAHUKIMJP26P6"
+    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
+    use_iam_role: false
+
+  # PostgreSQL configuration for state management
+  postgresql:
+    host: "192.168.86.137"
+    port: 5432
+    database: "bytefreezer"
+    username: "bytefreezer"
+    password: "bytefreezer123"
+    ssl_mode: "disable"
+    schema: "public"
+    # Connection pool settings (prevents "context deadline exceeded" errors)
+    max_open_conns: 25
+    max_idle_conns: 10
+    conn_max_lifetime: "5m"
+    conn_max_idle_time: "5m"
+
+  # Processing engine configuration
+  processing:
+    max_concurrent_jobs: 10
+    job_timeout_seconds: 600
+    retry_attempts: 3
+    retry_backoff: "exponential"
+    buffer_size: 1000
+
+  # Pipeline configuration
+  pipeline:
+    controller_endpoint: ""
+    config_refresh_interval: "5m"
+    geoip_database_path: "/opt/geoip"
+    geoip_city_database: "GeoLite2-City.mmdb"
+    geoip_country_database: "GeoLite2-Country.mmdb"
+    enable_geoip: false
+
+  # Control Service configuration - Managed deployment (process all managed accounts)
+  control_service:
+    enabled: true
+    base_url: "http://192.168.86.103:8082"
+    api_key: "bytefreezer-service-api-key-8f4a2d1b-3c5e-4f6a-9b8c-7d2e1f3a4b5c"
+    timeout_seconds: 30
+    account_id: ""  # Empty = process all managed accounts (deployment_type: managed)
+    tenant_id: ""   # Empty = process all tenants
+
+  # Parser configuration for log parsing (Logstash-style)
+  parsers:
+    enabled: false
+    load_defaults: true
+    settings:
+      max_line_length: 65536
+      buffer_size: 4096
+      parse_timeout_seconds: 30
+      max_parse_errors: 100
+      grok_patterns_dir: "/opt/grok-patterns"
+    auto_tenant_parsers: true
+    format_defaults:
+      plaintext:
+        - type: "parse"
+          config:
+            auto_select: true
+            source_field: "message"
+            on_parse_failure: "tag"
+            preserve_raw: false
+      syslog:
+        - type: "parse"
+          config:
+            parser_name: "syslog-rfc3164"
+            source_field: "message"
+            on_parse_failure: "tag"
+      ndjson:
+        - type: "parse"
+          config:
+            parser_name: "json-logs"
+            source_field: "message"
+            on_parse_failure: "pass_through"
+      json:
+        - type: "parse"
+          config:
+            parser_name: "json-logs"
+            source_field: "message"
+            on_parse_failure: "pass_through"
+
+  # Monitoring and observability
+  monitoring:
+    metrics_port: 9092
+    log_level: "info"
+    enable_tracing: false
+
+  # Secrets management
+  secrets:
+    provider: "aws"
+    region: "us-east-1"
+
+  # Housekeeping configuration
+  housekeeping:
+    enabled: true
+    intervalseconds: 300
+
+  soc:
+    enabled: false
+
+  # Development mode
+  dev: false
+
+  # Health reporting configuration
+  health_reporting:
+    enabled: true
+    report_interval: 30
+    timeout_seconds: 10
+    register_on_startup: true
+
+  # Error tracking configuration
+  error_tracking:
+    enabled: true
+
+# Download configuration
+download:
+  url: "https://github.com/{{ github_repo }}/releases/{{ 'latest/download' if version == 'latest' else 'download/' + version }}/bytefreezer-piper-linux-amd64.tar.gz"
+
+# Docker image configuration
+docker:
+  image_name: "ghcr.io/n0needt0/bytefreezer-piper"
+  tag: "{{ bytefreezer_piper_version | default('latest') }}"
+  force_pull: false
+
+# Remove configuration
+remove:
+  cache_dir: "{{ bytefreezer_piper_remove_cache_dir | default(false) }}"
+  spool_dir: "{{ bytefreezer_piper_remove_spool_dir | default(false) }}"
+
+# AWX Survey Variables
+force_reinstall: "{{ force_reinstall | default(false) }}"
+skip_validation: "{{ skip_validation | default(false) }}"
+enable_debug_logging: "{{ enable_debug_logging | default(false) }}"

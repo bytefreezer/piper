@@ -288,8 +288,18 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 
 	log.Infof("Fetching tenants from Control Service: %s", sdm.config.ControlService.BaseURL)
 
-	// First, fetch all accounts
-	accountsURL := fmt.Sprintf("%s/api/v1/accounts?limit=1000", sdm.config.ControlService.BaseURL)
+	// Determine which accounts to fetch based on deployment configuration
+	var accountsURL string
+	if sdm.config.ControlService.AccountID != "" {
+		// On-prem deployment: fetch only the specific account
+		log.Infof("On-prem mode: processing only account %s", sdm.config.ControlService.AccountID)
+		accountsURL = fmt.Sprintf("%s/api/v1/accounts/%s", sdm.config.ControlService.BaseURL, sdm.config.ControlService.AccountID)
+	} else {
+		// Managed deployment: fetch all accounts (will filter by deployment_type)
+		log.Info("Managed mode: processing managed accounts only")
+		accountsURL = fmt.Sprintf("%s/api/v1/accounts?limit=1000", sdm.config.ControlService.BaseURL)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", accountsURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounts request: %w", err)
@@ -310,25 +320,62 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 		return nil, fmt.Errorf("control service returned status %d for accounts", resp.StatusCode)
 	}
 
-	var accountsResp struct {
-		Items []struct {
-			ID     string `json:"id"`
-			Name   string `json:"name"`
-			Active bool   `json:"active"`
-		} `json:"items"`
-	}
-	if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&accountsResp); err != nil {
-		return nil, fmt.Errorf("failed to decode accounts response: %w", err)
+	// Parse response - handle both single account and list of accounts
+	var accounts []struct {
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		Active         bool   `json:"active"`
+		DeploymentType string `json:"deployment_type"`
 	}
 
-	log.Infof("Fetched %d accounts from Control Service", len(accountsResp.Items))
+	if sdm.config.ControlService.AccountID != "" {
+		// Single account response
+		var singleAccount struct {
+			ID             string `json:"id"`
+			Name           string `json:"name"`
+			Active         bool   `json:"active"`
+			DeploymentType string `json:"deployment_type"`
+		}
+		if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&singleAccount); err != nil {
+			return nil, fmt.Errorf("failed to decode account response: %w", err)
+		}
+		accounts = append(accounts, singleAccount)
+	} else {
+		// Multiple accounts response
+		var accountsResp struct {
+			Items []struct {
+				ID             string `json:"id"`
+				Name           string `json:"name"`
+				Active         bool   `json:"active"`
+				DeploymentType string `json:"deployment_type"`
+			} `json:"items"`
+		}
+		if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&accountsResp); err != nil {
+			return nil, fmt.Errorf("failed to decode accounts response: %w", err)
+		}
+		accounts = accountsResp.Items
+	}
+
+	log.Infof("Fetched %d accounts from Control Service", len(accounts))
 
 	// Fetch tenants for each account
 	allTenants := make([]TenantInfo, 0)
-	for _, account := range accountsResp.Items {
+	for _, account := range accounts {
 		if !account.Active {
+			log.Debugf("Skipping inactive account %s", account.ID)
 			continue
 		}
+
+		// Filter by deployment type in managed mode
+		if sdm.config.ControlService.AccountID == "" {
+			// Managed deployment: only process managed accounts
+			if account.DeploymentType != "managed" {
+				log.Debugf("Skipping non-managed account %s (deployment_type: %s)", account.ID, account.DeploymentType)
+				continue
+			}
+		}
+
+		log.Debugf("Processing account %s (deployment_type: %s)", account.ID, account.DeploymentType)
 
 		tenantsURL := fmt.Sprintf("%s/api/v1/accounts/%s/tenants?limit=1000",
 			sdm.config.ControlService.BaseURL, account.ID)

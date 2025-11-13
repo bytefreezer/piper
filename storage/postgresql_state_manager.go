@@ -850,13 +850,15 @@ func (sm *PostgreSQLStateManager) ClaimTransformationJob(ctx context.Context, pr
 
 // UpdateTransformationJob updates a transformation job's status and result
 func (sm *PostgreSQLStateManager) UpdateTransformationJob(ctx context.Context, job *domain.TransformationJob) error {
-	var resultJSON []byte
-	var err error
+	var resultJSON interface{}
 	if job.Result != nil {
-		resultJSON, err = sonic.Marshal(job.Result)
+		resultBytes, err := sonic.Marshal(job.Result)
 		if err != nil {
 			return fmt.Errorf("failed to marshal result: %w", err)
 		}
+		resultJSON = resultBytes
+	} else {
+		resultJSON = nil  // Pass NULL to database when no result
 	}
 
 	now := time.Now()
@@ -874,7 +876,7 @@ func (sm *PostgreSQLStateManager) UpdateTransformationJob(ctx context.Context, j
 		job.CompletedAt = completedAt
 	}
 
-	_, err = sm.db.ExecContext(ctx, updateSQL,
+	_, err := sm.db.ExecContext(ctx, updateSQL,
 		job.Status, resultJSON, job.ErrorMsg, now, completedAt, job.JobID)
 
 	if err != nil {

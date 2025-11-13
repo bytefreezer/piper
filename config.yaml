@@ -6,7 +6,7 @@ app:
   log_level: "debug"
 
 server:
-  apiport: 8090
+  api_port: 8082
 
 # S3 source configuration (raw data input from bytefreezer-receiver)
 s3_source:
@@ -138,7 +138,7 @@ parsers:
 
 # Monitoring and observability
 monitoring:
-  metrics_port: 9090
+  metrics_port: 9092
   log_level: "info"
   enable_tracing: false
   # tracing_endpoint: ""    # Optional - OpenTelemetry endpoint

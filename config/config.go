@@ -48,7 +48,7 @@ type App struct {
 
 // Server represents server configuration following receiver pattern
 type Server struct {
-	ApiPort int `koanf:"apiport"`
+	ApiPort int `koanf:"api_port"`
 }
 
 // S3Source represents configuration for reading raw data from S3
@@ -129,6 +129,7 @@ type ControlService struct {
 	BaseURL        string `koanf:"base_url"`
 	APIKey         string `koanf:"api_key"`
 	TimeoutSeconds int    `koanf:"timeout_seconds"`
+	AccountID      string `koanf:"account_id"` // Optional: for on-prem deployments, only process this account
 }
 
 // Monitoring represents monitoring and observability configuration
