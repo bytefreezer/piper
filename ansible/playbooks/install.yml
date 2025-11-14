@@ -187,7 +187,7 @@
           - "- S3 source: {{ config.s3_source.bucket_name }}"
           - "- S3 destination: {{ config.s3_destination.bucket_name }}"
           - "- Metrics: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.metrics_port }}/metrics"
-          - "- API: http://{{ ansible_default_ipv4.address }}:{{ config.server.apiport }}/api/v1/status"
+          - "- API: http://{{ ansible_default_ipv4.address }}:{{ config.server.api_port }}/api/v1/status"
           - ""
           - "Troubleshooting:"
           - "- Check service logs: journalctl -u {{ service.name }} -f"
