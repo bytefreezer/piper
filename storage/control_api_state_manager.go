@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/n0needt0/bytefreezer-piper/config"
@@ -82,12 +83,21 @@ func (sm *ControlAPIStateManager) AcquireFileLock(ctx context.Context, fileKey, 
 
 // AcquireFileLockWithTTL acquires a file lock with a specific TTL
 func (sm *ControlAPIStateManager) AcquireFileLockWithTTL(ctx context.Context, fileKey, processorType, processorID, jobID string, ttl time.Duration) error {
+	// Parse tenant_id and dataset_id from fileKey (format: tenant/dataset/filename)
+	parts := strings.Split(fileKey, "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid file_key format: %s (expected tenant/dataset/filename)", fileKey)
+	}
+
+	tenantID := parts[0]
+	datasetID := parts[1]
+
 	body := map[string]interface{}{
-		"file_key":       fileKey,
-		"processor_type": processorType,
-		"processor_id":   processorID,
-		"job_id":         jobID,
-		"ttl_seconds":    int(ttl.Seconds()),
+		"tenant_id":             tenantID,
+		"dataset_id":            datasetID,
+		"file_key":              fileKey,
+		"locked_by":             processorID,
+		"lock_duration_seconds": int(ttl.Seconds()),
 	}
 
 	resp, err := sm.doRequest(ctx, "POST", "/api/v1/piper/locks/files", body)
@@ -226,14 +236,17 @@ func (sm *ControlAPIStateManager) CleanupStaleLocksOnStartup(ctx context.Context
 
 // CachePipelineConfiguration caches a pipeline configuration
 func (sm *ControlAPIStateManager) CachePipelineConfiguration(ctx context.Context, configKey, tenantID, datasetID, version string, configuration []byte, filterCount int, instanceID string) error {
+	// Parse configuration bytes into map
+	var configMap map[string]interface{}
+	if err := json.Unmarshal(configuration, &configMap); err != nil {
+		return fmt.Errorf("failed to unmarshal configuration: %w", err)
+	}
+
 	body := map[string]interface{}{
-		"config_key":    configKey,
 		"tenant_id":     tenantID,
 		"dataset_id":    datasetID,
-		"version":       version,
-		"configuration": string(configuration),
-		"filter_count":  filterCount,
-		"instance_id":   instanceID,
+		"configuration": configMap,
+		"ttl_hours":     24,
 	}
 
 	resp, err := sm.doRequest(ctx, "POST", "/api/v1/piper/cache/pipelines", body)
@@ -305,11 +318,14 @@ func splitConfigKey(configKey string) []string {
 // CacheTenant caches tenant data
 func (sm *ControlAPIStateManager) CacheTenant(ctx context.Context, tenantID, name string, datasets []string, active bool, instanceID string) error {
 	body := map[string]interface{}{
-		"tenant_id":   tenantID,
-		"name":        name,
-		"datasets":    datasets,
-		"active":      active,
-		"instance_id": instanceID,
+		"tenant_id": tenantID,
+		"tenant_data": map[string]interface{}{
+			"name":        name,
+			"datasets":    datasets,
+			"active":      active,
+			"instance_id": instanceID,
+		},
+		"ttl_hours": 24,
 	}
 
 	resp, err := sm.doRequest(ctx, "POST", "/api/v1/piper/cache/tenants", body)
@@ -402,43 +418,193 @@ func (sm *ControlAPIStateManager) CleanupExpiredJobRecords(ctx context.Context) 
 
 // CreateTransformationJob creates a transformation job (not implemented in control API yet)
 func (sm *ControlAPIStateManager) CreateTransformationJob(ctx context.Context, job *domain.TransformationJob) error {
-	// TODO: This endpoint may not exist in control service yet
-	log.Warn("CreateTransformationJob called but not implemented in control API")
+	body := map[string]interface{}{
+		"job_id":     job.JobID,
+		"tenant_id":  job.TenantID,
+		"dataset_id": job.DatasetID,
+		"job_type":   job.JobType,
+		"status":     job.Status,
+		"ttl_hours":  24,
+	}
+
+	if job.ProcessorID != "" {
+		body["processor_id"] = job.ProcessorID
+	}
+	if job.Request != nil {
+		body["request"] = job.Request
+	}
+
+	resp, err := sm.doRequest(ctx, "POST", "/api/v1/piper/transformation-jobs", body)
+	if err != nil {
+		return fmt.Errorf("failed to create transformation job: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create transformation job: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	log.Debugf("Created transformation job %s via control API", job.JobID)
 	return nil
 }
 
-// ClaimTransformationJob claims a transformation job (not implemented in control API yet)
+// ClaimTransformationJob claims a transformation job
 func (sm *ControlAPIStateManager) ClaimTransformationJob(ctx context.Context, processorID string, jobTypes []domain.TransformationJobType) (*domain.TransformationJob, error) {
-	// TODO: This endpoint may not exist in control service yet
-	log.Warn("ClaimTransformationJob called but not implemented in control API")
-	return nil, nil
+	body := map[string]interface{}{
+		"processor_id": processorID,
+		"job_types":    jobTypes,
+	}
+
+	resp, err := sm.doRequest(ctx, "POST", "/api/v1/piper/transformation-jobs/claim", body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim transformation job: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to claim transformation job: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var result struct {
+		Job *domain.TransformationJob `json:"job"`
+	}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	if result.Job != nil {
+		log.Infof("Claimed transformation job %s via control API", result.Job.JobID)
+	}
+	return result.Job, nil
 }
 
-// UpdateTransformationJob updates a transformation job (not implemented in control API yet)
+// UpdateTransformationJob updates a transformation job
 func (sm *ControlAPIStateManager) UpdateTransformationJob(ctx context.Context, job *domain.TransformationJob) error {
-	// TODO: This endpoint may not exist in control service yet
-	log.Warn("UpdateTransformationJob called but not implemented in control API")
+	body := map[string]interface{}{
+		"status": job.Status,
+	}
+
+	if job.ProcessorID != "" {
+		body["processor_id"] = job.ProcessorID
+	}
+	if job.Result != nil {
+		body["result"] = job.Result
+	}
+	if job.ErrorMsg != "" {
+		body["error_message"] = job.ErrorMsg
+	}
+
+	endpoint := fmt.Sprintf("/api/v1/piper/transformation-jobs/%s", job.JobID)
+	resp, err := sm.doRequest(ctx, "PUT", endpoint, body)
+	if err != nil {
+		return fmt.Errorf("failed to update transformation job: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to update transformation job: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	log.Debugf("Updated transformation job %s via control API", job.JobID)
 	return nil
 }
 
-// GetTransformationJob gets a transformation job (not implemented in control API yet)
+// GetTransformationJob gets a transformation job
 func (sm *ControlAPIStateManager) GetTransformationJob(ctx context.Context, jobID string) (*domain.TransformationJob, error) {
-	// TODO: This endpoint may not exist in control service yet
-	log.Warn("GetTransformationJob called but not implemented in control API")
-	return nil, nil
+	endpoint := fmt.Sprintf("/api/v1/piper/transformation-jobs/%s", jobID)
+	resp, err := sm.doRequest(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transformation job: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to get transformation job: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var result struct {
+		Job *domain.TransformationJob `json:"job"`
+	}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return result.Job, nil
 }
 
-// ListPendingTransformationJobs lists pending transformation jobs (not implemented in control API yet)
+// ListPendingTransformationJobs lists pending transformation jobs
 func (sm *ControlAPIStateManager) ListPendingTransformationJobs(ctx context.Context, limit int) ([]*domain.TransformationJob, error) {
-	// TODO: This endpoint may not exist in control service yet
-	log.Warn("ListPendingTransformationJobs called but not implemented in control API")
-	return nil, nil
+	endpoint := fmt.Sprintf("/api/v1/piper/transformation-jobs/pending?limit=%d", limit)
+	resp, err := sm.doRequest(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pending transformation jobs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to list pending transformation jobs: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var result struct {
+		Jobs  []*domain.TransformationJob `json:"jobs"`
+		Count int                          `json:"count"`
+	}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return result.Jobs, nil
 }
 
-// CleanupExpiredTransformationJobs cleans up expired transformation jobs (not implemented in control API yet)
+// CleanupExpiredTransformationJobs cleans up expired transformation jobs
 func (sm *ControlAPIStateManager) CleanupExpiredTransformationJobs(ctx context.Context) error {
-	// TODO: This endpoint may not exist in control service yet
-	log.Warn("CleanupExpiredTransformationJobs called but not implemented in control API")
+	resp, err := sm.doRequest(ctx, "DELETE", "/api/v1/piper/transformation-jobs/cleanup/expired", nil)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup expired transformation jobs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to cleanup expired transformation jobs: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var result struct {
+		DeletedCount int  `json:"deleted_count"`
+		Success      bool `json:"success"`
+	}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	if result.DeletedCount > 0 {
+		log.Infof("Cleaned up %d expired transformation jobs via control API", result.DeletedCount)
+	}
 	return nil
 }
 
