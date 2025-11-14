@@ -71,7 +71,7 @@ func (sdm *SimpleDiscoveryManager) DiscoverJobs(ctx context.Context) ([]*domain.
 			}
 
 			// Check if we can acquire a lock on this file with TTL (2x job timeout)
-			processorID := fmt.Sprintf("piper-%s", sdm.config.App.InstanceID)
+			processorID := sdm.config.App.InstanceID
 			jobID := uuid.New().String()
 			lockTTL := 2 * sdm.config.Processing.JobTimeout
 
