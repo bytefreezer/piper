@@ -15,11 +15,11 @@ type ConfigManager struct {
 	cfg              *config.Config
 	pipelineClient   *pipeline.PipelineClient
 	pipelineDatabase *pipeline.PipelineDatabase
-	stateManager     *storage.PostgreSQLStateManager
+	stateManager     storage.StateManager
 }
 
 // NewConfigManager creates a new configuration manager with database caching
-func NewConfigManager(cfg *config.Config, stateManager *storage.PostgreSQLStateManager) *ConfigManager {
+func NewConfigManager(cfg *config.Config, stateManager storage.StateManager) *ConfigManager {
 	// Initialize pipeline client for control API communication
 	pipelineClient := pipeline.NewPipelineClient(cfg)
 

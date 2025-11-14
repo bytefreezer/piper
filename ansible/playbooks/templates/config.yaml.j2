@@ -41,20 +41,6 @@ s3_geoip:
   secret_key: {{ config.s3_geoip.secret_key }}
   use_iam_role: {{ config.s3_geoip.use_iam_role | default(false) | lower }}
 
-# PostgreSQL configuration for state management
-postgresql:
-  host: {{ config.postgresql.host }}
-  port: {{ config.postgresql.port }}
-  database: {{ config.postgresql.database }}
-  username: {{ config.postgresql.username }}
-  password: {{ config.postgresql.password }}
-  ssl_mode: {{ config.postgresql.ssl_mode }}
-  schema: {{ config.postgresql.schema }}
-  max_open_conns: {{ config.postgresql.max_open_conns | default(25) }}
-  max_idle_conns: {{ config.postgresql.max_idle_conns | default(10) }}
-  conn_max_lifetime: {{ config.postgresql.conn_max_lifetime | default('5m') }}
-  conn_max_idle_time: {{ config.postgresql.conn_max_idle_time | default('5m') }}
-
 # Processing engine configuration
 processing:
   max_concurrent_jobs: {{ config.processing.max_concurrent_jobs }}

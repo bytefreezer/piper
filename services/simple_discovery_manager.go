@@ -21,7 +21,7 @@ import (
 type SimpleDiscoveryManager struct {
 	config       *config.Config
 	s3Client     *storage.S3Client
-	stateManager *storage.PostgreSQLStateManager
+	stateManager storage.StateManager
 	httpClient   *http.Client
 
 	// Lifecycle management
@@ -145,7 +145,7 @@ func (sdm *SimpleDiscoveryManager) extractDatasetFromPath(fileKey string, datase
 }
 
 // NewSimpleDiscoveryManager creates a new simple discovery manager
-func NewSimpleDiscoveryManager(cfg *config.Config, s3Client *storage.S3Client, stateManager *storage.PostgreSQLStateManager) *SimpleDiscoveryManager {
+func NewSimpleDiscoveryManager(cfg *config.Config, s3Client *storage.S3Client, stateManager storage.StateManager) *SimpleDiscoveryManager {
 	return &SimpleDiscoveryManager{
 		config:       cfg,
 		s3Client:     s3Client,

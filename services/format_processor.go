@@ -24,7 +24,7 @@ import (
 type FormatProcessor struct {
 	cfg            *config.Config
 	s3Client       *storage.S3Client
-	stateManager   *storage.PostgreSQLStateManager
+	stateManager   storage.StateManager
 	sampleClient   *storage.DatasetSampleClient
 	parserRegistry parsers.ParserRegistry
 	formatDetector *parsers.FormatDetector
@@ -33,7 +33,7 @@ type FormatProcessor struct {
 }
 
 // NewFormatProcessor creates a new format processor
-func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager *storage.PostgreSQLStateManager) (*FormatProcessor, error) {
+func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager storage.StateManager) (*FormatProcessor, error) {
 	// Create parser registry
 	parserRegistry := parsers.NewRegistry()
 

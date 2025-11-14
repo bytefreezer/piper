@@ -22,7 +22,6 @@ type Config struct {
 	S3Source         S3Source         `koanf:"s3_source"`
 	S3Dest           S3Dest           `koanf:"s3_destination"`
 	S3GeoIP          S3GeoIP          `koanf:"s3_geoip"`
-	PostgreSQL       PostgreSQL       `koanf:"postgresql"`
 	Processing       Processing       `koanf:"processing"`
 	Pipeline         Pipeline         `koanf:"pipeline"`
 	ControlService   ControlService   `koanf:"control_service"`

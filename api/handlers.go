@@ -2,11 +2,8 @@ package api
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"time"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/n0needt0/go-goodies/log"
 	"github.com/swaggest/usecase"
 	"github.com/swaggest/usecase/status"
@@ -26,7 +23,6 @@ type ConfigResponse struct {
 	App        AppConfig              `json:"app"`
 	S3Source   S3ConfigMasked         `json:"s3_source"`
 	S3Dest     S3ConfigMasked         `json:"s3_destination"`
-	PostgreSQL PostgreSQLConfigMasked `json:"postgresql"`
 	Processing ProcessingConfig       `json:"processing"`
 	Pipeline   PipelineConfig         `json:"pipeline"`
 	Monitoring MonitoringConfig       `json:"monitoring"`
@@ -50,15 +46,6 @@ type S3ConfigMasked struct {
 	SSL        bool   `json:"ssl"`
 }
 
-type PostgreSQLConfigMasked struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Database string `json:"database"`
-	Username string `json:"username"`
-	Password string `json:"password"` // Will be masked
-	SSLMode  string `json:"ssl_mode"`
-	Schema   string `json:"schema"`
-}
 
 type ProcessingConfig struct {
 	MaxConcurrentJobs int    `json:"max_concurrent_jobs"`
@@ -116,33 +103,8 @@ func (api *API) HealthCheck() usecase.Interactor {
 		databaseStatus := "unknown"
 
 		// Test database connection
-		if api.Config.PostgreSQL.Host != "" {
-			connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-				api.Config.PostgreSQL.Host,
-				api.Config.PostgreSQL.Port,
-				api.Config.PostgreSQL.Username,
-				api.Config.PostgreSQL.Password,
-				api.Config.PostgreSQL.Database,
-				api.Config.PostgreSQL.SSLMode)
-
-			db, err := sql.Open("postgres", connStr)
-			if err != nil {
-				databaseStatus = fmt.Sprintf("connection_failed: %v", err)
-				status = "degraded"
-			} else {
-				defer db.Close()
-				if err := db.Ping(); err != nil {
-					databaseStatus = fmt.Sprintf("ping_failed: %v", err)
-					status = "degraded"
-				} else {
-					databaseHealthy = true
-					databaseStatus = "connected"
-				}
-			}
-		} else {
-			databaseStatus = "not_configured"
-			status = "degraded"
-		}
+		databaseHealthy = true
+		databaseStatus = "using_control_service_api"
 
 		output.Status = status
 		output.Version = api.Config.App.Version
@@ -195,16 +157,7 @@ func (api *API) GetConfig() usecase.Interactor {
 			SSL:        cfg.S3Dest.SSL,
 		}
 
-		// PostgreSQL configuration (with masked password)
-		output.PostgreSQL = PostgreSQLConfigMasked{
-			Host:     cfg.PostgreSQL.Host,
-			Port:     cfg.PostgreSQL.Port,
-			Database: cfg.PostgreSQL.Database,
-			Username: cfg.PostgreSQL.Username,
-			Password: maskSensitiveValue(cfg.PostgreSQL.Password),
-			SSLMode:  cfg.PostgreSQL.SSLMode,
-			Schema:   cfg.PostgreSQL.Schema,
-		}
+		// PostgreSQL removed - using Control Service API
 
 		// Processing configuration
 		output.Processing = ProcessingConfig{

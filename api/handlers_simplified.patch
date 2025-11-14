@@ -1,0 +1,92 @@
+--- a/api/handlers.go
++++ b/api/handlers.go
+@@ -6,7 +6,6 @@
+ 	"fmt"
+ 	"time"
+ 
+-	_ "github.com/lib/pq" // PostgreSQL driver
+ 	"github.com/n0needt0/go-goodies/log"
+ 	"github.com/swaggest/usecase"
+ 	"github.com/swaggest/usecase/status"
+@@ -26,7 +25,6 @@
+ 	App        AppConfig              `json:"app"`
+ 	S3Source   S3ConfigMasked         `json:"s3_source"`
+ 	S3Dest     S3ConfigMasked         `json:"s3_destination"`
+-	PostgreSQL PostgreSQLConfigMasked `json:"postgresql"`
+ 	Processing ProcessingConfig       `json:"processing"`
+ 	Pipeline   PipelineConfig         `json:"pipeline"`
+ 	Monitoring MonitoringConfig       `json:"monitoring"`
+@@ -50,16 +48,6 @@
+ 	SSL        bool   `json:"ssl"`
+ }
+ 
+-type PostgreSQLConfigMasked struct {
+-	Host     string `json:"host"`
+-	Port     int    `json:"port"`
+-	Database string `json:"database"`
+-	Username string `json:"username"`
+-	Password string `json:"password"` // Will be masked
+-	SSLMode  string `json:"ssl_mode"`
+-	Schema   string `json:"schema"`
+-}
+-
+ type ProcessingConfig struct {
+ 	MaxConcurrentJobs int    `json:"max_concurrent_jobs"`
+ 	JobTimeout        string `json:"job_timeout"`
+@@ -113,34 +101,10 @@
+ 	u := usecase.NewInteractor(func(ctx context.Context, input struct{}, output *HealthResponse) error {
+ 		status := "ok"
+ 		databaseHealthy := false
+-		databaseStatus := "unknown"
+-
+-		// Test database connection
+-		if api.Config.PostgreSQL.Host != "" {
+-			connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+-				api.Config.PostgreSQL.Host,
+-				api.Config.PostgreSQL.Port,
+-				api.Config.PostgreSQL.Username,
+-				api.Config.PostgreSQL.Password,
+-				api.Config.PostgreSQL.Database,
+-				api.Config.PostgreSQL.SSLMode)
+-
+-			db, err := sql.Open("postgres", connStr)
+-			if err != nil {
+-				databaseStatus = fmt.Sprintf("connection_failed: %v", err)
+-			} else {
+-				defer db.Close()
+-				if err := db.Ping(); err != nil {
+-					databaseStatus = fmt.Sprintf("ping_failed: %v", err)
+-				} else {
+-					databaseHealthy = true
+-					databaseStatus = "connected"
+-				}
+-			}
+-		} else {
+-			databaseStatus = "not_configured"
+-			databaseHealthy = true // Not an error if not configured
+-		}
++		databaseStatus := "not_using_direct_db"
++		
++		// Using control service API instead of direct database
++		databaseHealthy = true
+ 
+ 		output.Status = status
+ 		output.Version = api.Config.App.Version
+@@ -195,15 +159,6 @@
+ 			SSL:        cfg.S3Dest.SSL,
+ 		}
+ 
+-		// PostgreSQL configuration (with masked password)
+-		output.PostgreSQL = PostgreSQLConfigMasked{
+-			Host:     cfg.PostgreSQL.Host,
+-			Port:     cfg.PostgreSQL.Port,
+-			Database: cfg.PostgreSQL.Database,
+-			Username: cfg.PostgreSQL.Username,
+-			Password: maskSensitiveValue(cfg.PostgreSQL.Password),
+-			SSLMode:  cfg.PostgreSQL.SSLMode,
+-			Schema:   cfg.PostgreSQL.Schema,
+-		}
++		// PostgreSQL removed - using Control Service API
+ 
+ 		// Processing configuration
+ 		output.Processing = ProcessingConfig{

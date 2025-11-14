@@ -41,7 +41,7 @@ config:
 
   # S3 source configuration (raw data input from bytefreezer-receiver)
   s3_source:
-    bucket_name: "intake"
+    bucket_name: "intake-onprem"
     region: "us-east-1"
     poll_interval: "30s"
     endpoint: "192.168.86.125:9000"
@@ -52,7 +52,7 @@ config:
 
   # S3 destination configuration (processed data output for bytefreezer-packer)
   s3_destination:
-    bucket_name: "piper"
+    bucket_name: "piper-onprem"
     region: "us-east-1"
     endpoint: "192.168.86.125:9000"
     ssl: false
@@ -69,21 +69,6 @@ config:
     access_key: "AKIAQNXBAHUKIMJP26P6"
     secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
     use_iam_role: false
-
-  # PostgreSQL configuration for state management
-  postgresql:
-    host: "192.168.86.137"
-    port: 5432
-    database: "bytefreezer"
-    username: "bytefreezer"
-    password: "bytefreezer123"
-    ssl_mode: "disable"
-    schema: "public"
-    # Connection pool settings (prevents "context deadline exceeded" errors)
-    max_open_conns: 25
-    max_idle_conns: 10
-    conn_max_lifetime: "5m"
-    conn_max_idle_time: "5m"
 
   # Processing engine configuration
   processing:

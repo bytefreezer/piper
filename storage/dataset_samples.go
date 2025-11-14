@@ -28,12 +28,18 @@ type DatasetSampleClient struct {
 }
 
 // NewDatasetSampleClient creates a new dataset sample client
-func NewDatasetSampleClient(stateManager *PostgreSQLStateManager) *DatasetSampleClient {
-	if stateManager == nil || stateManager.db == nil {
+func NewDatasetSampleClient(stateManager StateManager) *DatasetSampleClient {
+	if stateManager == nil {
+		return nil
+	}
+	// Only PostgreSQL state manager has direct DB access
+	// For Control API state manager, this client is not available
+	pgStateManager, ok := stateManager.(*PostgreSQLStateManager)
+	if !ok || pgStateManager.db == nil {
 		return nil
 	}
 	return &DatasetSampleClient{
-		db: stateManager.db,
+		db: pgStateManager.db,
 	}
 }
 

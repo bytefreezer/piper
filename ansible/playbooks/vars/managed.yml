@@ -70,21 +70,6 @@ config:
     secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
     use_iam_role: false
 
-  # PostgreSQL configuration for state management
-  postgresql:
-    host: "192.168.86.137"
-    port: 5432
-    database: "bytefreezer"
-    username: "bytefreezer"
-    password: "bytefreezer123"
-    ssl_mode: "disable"
-    schema: "public"
-    # Connection pool settings (prevents "context deadline exceeded" errors)
-    max_open_conns: 25
-    max_idle_conns: 10
-    conn_max_lifetime: "5m"
-    conn_max_idle_time: "5m"
-
   # Processing engine configuration
   processing:
     max_concurrent_jobs: 10

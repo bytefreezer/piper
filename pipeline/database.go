@@ -29,7 +29,7 @@ type PipelineDatabase struct {
 
 	// External dependencies
 	client       *PipelineClient
-	stateManager *storage.PostgreSQLStateManager
+	stateManager storage.StateManager
 
 	// Statistics
 	cacheHits   int64
@@ -41,7 +41,7 @@ type PipelineDatabase struct {
 }
 
 // NewPipelineDatabase creates a new pipeline database
-func NewPipelineDatabase(client *PipelineClient, stateManager *storage.PostgreSQLStateManager, instanceID string) *PipelineDatabase {
+func NewPipelineDatabase(client *PipelineClient, stateManager storage.StateManager, instanceID string) *PipelineDatabase {
 	return &PipelineDatabase{
 		pipelines:    make(map[string]*domain.PipelineConfiguration),
 		tenants:      make(map[string]TenantInfo),

@@ -1,0 +1,41 @@
+--- api/handlers.go
++++ api/handlers.go
+@@ -101,34 +89,10 @@
+ 	u := usecase.NewInteractor(func(ctx context.Context, input struct{}, output *HealthResponse) error {
+ 		status := "ok"
+ 		databaseHealthy := false
+-		databaseStatus := "unknown"
+-
+-		// Test database connection
+-		if api.Config.PostgreSQL.Host != "" {
+-			connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+-				api.Config.PostgreSQL.Host,
+-				api.Config.PostgreSQL.Port,
+-				api.Config.PostgreSQL.Username,
+-				api.Config.PostgreSQL.Password,
+-				api.Config.PostgreSQL.Database,
+-				api.Config.PostgreSQL.SSLMode)
+-
+-			db, err := sql.Open("postgres", connStr)
+-			if err != nil {
+-				databaseStatus = fmt.Sprintf("connection_failed: %v", err)
+-			} else {
+-				defer db.Close()
+-				if err := db.Ping(); err != nil {
+-					databaseStatus = fmt.Sprintf("ping_failed: %v", err)
+-				} else {
+-					databaseHealthy = true
+-					databaseStatus = "connected"
+-				}
+-			}
+-		} else {
+-			databaseStatus = "not_configured"
+-			databaseHealthy = true // Not an error if not configured
+-		}
++		databaseStatus := "not_using_direct_db"
++		
++		// Using control service API instead of direct database
++		databaseHealthy = true
+ 
+ 		output.Status = status
+ 		output.Version = api.Config.App.Version

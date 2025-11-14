@@ -19,7 +19,7 @@ import (
 type PiperService struct {
 	cfg                  *config.Config
 	s3Client             *storage.S3Client
-	stateManager         *storage.PostgreSQLStateManager
+	stateManager         storage.StateManager
 	discoveryManager     *SimpleDiscoveryManager
 	processor            *FormatProcessor
 	configManager        *ConfigManager
@@ -42,8 +42,8 @@ func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMe
 		return nil, fmt.Errorf("failed to create S3 client: %w", err)
 	}
 
-	// Create PostgreSQL state manager
-	stateManager, err := storage.NewPostgreSQLStateManager(&cfg.PostgreSQL)
+	// Create state manager (use Control API)
+	stateManager, err := storage.NewControlAPIStateManager(&cfg.ControlService, cfg.App.InstanceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state manager: %w", err)
 	}

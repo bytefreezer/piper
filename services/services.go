@@ -19,7 +19,7 @@ type Services struct {
 	Config                     *config.Config
 	PiperService               *PiperService
 	PipelineDatabase           *pipeline.PipelineDatabase
-	StateManager               *storage.PostgreSQLStateManager
+	StateManager               storage.StateManager
 	DatasetSampleClient        *storage.DatasetSampleClient
 	HealthReporter             *HealthReportingService
 	DatasetMetricsClient       *metrics.DatasetMetricsClient
@@ -28,11 +28,11 @@ type Services struct {
 
 // NewServices creates and initializes all services
 func NewServices(conf *config.Config) *Services {
-	// Create PostgreSQL state manager
-	stateManager, err := storage.NewPostgreSQLStateManager(&conf.PostgreSQL)
+	// Create state manager (use Control API)
+	stateManager, err := storage.NewControlAPIStateManager(&conf.ControlService, conf.App.InstanceID)
 	if err != nil {
 		// Continue without state manager for development
-		log.Warnf("Failed to create state manager: %v - continuing without database", err)
+		log.Warnf("Failed to create state manager: %v - continuing without state manager", err)
 	}
 
 	// Create pipeline client
@@ -190,15 +190,10 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 			"access_key":  maskSensitive(conf.S3GeoIP.AccessKey),
 			"secret_key":  maskSensitive(conf.S3GeoIP.SecretKey),
 		},
-		"postgresql": map[string]interface{}{
-			"enabled":  conf.PostgreSQL.Host != "",
-			"host":     conf.PostgreSQL.Host,
-			"port":     conf.PostgreSQL.Port,
-			"database": conf.PostgreSQL.Database,
-			"username": conf.PostgreSQL.Username,
-			"password": maskSensitive(conf.PostgreSQL.Password),
-			"ssl_mode": conf.PostgreSQL.SSLMode,
-			"schema":   conf.PostgreSQL.Schema,
+		"state_manager": map[string]interface{}{
+			"type":              "control_service_api",
+			"control_service":   conf.ControlService.BaseURL,
+			"control_enabled":   conf.ControlService.Enabled,
 		},
 		"processing": map[string]interface{}{
 			"max_concurrent_jobs": conf.Processing.MaxConcurrentJobs,
