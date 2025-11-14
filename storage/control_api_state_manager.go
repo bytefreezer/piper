@@ -120,9 +120,20 @@ func (sm *ControlAPIStateManager) AcquireFileLockWithTTL(ctx context.Context, fi
 
 // ReleaseFileLock releases a file lock
 func (sm *ControlAPIStateManager) ReleaseFileLock(ctx context.Context, fileKey, processorID string) error {
+	// Parse tenant_id and dataset_id from fileKey (format: tenant/dataset/filename)
+	parts := strings.Split(fileKey, "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid file_key format: %s (expected tenant/dataset/filename)", fileKey)
+	}
+
+	tenantID := parts[0]
+	datasetID := parts[1]
+
 	body := map[string]interface{}{
-		"file_key":     fileKey,
-		"processor_id": processorID,
+		"tenant_id":  tenantID,
+		"dataset_id": datasetID,
+		"file_key":   fileKey,
+		"locked_by":  processorID,
 	}
 
 	resp, err := sm.doRequest(ctx, "DELETE", "/api/v1/piper/locks/files", body)
@@ -289,13 +300,19 @@ func (sm *ControlAPIStateManager) GetCachedPipelineConfiguration(ctx context.Con
 	}
 
 	var result struct {
-		Configuration string `json:"configuration"`
+		Configuration map[string]interface{} `json:"configuration"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, false, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return []byte(result.Configuration), true, nil
+	// Marshal the configuration map back to JSON bytes
+	configBytes, err := json.Marshal(result.Configuration)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to marshal configuration: %w", err)
+	}
+
+	return configBytes, true, nil
 }
 
 // splitConfigKey splits a config key into tenant and dataset IDs
