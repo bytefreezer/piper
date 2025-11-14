@@ -136,7 +136,7 @@ func (sm *ControlAPIStateManager) ReleaseFileLock(ctx context.Context, fileKey, 
 		"locked_by":  processorID,
 	}
 
-	resp, err := sm.doRequest(ctx, "DELETE", "/api/v1/piper/locks/files", body)
+	resp, err := sm.doRequest(ctx, "POST", "/api/v1/piper/locks/files/release", body)
 	if err != nil {
 		return err
 	}
