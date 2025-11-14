@@ -326,12 +326,6 @@ func getDefaults() map[string]interface{} {
 		"s3_geoip.endpoint":    "192.168.86.125:9000",
 		"s3_geoip.ssl":         false,
 
-		// PostgreSQL connection pool defaults
-		"postgresql.max_open_conns":     25,      // Enough for 10 workers + overhead
-		"postgresql.max_idle_conns":     10,      // Match concurrent job count
-		"postgresql.conn_max_lifetime":  "5m",    // Rotate connections every 5 minutes
-		"postgresql.conn_max_idle_time": "5m",    // Close idle connections after 5 minutes
-
 		"processing.max_concurrent_jobs":  10,
 		"processing.job_timeout_seconds":  600,  // 10 minutes
 		"processing.retry_attempts":       3,
