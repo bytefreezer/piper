@@ -38,11 +38,12 @@ type Config struct {
 
 // App represents application-level configuration
 type App struct {
-	Name       string `koanf:"name"`
-	Version    string `koanf:"version"`
-	InstanceID string `koanf:"instance_id"`
-	LogLevel   string `koanf:"log_level"`
-	Dev        bool   `koanf:"dev"`
+	Name           string `koanf:"name"`
+	Version        string `koanf:"version"`
+	InstanceID     string `koanf:"instance_id"`
+	LogLevel       string `koanf:"log_level"`
+	Dev            bool   `koanf:"dev"`
+	DeploymentType string `koanf:"deployment_type"` // "managed" or "on_prem"
 }
 
 // Server represents server configuration following receiver pattern

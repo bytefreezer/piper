@@ -290,13 +290,18 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 
 	// Determine which accounts to fetch based on deployment configuration
 	var accountsURL string
+	deploymentType := sdm.config.App.DeploymentType
+	if deploymentType == "" {
+		deploymentType = "managed" // Default to managed if not specified
+	}
+
 	if sdm.config.ControlService.AccountID != "" {
 		// On-prem deployment: fetch only the specific account
-		log.Infof("On-prem mode: processing only account %s", sdm.config.ControlService.AccountID)
+		log.Infof("On-prem mode: processing only account %s (deployment_type: %s)", sdm.config.ControlService.AccountID, deploymentType)
 		accountsURL = fmt.Sprintf("%s/api/v1/accounts/%s", sdm.config.ControlService.BaseURL, sdm.config.ControlService.AccountID)
 	} else {
 		// Managed deployment: fetch all accounts (will filter by deployment_type)
-		log.Info("Managed mode: processing managed accounts only")
+		log.Infof("Managed mode: processing accounts with deployment_type '%s'", deploymentType)
 		accountsURL = fmt.Sprintf("%s/api/v1/accounts?limit=1000", sdm.config.ControlService.BaseURL)
 	}
 
@@ -368,9 +373,10 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 
 		// Filter by deployment type in managed mode
 		if sdm.config.ControlService.AccountID == "" {
-			// Managed deployment: only process managed accounts
-			if account.DeploymentType != "managed" {
-				log.Debugf("Skipping non-managed account %s (deployment_type: %s)", account.ID, account.DeploymentType)
+			// Managed deployment: only process accounts matching configured deployment_type
+			if account.DeploymentType != deploymentType {
+				log.Debugf("Skipping account %s with deployment_type '%s' (service is configured for '%s')",
+					account.ID, account.DeploymentType, deploymentType)
 				continue
 			}
 		}

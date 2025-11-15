@@ -6,6 +6,7 @@ app:
   name: {{ config.app.name }}
   version: {{ config.app.version }}
   log_level: {{ config.app.log_level }}
+  deployment_type: {{ config.app.deployment_type | default('managed') }}
 
 server:
   api_port: {{ config.server.api_port }}
