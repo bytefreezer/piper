@@ -18,6 +18,7 @@ import (
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/geoip"
 	"github.com/n0needt0/bytefreezer-piper/services"
+	"github.com/n0needt0/bytefreezer-piper/storage"
 )
 
 var (
@@ -65,6 +66,22 @@ func Run() error {
 
 	log.Infof("Source bucket: %s (prefix: %s)", cfg.S3Source.BucketName, "(none)")
 	log.Infof("Destination bucket: %s (prefix: %s)", cfg.S3Dest.BucketName, "(none)")
+
+	// Cleanup abandoned locks from previous runs of this instance
+	log.Infof("Cleaning up abandoned locks from previous runs of this instance (%s)...", cfg.App.InstanceID)
+	if stateManager, err := storage.NewControlAPIStateManager(&cfg.ControlService, cfg.App.InstanceID); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := stateManager.CleanupInstanceLocks(ctx, cfg.App.InstanceID); err != nil {
+			log.Warnf("Failed to cleanup instance locks on startup: %v", err)
+		} else {
+			log.Infof("Instance lock cleanup completed successfully for %s", cfg.App.InstanceID)
+		}
+		stateManager.Close()
+	} else {
+		log.Warnf("Failed to create state manager for lock cleanup: %v", err)
+	}
 
 	// Initialize GeoIP updater
 	geoipUpdater, err := geoip.NewUpdater(cfg)

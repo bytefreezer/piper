@@ -462,6 +462,26 @@ func (sm *PostgreSQLStateManager) CleanupStaleLocksOnStartup(ctx context.Context
 	return nil
 }
 
+// CleanupInstanceLocks removes all locks held by a specific instance
+func (sm *PostgreSQLStateManager) CleanupInstanceLocks(ctx context.Context, instanceID string) error {
+	// #nosec G202 - Schema name is validated with regex pattern in NewPostgreSQLStateManager
+	deleteSQL := `
+		DELETE FROM ` + sm.buildTableName("piper_file_locks") + `
+		WHERE processor_id = $1`
+
+	result, err := sm.db.ExecContext(ctx, deleteSQL, instanceID)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup instance locks: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err == nil && rowsAffected > 0 {
+		log.Infof("Cleaned up %d locks from instance %s", rowsAffected, instanceID)
+	}
+
+	return nil
+}
+
 // extractBaseInstanceID extracts the base instance ID without PID and timestamp
 // Example: "piper-192-168-1-100-12345-1234567890" -> "piper-192-168-1-100"
 // Example: "piper-hostname-12345-1234567890" -> "piper-hostname"

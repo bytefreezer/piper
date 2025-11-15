@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/knadh/koanf/parsers/yaml"
@@ -249,25 +248,15 @@ func LoadConfig(configPath string) (*Config, error) {
 	return &config, nil
 }
 
-// generateInstanceID generates a unique instance ID based on IP address, PID, and timestamp
+// generateInstanceID creates a stable identifier for this service instance based on hostname
+// This remains constant across restarts, allowing detection and cleanup of abandoned locks
 func generateInstanceID() string {
-	pid := os.Getpid()
-	timestamp := time.Now().Unix()
-
-	// Try to get the first non-loopback IP address
-	if ip := getFirstNonLoopbackIP(); ip != "" {
-		ipFormatted := strings.ReplaceAll(ip, ".", "-")
-		return fmt.Sprintf("piper-%s-%d-%d", ipFormatted, pid, timestamp)
-	}
-
-	// Fallback to hostname
 	hostname, err := os.Hostname()
-	if err == nil && hostname != "" {
-		return fmt.Sprintf("piper-%s-%d-%d", hostname, pid, timestamp)
+	if err != nil {
+		// Fallback to a default if hostname can't be determined
+		return "piper-unknown"
 	}
-
-	// Final fallback to static default with unique suffix
-	return fmt.Sprintf("piper-default-%d-%d", pid, timestamp)
+	return hostname
 }
 
 // getFirstNonLoopbackIP extracts IP address logic for reuse

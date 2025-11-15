@@ -245,6 +245,27 @@ func (sm *ControlAPIStateManager) CleanupStaleLocksOnStartup(ctx context.Context
 	return nil
 }
 
+// CleanupInstanceLocks removes all locks held by a specific instance
+func (sm *ControlAPIStateManager) CleanupInstanceLocks(ctx context.Context, instanceID string) error {
+	body := map[string]interface{}{
+		"instance_id": instanceID,
+	}
+
+	resp, err := sm.doRequest(ctx, "DELETE", "/api/v1/piper/locks/files/cleanup/instance", body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to cleanup instance locks: status %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	log.Infof("Successfully cleaned up locks for instance %s", instanceID)
+	return nil
+}
+
 // CachePipelineConfiguration caches a pipeline configuration
 func (sm *ControlAPIStateManager) CachePipelineConfiguration(ctx context.Context, configKey, tenantID, datasetID, version string, configuration []byte, filterCount int, instanceID string) error {
 	// Parse configuration bytes into map

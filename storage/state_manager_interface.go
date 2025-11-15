@@ -15,6 +15,7 @@ type StateManager interface {
 	ReleaseFileLock(ctx context.Context, fileKey, processorID string) error
 	CleanupExpiredLocks(ctx context.Context) error
 	CleanupStaleLocksOnStartup(ctx context.Context, currentInstanceID string) error
+	CleanupInstanceLocks(ctx context.Context, instanceID string) error
 
 	// Job management
 	CreateJobRecord(ctx context.Context, job *domain.JobRecord) error
