@@ -17,25 +17,26 @@ import (
 
 // PiperService orchestrates the data processing pipeline
 type PiperService struct {
-	cfg                  *config.Config
-	s3Client             *storage.S3Client
-	stateManager         storage.StateManager
-	discoveryManager     *SimpleDiscoveryManager
-	processor            *FormatProcessor
-	configManager        *ConfigManager
-	socClient            *alerts.SOCAlertClient
-	failureMonitor       *alerts.FailureMonitor
-	datasetMetricsClient *metrics.DatasetMetricsClient
-	running              bool
-	mutex                sync.RWMutex
-	workers              chan struct{}
-	jobQueue             chan *domain.ProcessingJob
-	stopChan             chan struct{}
-	wg                   sync.WaitGroup
+	cfg                    *config.Config
+	s3Client               *storage.S3Client
+	stateManager           storage.StateManager
+	discoveryManager       *SimpleDiscoveryManager
+	processor              *FormatProcessor
+	configManager          *ConfigManager
+	socClient              *alerts.SOCAlertClient
+	failureMonitor         *alerts.FailureMonitor
+	datasetMetricsClient   *metrics.DatasetMetricsClient
+	schemaSubmissionClient *metrics.SchemaSubmissionClient
+	running                bool
+	mutex                  sync.RWMutex
+	workers                chan struct{}
+	jobQueue               chan *domain.ProcessingJob
+	stopChan               chan struct{}
+	wg                     sync.WaitGroup
 }
 
 // NewPiperService creates a new piper service with pipeline processing
-func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMetricsClient) (*PiperService, error) {
+func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMetricsClient, schemaSubmissionClient *metrics.SchemaSubmissionClient) (*PiperService, error) {
 	// Create S3 client
 	s3Client, err := storage.NewS3Client(&cfg.S3Source, &cfg.S3Dest)
 	if err != nil {
@@ -52,7 +53,7 @@ func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMe
 	discoveryManager := NewSimpleDiscoveryManager(cfg, s3Client, stateManager)
 
 	// Create format processor
-	processor, err := NewFormatProcessor(cfg, s3Client, stateManager)
+	processor, err := NewFormatProcessor(cfg, s3Client, stateManager, schemaSubmissionClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create format processor: %w", err)
 	}
@@ -87,18 +88,19 @@ func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMe
 	failureMonitor := alerts.NewFailureMonitor(failureConfig, socClient)
 
 	service := &PiperService{
-		cfg:                  cfg,
-		s3Client:             s3Client,
-		stateManager:         stateManager,
-		discoveryManager:     discoveryManager,
-		processor:            processor,
-		configManager:        configManager,
-		socClient:            socClient,
-		failureMonitor:       failureMonitor,
-		datasetMetricsClient: datasetMetricsClient,
-		workers:              make(chan struct{}, cfg.Processing.MaxConcurrentJobs),
-		jobQueue:             make(chan *domain.ProcessingJob, cfg.Processing.BufferSize),
-		stopChan:             make(chan struct{}),
+		cfg:                    cfg,
+		s3Client:               s3Client,
+		stateManager:           stateManager,
+		discoveryManager:       discoveryManager,
+		processor:              processor,
+		configManager:          configManager,
+		socClient:              socClient,
+		failureMonitor:         failureMonitor,
+		datasetMetricsClient:   datasetMetricsClient,
+		schemaSubmissionClient: schemaSubmissionClient,
+		workers:                make(chan struct{}, cfg.Processing.MaxConcurrentJobs),
+		jobQueue:               make(chan *domain.ProcessingJob, cfg.Processing.BufferSize),
+		stopChan:               make(chan struct{}),
 	}
 
 	return service, nil

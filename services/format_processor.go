@@ -15,6 +15,7 @@ import (
 
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/domain"
+	"github.com/n0needt0/bytefreezer-piper/metrics"
 	"github.com/n0needt0/bytefreezer-piper/parsers"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
 	"github.com/n0needt0/bytefreezer-piper/storage"
@@ -22,18 +23,19 @@ import (
 
 // FormatProcessor processes files with automatic format detection
 type FormatProcessor struct {
-	cfg            *config.Config
-	s3Client       *storage.S3Client
-	stateManager   storage.StateManager
-	sampleClient   *storage.DatasetSampleClient
-	parserRegistry parsers.ParserRegistry
-	formatDetector *parsers.FormatDetector
-	filterRegistry pipeline.FilterRegistry
-	configManager  *ConfigManager
+	cfg                    *config.Config
+	s3Client               *storage.S3Client
+	stateManager           storage.StateManager
+	sampleClient           *storage.DatasetSampleClient
+	parserRegistry         parsers.ParserRegistry
+	formatDetector         *parsers.FormatDetector
+	filterRegistry         pipeline.FilterRegistry
+	configManager          *ConfigManager
+	schemaSubmissionClient *metrics.SchemaSubmissionClient
 }
 
 // NewFormatProcessor creates a new format processor
-func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager storage.StateManager) (*FormatProcessor, error) {
+func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager storage.StateManager, schemaSubmissionClient *metrics.SchemaSubmissionClient) (*FormatProcessor, error) {
 	// Create parser registry
 	parserRegistry := parsers.NewRegistry()
 
@@ -50,14 +52,15 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 	sampleClient := storage.NewDatasetSampleClient(stateManager)
 
 	processor := &FormatProcessor{
-		cfg:            cfg,
-		s3Client:       s3Client,
-		stateManager:   stateManager,
-		sampleClient:   sampleClient,
-		parserRegistry: parserRegistry,
-		formatDetector: formatDetector,
-		filterRegistry: filterRegistry,
-		configManager:  configManager,
+		cfg:                    cfg,
+		s3Client:               s3Client,
+		stateManager:           stateManager,
+		sampleClient:           sampleClient,
+		parserRegistry:         parserRegistry,
+		formatDetector:         formatDetector,
+		filterRegistry:         filterRegistry,
+		configManager:          configManager,
+		schemaSubmissionClient: schemaSubmissionClient,
 	}
 
 	return processor, nil
@@ -682,6 +685,51 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 		}
 	}
 
+	// Submit schemas and samples to control service
+	if p.schemaSubmissionClient != nil && (len(inputSamples) > 0 || len(outputSamples) > 0) {
+		// Submit input schema and samples
+		if len(inputSamples) > 0 {
+			inputSchema := p.inferSchemaFromSamples(inputSamples)
+
+			// Convert samples to metrics.SampleData format
+			metricsSamples := make([]metrics.SampleData, len(inputSamples))
+			for i, sample := range inputSamples {
+				metricsSamples[i] = metrics.SampleData{
+					LineNumber: sample.LineNumber,
+					SampleData: sample.SampleData,
+					BatchID:    sample.BatchID,
+				}
+			}
+
+			if err := p.schemaSubmissionClient.SubmitSchema(ctx, job.TenantID, job.DatasetID, "input", inputSchema, metricsSamples); err != nil {
+				log.Warnf("Failed to submit input schema to control: %v", err)
+			} else {
+				log.Infof("Submitted input schema and %d samples to control for %s/%s", len(inputSamples), job.TenantID, job.DatasetID)
+			}
+		}
+
+		// Submit output schema and samples
+		if len(outputSamples) > 0 {
+			outputSchema := p.inferSchemaFromSamples(outputSamples)
+
+			// Convert samples to metrics.SampleData format
+			metricsSamples := make([]metrics.SampleData, len(outputSamples))
+			for i, sample := range outputSamples {
+				metricsSamples[i] = metrics.SampleData{
+					LineNumber: sample.LineNumber,
+					SampleData: sample.SampleData,
+					BatchID:    sample.BatchID,
+				}
+			}
+
+			if err := p.schemaSubmissionClient.SubmitSchema(ctx, job.TenantID, job.DatasetID, "output", outputSchema, metricsSamples); err != nil {
+				log.Warnf("Failed to submit output schema to control: %v", err)
+			} else {
+				log.Infof("Submitted output schema and %d samples to control for %s/%s", len(outputSamples), job.TenantID, job.DatasetID)
+			}
+		}
+	}
+
 	stats = domain.ProcessingStats{
 		InputRecords:   lineCount,
 		OutputRecords:  lineCount - errorCount,
@@ -782,4 +830,63 @@ func (p *FormatProcessor) processLineWithPipeline(ctx context.Context, line stri
 	// For now, return the line as-is since pipeline processing is disabled in config
 	// This is where pipeline transformations would be applied when enabled
 	return line, nil
+}
+
+// inferSchemaFromSamples creates a unified schema from multiple samples
+// The schema is a union of all fields found across all samples
+func (p *FormatProcessor) inferSchemaFromSamples(samples []storage.DatasetSample) map[string]interface{} {
+	schema := make(map[string]interface{})
+	fields := make(map[string]map[string]bool) // field -> types seen
+
+	// Collect all fields and their types from all samples
+	for _, sample := range samples {
+		for fieldName, fieldValue := range sample.SampleData {
+			if fields[fieldName] == nil {
+				fields[fieldName] = make(map[string]bool)
+			}
+
+			// Determine field type
+			fieldType := "unknown"
+			if fieldValue == nil {
+				fieldType = "null"
+			} else {
+				switch fieldValue.(type) {
+				case string:
+					fieldType = "string"
+				case float64, int, int64:
+					fieldType = "number"
+				case bool:
+					fieldType = "boolean"
+				case map[string]interface{}:
+					fieldType = "object"
+				case []interface{}:
+					fieldType = "array"
+				default:
+					fieldType = "unknown"
+				}
+			}
+			fields[fieldName][fieldType] = true
+		}
+	}
+
+	// Build schema fields with all types seen for each field
+	schemaFields := make([]map[string]interface{}, 0, len(fields))
+	for fieldName, types := range fields {
+		typesList := make([]string, 0, len(types))
+		for t := range types {
+			typesList = append(typesList, t)
+		}
+
+		fieldSchema := map[string]interface{}{
+			"name":  fieldName,
+			"types": typesList,
+		}
+		schemaFields = append(schemaFields, fieldSchema)
+	}
+
+	schema["fields"] = schemaFields
+	schema["sample_count"] = len(samples)
+	schema["inferred_at"] = time.Now().UTC().Format(time.RFC3339)
+
+	return schema
 }

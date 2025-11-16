@@ -23,6 +23,7 @@ type Services struct {
 	DatasetSampleClient        *storage.DatasetSampleClient
 	HealthReporter             *HealthReportingService
 	DatasetMetricsClient       *metrics.DatasetMetricsClient
+	SchemaSubmissionClient     *metrics.SchemaSubmissionClient
 	TransformationJobService   *TransformationJobService
 }
 
@@ -59,20 +60,31 @@ func NewServices(conf *config.Config) *Services {
 	log.Infof("Dataset metrics client initialized (enabled: %v, endpoint: %s)",
 		conf.ControlService.Enabled, conf.ControlService.BaseURL)
 
+	// Create schema submission client
+	schemaSubmissionClient := metrics.NewSchemaSubmissionClient(
+		conf.ControlService.BaseURL,
+		conf.ControlService.APIKey,
+		conf.ControlService.TimeoutSeconds,
+		conf.ControlService.Enabled,
+	)
+	log.Infof("Schema submission client initialized (enabled: %v, endpoint: %s)",
+		conf.ControlService.Enabled, conf.ControlService.BaseURL)
+
 	// Create piper service
-	piperService, err := NewPiperService(conf, datasetMetricsClient)
+	piperService, err := NewPiperService(conf, datasetMetricsClient, schemaSubmissionClient)
 	if err != nil {
 		log.Fatalf("Failed to create piper service: %v", err)
 	}
 
 	// Create services struct first
 	services := &Services{
-		Config:               conf,
-		PiperService:         piperService,
-		PipelineDatabase:     pipelineDatabase,
-		StateManager:         stateManager,
-		DatasetSampleClient:  datasetSampleClient,
-		DatasetMetricsClient: datasetMetricsClient,
+		Config:                 conf,
+		PiperService:           piperService,
+		PipelineDatabase:       pipelineDatabase,
+		StateManager:           stateManager,
+		DatasetSampleClient:    datasetSampleClient,
+		DatasetMetricsClient:   datasetMetricsClient,
+		SchemaSubmissionClient: schemaSubmissionClient,
 	}
 
 	// Create transformation job service if state manager is available
