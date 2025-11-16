@@ -703,8 +703,6 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 
 			if err := p.schemaSubmissionClient.SubmitSchema(ctx, job.TenantID, job.DatasetID, "input", inputSchema, metricsSamples); err != nil {
 				log.Warnf("Failed to submit input schema to control: %v", err)
-			} else {
-				log.Infof("Submitted input schema and %d samples to control for %s/%s", len(inputSamples), job.TenantID, job.DatasetID)
 			}
 		}
 
@@ -724,8 +722,6 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 
 			if err := p.schemaSubmissionClient.SubmitSchema(ctx, job.TenantID, job.DatasetID, "output", outputSchema, metricsSamples); err != nil {
 				log.Warnf("Failed to submit output schema to control: %v", err)
-			} else {
-				log.Infof("Submitted output schema and %d samples to control for %s/%s", len(outputSamples), job.TenantID, job.DatasetID)
 			}
 		}
 	}
