@@ -27,6 +27,7 @@ type PiperService struct {
 	failureMonitor         *alerts.FailureMonitor
 	datasetMetricsClient   *metrics.DatasetMetricsClient
 	schemaSubmissionClient *metrics.SchemaSubmissionClient
+	activityReporter       *ActivityReporter
 	running                bool
 	mutex                  sync.RWMutex
 	workers                chan struct{}
@@ -87,6 +88,19 @@ func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMe
 	}
 	failureMonitor := alerts.NewFailureMonitor(failureConfig, socClient)
 
+	// Initialize activity reporter if control service is configured
+	var activityReporter *ActivityReporter
+	if cfg.ControlService.Enabled && cfg.ControlService.BaseURL != "" {
+		activityReporter = NewActivityReporter(
+			cfg.ControlService.BaseURL,
+			cfg.ControlService.APIKey,
+			cfg.App.InstanceID,
+		)
+		log.Info("Activity reporter initialized for operation tracking")
+	} else {
+		log.Info("Activity reporter disabled (control service not configured)")
+	}
+
 	service := &PiperService{
 		cfg:                    cfg,
 		s3Client:               s3Client,
@@ -98,6 +112,7 @@ func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMe
 		failureMonitor:         failureMonitor,
 		datasetMetricsClient:   datasetMetricsClient,
 		schemaSubmissionClient: schemaSubmissionClient,
+		activityReporter:       activityReporter,
 		workers:                make(chan struct{}, cfg.Processing.MaxConcurrentJobs),
 		jobQueue:               make(chan *domain.ProcessingJob, cfg.Processing.BufferSize),
 		stopChan:               make(chan struct{}),
@@ -291,6 +306,12 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 
 	log.Infof("Worker %d processing job %s (file: %s)", workerID, job.JobID, job.SourceFile.Key)
 
+	// Start activity reporting for this operation
+	operationID := fmt.Sprintf("%s/%s-%s", job.TenantID, job.DatasetID, job.JobID)
+	if s.activityReporter != nil {
+		s.activityReporter.StartOperation(operationID, job.TenantID, job.DatasetID, "processing", 1, "files")
+	}
+
 	// Create a timeout context for this job
 	jobCtx, cancel := context.WithTimeout(ctx, s.cfg.Processing.JobTimeout)
 	defer cancel()
@@ -298,6 +319,9 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 	// Update job status to processing
 	if err := s.stateManager.UpdateJobStatus(jobCtx, job.JobID, domain.JobStatusProcessing); err != nil {
 		log.Errorf("Failed to update job status to processing: %v", err)
+		if s.activityReporter != nil {
+			s.activityReporter.FailOperation(operationID, fmt.Sprintf("Failed to update status: %v", err))
+		}
 		return
 	}
 
@@ -305,6 +329,11 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 	result, err := s.processor.ProcessFile(jobCtx, job)
 	if err != nil {
 		log.Errorf("Worker %d failed to process job %s: %v", workerID, job.JobID, err)
+
+		// Report operation failure
+		if s.activityReporter != nil {
+			s.activityReporter.FailOperation(operationID, fmt.Sprintf("Processing failed: %v", err))
+		}
 
 		// Record failure in failure monitor
 		s.failureMonitor.RecordProcessingResult(job.TenantID, job.DatasetID, false)
@@ -320,6 +349,11 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 		}
 
 		return
+	}
+
+	// Report operation completion
+	if s.activityReporter != nil {
+		s.activityReporter.CompleteOperation(operationID, result.Stats.InputSize, result.Stats.OutputSize, result.Stats.OutputRecords)
 	}
 
 	// Record success in failure monitor
