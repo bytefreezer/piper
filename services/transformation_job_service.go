@@ -65,9 +65,12 @@ func (s *TransformationJobService) Stop() {
 
 // processJobs claims and processes pending transformation jobs
 func (s *TransformationJobService) processJobs(ctx context.Context) {
+	log.Infof("TRACE: processJobs called")
 	if s.services.StateManager == nil {
+		log.Warnf("Transformation job service: StateManager is nil, cannot process jobs")
 		return // No state manager available
 	}
+	log.Infof("TRACE: StateManager is not nil, proceeding to claim job")
 
 	// Claim a pending job (supports all job types)
 	jobTypes := []domain.TransformationJobType{
@@ -78,7 +81,7 @@ func (s *TransformationJobService) processJobs(ctx context.Context) {
 
 	job, err := s.services.StateManager.ClaimTransformationJob(ctx, s.instanceID, jobTypes)
 	if err != nil {
-		log.Debugf("No jobs to claim: %v", err)
+		log.Infof("ClaimTransformationJob returned error: %v", err)
 		return
 	}
 

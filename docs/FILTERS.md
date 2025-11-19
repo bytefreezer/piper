@@ -1303,18 +1303,34 @@ This guide documents all available filters in ByteFreezer Piper with detailed us
 **Type**: `uppercase_keys`
 
 **Parameters**:
-- `source_field` (string): Field to operate on
+- `source_field` (string, optional): Specific field to operate on. If not specified, operates on entire record
 - `recursive` (bool): Recursively uppercase nested objects (default: true)
 
 **Examples**:
 
 ```json
-// Uppercase all keys
+// Uppercase all keys in the entire record (most common use case)
 {
   "type": "uppercase_keys",
   "config": {
-    "source_field": "@flatten",
     "recursive": true
+  }
+}
+
+// Uppercase keys in a specific nested field
+{
+  "type": "uppercase_keys",
+  "config": {
+    "source_field": "metadata",
+    "recursive": true
+  }
+}
+
+// Uppercase only top-level keys (non-recursive)
+{
+  "type": "uppercase_keys",
+  "config": {
+    "recursive": false
   }
 }
 ```

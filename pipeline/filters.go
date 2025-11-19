@@ -547,10 +547,8 @@ type UppercaseKeysFilter struct {
 
 // NewUppercaseKeysFilter creates a new uppercase keys filter
 func NewUppercaseKeysFilter(config map[string]interface{}) (Filter, error) {
-	sourceField, ok := config["source_field"].(string)
-	if !ok || sourceField == "" {
-		sourceField = "@flatten" // Default field to operate on
-	}
+	sourceField, _ := config["source_field"].(string)
+	// If source_field is not specified or empty, operate on entire record (sourceField = "")
 
 	recursive, ok := config["recursive"].(bool)
 	if !ok {
@@ -577,6 +575,17 @@ func (f *UppercaseKeysFilter) Validate(config map[string]interface{}) error {
 func (f *UppercaseKeysFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*FilterResult, error) {
 	start := time.Now()
 
+	// If no source field specified, operate on entire record
+	if f.sourceField == "" {
+		record = f.uppercaseKeys(record)
+		return &FilterResult{
+			Record:   record,
+			Skip:     false,
+			Applied:  true,
+			Duration: time.Since(start),
+		}, nil
+	}
+
 	// Get the source field value
 	sourceValue, exists := record[f.sourceField]
 	if !exists {
@@ -589,13 +598,9 @@ func (f *UppercaseKeysFilter) Apply(ctx *FilterContext, record map[string]interf
 	}
 
 	// Convert keys to uppercase
-	var updatedValue interface{}
 	if sourceMap, ok := sourceValue.(map[string]interface{}); ok {
-		updatedValue = f.uppercaseKeys(sourceMap)
+		updatedValue := f.uppercaseKeys(sourceMap)
 		record[f.sourceField] = updatedValue
-	} else {
-		// If the source field is not a map, try to uppercase all keys in the record
-		record = f.uppercaseKeys(record)
 	}
 
 	return &FilterResult{
