@@ -8,7 +8,7 @@ Comprehensive documentation for ByteFreezer Piper filters and pipeline configura
 - **[Transformation Workflow](TRANSFORMATION_WORKFLOW.md)** - Step-by-step guide for developing and deploying transformations
 - **[Transformation API Testing](TRANSFORMATION_API_TESTING.md)** - Complete API reference with testing examples
 - **[Quick Reference](QUICK_REFERENCE.md)** - Fast lookup for filter syntax and common patterns
-- **[Filter Reference Guide](FILTERS.md)** - Complete documentation for all 24 filters
+- **[Filter Reference Guide](FILTERS.md)** - Complete documentation for all 21 filters
 - **[Filter Chaining Examples](FILTER_CHAINING_EXAMPLES.md)** - 10 real-world use cases with complete pipelines
 
 ### Specific Filter Guides
@@ -66,7 +66,7 @@ Comprehensive documentation for ByteFreezer Piper filters and pipeline configura
 - [DNS Filter](FILTERS.md#dns-filter) - DNS lookups
 - [Fingerprint Filter](FILTERS.md#fingerprint-filter) - Event hashing
 
-## Available Filters (24 Total)
+## Available Filters (21 Total)
 
 ### Event Filtering (4)
 1. `include` - Keep only matching events
@@ -93,7 +93,7 @@ Comprehensive documentation for ByteFreezer Piper filters and pipeline configura
 16. `dns` - DNS lookups with caching
 17. `fingerprint` - Event hashing (MD5, SHA256, etc.)
 
-### Utility (7)
+### Utility (4)
 18. `conditional` - Conditional processing with 10 operators
 19. `json_validate` - Validate JSON before processing
 20. `json_flatten` - Flatten nested JSON structures
