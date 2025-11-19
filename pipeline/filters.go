@@ -541,14 +541,34 @@ func (f *JSONFlattenFilter) flattenObject(obj interface{}, prefix string) map[st
 
 // UppercaseKeysFilter converts all keys to uppercase
 type UppercaseKeysFilter struct {
-	sourceField string
-	recursive   bool
+	sourceFields []string
+	recursive    bool
 }
 
 // NewUppercaseKeysFilter creates a new uppercase keys filter
 func NewUppercaseKeysFilter(config map[string]interface{}) (Filter, error) {
-	sourceField, _ := config["source_field"].(string)
-	// If source_field is not specified or empty, operate on entire record (sourceField = "")
+	var sourceFields []string
+
+	// Handle source_field parameter - can be array, string, or "*"
+	if sf, ok := config["source_field"]; ok {
+		switch v := sf.(type) {
+		case []interface{}:
+			// Array of fields
+			for _, item := range v {
+				if str, ok := item.(string); ok {
+					sourceFields = append(sourceFields, str)
+				}
+			}
+		case string:
+			// Single field or "*"
+			if v == "*" || v == "" {
+				sourceFields = nil // Empty means entire record
+			} else {
+				sourceFields = []string{v}
+			}
+		}
+	}
+	// If source_field not specified or empty array, operate on entire record (sourceFields = nil)
 
 	recursive, ok := config["recursive"].(bool)
 	if !ok {
@@ -556,8 +576,8 @@ func NewUppercaseKeysFilter(config map[string]interface{}) (Filter, error) {
 	}
 
 	return &UppercaseKeysFilter{
-		sourceField: sourceField,
-		recursive:   recursive,
+		sourceFields: sourceFields,
+		recursive:    recursive,
 	}, nil
 }
 
@@ -575,8 +595,8 @@ func (f *UppercaseKeysFilter) Validate(config map[string]interface{}) error {
 func (f *UppercaseKeysFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*FilterResult, error) {
 	start := time.Now()
 
-	// If no source field specified, operate on entire record
-	if f.sourceField == "" {
+	// If no source fields specified (nil or empty), operate on entire record
+	if len(f.sourceFields) == 0 {
 		record = f.uppercaseKeys(record)
 		return &FilterResult{
 			Record:   record,
@@ -586,27 +606,26 @@ func (f *UppercaseKeysFilter) Apply(ctx *FilterContext, record map[string]interf
 		}, nil
 	}
 
-	// Get the source field value
-	sourceValue, exists := record[f.sourceField]
-	if !exists {
-		return &FilterResult{
-			Record:   record,
-			Skip:     false,
-			Applied:  false,
-			Duration: time.Since(start),
-		}, nil
-	}
+	// Apply to specific fields
+	applied := false
+	for _, fieldName := range f.sourceFields {
+		sourceValue, exists := record[fieldName]
+		if !exists {
+			continue
+		}
 
-	// Convert keys to uppercase
-	if sourceMap, ok := sourceValue.(map[string]interface{}); ok {
-		updatedValue := f.uppercaseKeys(sourceMap)
-		record[f.sourceField] = updatedValue
+		// Convert keys to uppercase if value is a map
+		if sourceMap, ok := sourceValue.(map[string]interface{}); ok {
+			updatedValue := f.uppercaseKeys(sourceMap)
+			record[fieldName] = updatedValue
+			applied = true
+		}
 	}
 
 	return &FilterResult{
 		Record:   record,
 		Skip:     false,
-		Applied:  true,
+		Applied:  applied,
 		Duration: time.Since(start),
 	}, nil
 }

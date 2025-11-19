@@ -1303,7 +1303,7 @@ This guide documents all available filters in ByteFreezer Piper with detailed us
 **Type**: `uppercase_keys`
 
 **Parameters**:
-- `source_field` (string, optional): Specific field to operate on. If not specified, operates on entire record
+- `source_field` (array or string, optional): Array of field names to operate on, single field name, "*" for all fields, or empty/omitted for entire record
 - `recursive` (bool): Recursively uppercase nested objects (default: true)
 
 **Examples**:
@@ -1322,6 +1322,24 @@ This guide documents all available filters in ByteFreezer Piper with detailed us
   "type": "uppercase_keys",
   "config": {
     "source_field": "metadata",
+    "recursive": true
+  }
+}
+
+// Uppercase keys in multiple specific fields
+{
+  "type": "uppercase_keys",
+  "config": {
+    "source_field": ["metadata", "context"],
+    "recursive": true
+  }
+}
+
+// Apply to all fields (same as omitting source_field)
+{
+  "type": "uppercase_keys",
+  "config": {
+    "source_field": "*",
     "recursive": true
   }
 }
