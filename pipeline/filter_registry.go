@@ -172,6 +172,11 @@ func (r *DefaultFilterRegistry) registerBuiltInFilters() {
 		return NewSampleFilter(config)
 	})
 
+	// Passthrough filter
+	r.Register("passthrough", func(config map[string]interface{}) (Filter, error) {
+		return NewPassthroughFilter(config)
+	})
+
 	// Parse filter will be registered externally to avoid import cycles
 }
 
