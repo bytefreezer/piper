@@ -33,6 +33,7 @@ type FormatProcessor struct {
 	configManager          *ConfigManager
 	schemaSubmissionClient *metrics.SchemaSubmissionClient
 	metricsTracker         *TransformationMetricsTracker
+	previewRecorder        *PreviewRecorder
 }
 
 // NewFormatProcessor creates a new format processor
@@ -52,6 +53,12 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 	// Create dataset sample client for storing input/output samples
 	sampleClient := storage.NewDatasetSampleClient(stateManager)
 
+	// Create preview recorder if state manager is PostgreSQL
+	var previewRecorder *PreviewRecorder
+	if psqlState, ok := stateManager.(*storage.PostgreSQLStateManager); ok {
+		previewRecorder = NewPreviewRecorder(psqlState.GetDB())
+	}
+
 	processor := &FormatProcessor{
 		cfg:                    cfg,
 		s3Client:               s3Client,
@@ -63,6 +70,7 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 		configManager:          configManager,
 		schemaSubmissionClient: schemaSubmissionClient,
 		metricsTracker:         metricsTracker,
+		previewRecorder:        previewRecorder,
 	}
 
 	return processor, nil
@@ -617,17 +625,26 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 
 		// Process line through pipeline if enabled
 		processedLine := line
-		if pipelineConfig != nil && pipelineConfig.Enabled {
-			processed, err := p.processLineWithPipeline(ctx, line, pipelineConfig, job.TenantID, job.DatasetID)
+		skipped := false
+		if pipelineConfig != nil && pipelineConfig.Enabled && len(pipelineConfig.Filters) > 0 {
+			processed, err := p.processLineWithPipeline(ctx, line, pipelineConfig, job.TenantID, job.DatasetID, int(lineCount))
 			if err != nil {
-				log.Warnf("Pipeline processing failed for line %d: %v", lineCount, err)
-				errorCount++
-
-				// Use original line on pipeline failure
-				processedLine = line
+				// Check if error is due to record being skipped
+				if strings.Contains(err.Error(), "record skipped") {
+					skipped = true
+					log.Debugf("Record skipped by filter at line %d", lineCount)
+				} else {
+					log.Warnf("Pipeline processing failed for line %d: %v", lineCount, err)
+					errorCount++
+				}
 			} else {
 				processedLine = processed
 			}
+		}
+
+		// Skip adding this line to output if it was filtered out
+		if skipped {
+			continue
 		}
 
 		// Collect output sample (after pipeline)
@@ -836,10 +853,79 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 }
 
 // processLineWithPipeline processes a single line through the configured pipeline
-func (p *FormatProcessor) processLineWithPipeline(ctx context.Context, line string, config *domain.PipelineConfiguration, tenantID, datasetID string) (string, error) {
-	// For now, return the line as-is since pipeline processing is disabled in config
-	// This is where pipeline transformations would be applied when enabled
-	return line, nil
+func (p *FormatProcessor) processLineWithPipeline(ctx context.Context, line string, config *domain.PipelineConfiguration, tenantID, datasetID string, lineNumber int) (string, error) {
+	// Parse the JSON line into a record
+	var record map[string]interface{}
+	if err := sonic.Unmarshal([]byte(line), &record); err != nil {
+		return "", fmt.Errorf("failed to unmarshal line: %w", err)
+	}
+
+	// Keep a copy of the original for preview sampling
+	originalRecord := make(map[string]interface{})
+	for k, v := range record {
+		originalRecord[k] = v
+	}
+
+	// Create filter instances from config
+	currentRecord := record
+	for i, filterConfig := range config.Filters {
+		if !filterConfig.Enabled {
+			continue
+		}
+
+		// Create filter instance
+		filter, err := p.filterRegistry.CreateFilter(filterConfig.Type, filterConfig.Config)
+		if err != nil {
+			return "", fmt.Errorf("failed to create filter %d (%s): %w", i, filterConfig.Type, err)
+		}
+
+		// Create filter context
+		filterCtx := &pipeline.FilterContext{
+			TenantID:   tenantID,
+			DatasetID:  datasetID,
+			Timestamp:  time.Now(),
+			LineNumber: 0,
+			Variables:  make(map[string]string),
+		}
+
+		// Apply filter
+		result, err := filter.Apply(filterCtx, currentRecord)
+		if err != nil {
+			if p.metricsTracker != nil {
+				p.metricsTracker.RecordError(tenantID, datasetID, 1, fmt.Sprintf("Filter %s error: %v", filterConfig.Type, err))
+			}
+			return "", fmt.Errorf("failed to apply filter %s: %w", filterConfig.Type, err)
+		}
+
+		// Handle skip result
+		if result.Skip {
+			if p.metricsTracker != nil {
+				p.metricsTracker.RecordSkip(tenantID, datasetID, 1)
+			}
+			return "", fmt.Errorf("record skipped by filter %s", filterConfig.Type)
+		}
+
+		currentRecord = result.Record
+	}
+
+	// Sample every 100th record for preview (to avoid performance impact)
+	if p.previewRecorder != nil && lineNumber%100 == 0 {
+		p.previewRecorder.RecordSample(PreviewSample{
+			TenantID:        tenantID,
+			DatasetID:       datasetID,
+			LineNumber:      lineNumber,
+			OriginalData:    originalRecord,
+			TransformedData: currentRecord,
+		})
+	}
+
+	// Marshal back to JSON string
+	processedJSON, err := sonic.Marshal(currentRecord)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal processed record: %w", err)
+	}
+
+	return string(processedJSON), nil
 }
 
 // inferSchemaFromSamples creates a unified schema from multiple samples

@@ -1049,6 +1049,11 @@ func (sm *PostgreSQLStateManager) CleanupExpiredTransformationJobs(ctx context.C
 	return nil
 }
 
+// GetDB returns the underlying database connection
+func (sm *PostgreSQLStateManager) GetDB() *sql.DB {
+	return sm.db
+}
+
 // Close closes the database connection
 func (sm *PostgreSQLStateManager) Close() error {
 	return sm.db.Close()
