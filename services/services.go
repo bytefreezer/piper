@@ -25,6 +25,8 @@ type Services struct {
 	DatasetMetricsClient       *metrics.DatasetMetricsClient
 	SchemaSubmissionClient     *metrics.SchemaSubmissionClient
 	TransformationJobService   *TransformationJobService
+	MetricsTracker             *TransformationMetricsTracker
+	MetricsReporter            *MetricsReporter
 }
 
 // NewServices creates and initializes all services
@@ -70,8 +72,12 @@ func NewServices(conf *config.Config) *Services {
 	log.Infof("Schema submission client initialized (enabled: %v, endpoint: %s)",
 		conf.ControlService.Enabled, conf.ControlService.BaseURL)
 
+	// Create metrics tracker
+	metricsTracker := NewTransformationMetricsTracker()
+	log.Info("Transformation metrics tracker initialized")
+
 	// Create piper service
-	piperService, err := NewPiperService(conf, datasetMetricsClient, schemaSubmissionClient)
+	piperService, err := NewPiperService(conf, datasetMetricsClient, schemaSubmissionClient, metricsTracker)
 	if err != nil {
 		log.Fatalf("Failed to create piper service: %v", err)
 	}
@@ -85,6 +91,7 @@ func NewServices(conf *config.Config) *Services {
 		DatasetSampleClient:    datasetSampleClient,
 		DatasetMetricsClient:   datasetMetricsClient,
 		SchemaSubmissionClient: schemaSubmissionClient,
+		MetricsTracker:         metricsTracker,
 	}
 
 	// Create transformation job service if state manager is available
@@ -134,6 +141,26 @@ func NewServices(conf *config.Config) *Services {
 		log.Infof("Health reporting service initialized (reporting to %s)", conf.ControlService.BaseURL)
 	} else {
 		log.Info("Health reporting disabled")
+	}
+
+	// Create and start metrics reporter if control service is enabled
+	if conf.ControlService.Enabled && conf.ControlService.BaseURL != "" {
+		// Use 30 second reporting interval and 10 second timeout
+		metricsReportInterval := 30 * time.Second
+		metricsTimeout := 10 * time.Second
+
+		services.MetricsReporter = NewMetricsReporter(
+			conf.ControlService.BaseURL,
+			conf.ControlService.APIKey,
+			metricsTracker,
+			metricsReportInterval,
+			metricsTimeout,
+			true, // enabled
+		)
+		log.Infof("Transformation metrics reporter initialized (reporting to %s every %v)",
+			conf.ControlService.BaseURL, metricsReportInterval)
+	} else {
+		log.Info("Transformation metrics reporting disabled (control service not configured)")
 	}
 
 	return services

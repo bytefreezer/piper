@@ -184,6 +184,12 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 		log.Info("Health reporter started successfully")
 	}
 
+	// Start transformation metrics reporter if enabled
+	if svc.Services.MetricsReporter != nil {
+		svc.Services.MetricsReporter.Start(svc.ctx)
+		log.Info("Transformation metrics reporter started successfully")
+	}
+
 	// Start transformation job service if enabled
 	if svc.Services.TransformationJobService != nil {
 		go svc.Services.TransformationJobService.Start(svc.ctx)
@@ -238,6 +244,12 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 			if svc.Services.TransformationJobService != nil {
 				svc.Services.TransformationJobService.Stop()
 				log.Info("Transformation job service stopped")
+			}
+
+			// Stop metrics reporter
+			if svc.Services.MetricsReporter != nil {
+				svc.Services.MetricsReporter.Stop()
+				log.Info("Transformation metrics reporter stopped")
 			}
 
 			// Stop health reporting

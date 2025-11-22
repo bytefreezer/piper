@@ -37,7 +37,7 @@ type PiperService struct {
 }
 
 // NewPiperService creates a new piper service with pipeline processing
-func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMetricsClient, schemaSubmissionClient *metrics.SchemaSubmissionClient) (*PiperService, error) {
+func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMetricsClient, schemaSubmissionClient *metrics.SchemaSubmissionClient, metricsTracker *TransformationMetricsTracker) (*PiperService, error) {
 	// Create S3 client
 	s3Client, err := storage.NewS3Client(&cfg.S3Source, &cfg.S3Dest)
 	if err != nil {
@@ -54,7 +54,7 @@ func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMe
 	discoveryManager := NewSimpleDiscoveryManager(cfg, s3Client, stateManager)
 
 	// Create format processor
-	processor, err := NewFormatProcessor(cfg, s3Client, stateManager, schemaSubmissionClient)
+	processor, err := NewFormatProcessor(cfg, s3Client, stateManager, schemaSubmissionClient, metricsTracker)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create format processor: %w", err)
 	}

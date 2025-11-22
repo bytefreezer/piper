@@ -32,10 +32,11 @@ type FormatProcessor struct {
 	filterRegistry         pipeline.FilterRegistry
 	configManager          *ConfigManager
 	schemaSubmissionClient *metrics.SchemaSubmissionClient
+	metricsTracker         *TransformationMetricsTracker
 }
 
 // NewFormatProcessor creates a new format processor
-func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager storage.StateManager, schemaSubmissionClient *metrics.SchemaSubmissionClient) (*FormatProcessor, error) {
+func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager storage.StateManager, schemaSubmissionClient *metrics.SchemaSubmissionClient, metricsTracker *TransformationMetricsTracker) (*FormatProcessor, error) {
 	// Create parser registry
 	parserRegistry := parsers.NewRegistry()
 
@@ -61,6 +62,7 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 		filterRegistry:         filterRegistry,
 		configManager:          configManager,
 		schemaSubmissionClient: schemaSubmissionClient,
+		metricsTracker:         metricsTracker,
 	}
 
 	return processor, nil
@@ -731,6 +733,18 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 		OutputRecords:  lineCount - errorCount,
 		ErrorRecords:   errorCount,
 		ProcessingTime: time.Since(startTime),
+	}
+
+	// Track metrics if tracker is available
+	if p.metricsTracker != nil {
+		// Record successful records
+		if stats.OutputRecords > 0 {
+			p.metricsTracker.RecordSuccess(job.TenantID, job.DatasetID, stats.OutputRecords)
+		}
+		// Record errors
+		if stats.ErrorRecords > 0 {
+			p.metricsTracker.RecordError(job.TenantID, job.DatasetID, stats.ErrorRecords, "Processing errors")
+		}
 	}
 
 	// Convert processed lines to compressed data
