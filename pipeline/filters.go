@@ -419,10 +419,11 @@ type JSONFlattenFilter struct {
 
 // NewJSONFlattenFilter creates a new JSON flatten filter
 func NewJSONFlattenFilter(config map[string]interface{}) (Filter, error) {
-	sourceField, ok := config["source_field"].(string)
-	if !ok || sourceField == "" {
-		sourceField = "message" // Default field
+	sourceField := ""
+	if sf, ok := config["source_field"].(string); ok {
+		sourceField = sf
 	}
+	// If source_field is not specified or empty, we'll flatten the entire record
 
 	targetField, ok := config["target_field"].(string)
 	if !ok || targetField == "" {
@@ -454,6 +455,24 @@ func (f *JSONFlattenFilter) Validate(config map[string]interface{}) error {
 // Apply applies the filter to a record
 func (f *JSONFlattenFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*FilterResult, error) {
 	start := time.Now()
+
+	// If source_field is empty, flatten the entire record
+	if f.sourceField == "" {
+		flattened := f.flattenObject(record, "")
+		// Replace the entire record with the flattened version
+		for k := range record {
+			delete(record, k)
+		}
+		for k, v := range flattened {
+			record[k] = v
+		}
+		return &FilterResult{
+			Record:   record,
+			Skip:     false,
+			Applied:  true,
+			Duration: time.Since(start),
+		}, nil
+	}
 
 	// Get the source field value
 	sourceValue, exists := record[f.sourceField]

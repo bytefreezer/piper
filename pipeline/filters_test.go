@@ -256,3 +256,147 @@ func TestUppercaseKeysFilter_EmptyArray(t *testing.T) {
 		t.Error("Expected MESSAGE key")
 	}
 }
+
+func TestJSONFlattenFilter_FlattenEntireRecord(t *testing.T) {
+	// Test flattening entire record when source_field is not specified
+	config := map[string]interface{}{
+		"recursive": true,
+		"separator": ".",
+	}
+
+	filter, err := NewJSONFlattenFilter(config)
+	if err != nil {
+		t.Fatalf("Failed to create filter: %v", err)
+	}
+
+	// Test input matching user's data structure
+	input := map[string]interface{}{
+		"timestamp": "2025-01-22T10:00:00Z",
+		"data": map[string]interface{}{
+			"user": map[string]interface{}{
+				"name": "John",
+				"age":  float64(30),
+				"address": map[string]interface{}{
+					"city": "NYC",
+					"zip":  "10001",
+				},
+			},
+			"tags": []interface{}{"test", "demo"},
+		},
+		"FileDevice": []interface{}{"1eh", "cgroup2", "/sys/fs/cgroup"},
+		"FileEvents": map[string]interface{}{
+			"ACCESS":        float64(1),
+			"CLOSE_NOWRITE": float64(1),
+			"OPEN":          float64(1),
+		},
+		"FilePermissions": []interface{}{"0644", "-rw-r--r--"},
+	}
+
+	ctx := &FilterContext{
+		TenantID:  "test-tenant",
+		DatasetID: "test-dataset",
+		Timestamp: time.Now(),
+	}
+	result, err := filter.Apply(ctx, input)
+	if err != nil {
+		t.Fatalf("Filter Apply failed: %v", err)
+	}
+
+	if !result.Applied {
+		t.Error("Filter was not applied")
+	}
+
+	// Check that nested structures are flattened
+	expectedKeys := []string{
+		"timestamp",
+		"data.user.name",
+		"data.user.age",
+		"data.user.address.city",
+		"data.user.address.zip",
+		"data.tags.0",
+		"data.tags.1",
+		"FileDevice.0",
+		"FileDevice.1",
+		"FileDevice.2",
+		"FileEvents.ACCESS",
+		"FileEvents.CLOSE_NOWRITE",
+		"FileEvents.OPEN",
+		"FilePermissions.0",
+		"FilePermissions.1",
+	}
+
+	for _, key := range expectedKeys {
+		if _, exists := result.Record[key]; !exists {
+			t.Errorf("Expected key '%s' not found in flattened result", key)
+		}
+	}
+
+	// Verify specific values
+	if val, ok := result.Record["data.user.name"]; !ok || val != "John" {
+		t.Errorf("Expected 'data.user.name' to be 'John', got %v", val)
+	}
+	if val, ok := result.Record["FileDevice.0"]; !ok || val != "1eh" {
+		t.Errorf("Expected 'FileDevice.0' to be '1eh', got %v", val)
+	}
+	if val, ok := result.Record["FileEvents.ACCESS"]; !ok || val != float64(1) {
+		t.Errorf("Expected 'FileEvents.ACCESS' to be 1, got %v", val)
+	}
+}
+
+func TestJSONFlattenFilter_WithSourceField(t *testing.T) {
+	// Test flattening specific field when source_field is specified
+	config := map[string]interface{}{
+		"source_field": "data",
+		"target_field": "flattened",
+		"separator":    ".",
+	}
+
+	filter, err := NewJSONFlattenFilter(config)
+	if err != nil {
+		t.Fatalf("Failed to create filter: %v", err)
+	}
+
+	input := map[string]interface{}{
+		"timestamp": "2025-01-22T10:00:00Z",
+		"data": map[string]interface{}{
+			"user": map[string]interface{}{
+				"name": "John",
+				"age":  float64(30),
+			},
+		},
+	}
+
+	ctx := &FilterContext{
+		TenantID:  "test-tenant",
+		DatasetID: "test-dataset",
+		Timestamp: time.Now(),
+	}
+	result, err := filter.Apply(ctx, input)
+	if err != nil {
+		t.Fatalf("Filter Apply failed: %v", err)
+	}
+
+	if !result.Applied {
+		t.Error("Filter was not applied")
+	}
+
+	// Original timestamp should still exist
+	if _, exists := result.Record["timestamp"]; !exists {
+		t.Error("Original 'timestamp' field should still exist")
+	}
+
+	// Flattened data should be in 'flattened' field
+	flattened, exists := result.Record["flattened"]
+	if !exists {
+		t.Fatal("'flattened' field not found")
+	}
+
+	flattenedMap, ok := flattened.(map[string]interface{})
+	if !ok {
+		t.Fatal("'flattened' field is not a map")
+	}
+
+	if _, exists := flattenedMap["user.name"]; !exists {
+		t.Error("Expected 'user.name' in flattened map")
+	}
+}

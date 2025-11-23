@@ -1269,19 +1269,56 @@ This guide documents all available filters in ByteFreezer Piper with detailed us
 
 ### JSON Flatten Filter
 
-**Purpose**: Flatten nested JSON objects
+**Purpose**: Flatten nested JSON objects and arrays into dot-notation keys
 
 **Type**: `json_flatten`
 
 **Parameters**:
-- `source_field` (string): Field containing JSON
-- `target_field` (string): Field to store flattened result
+- `source_field` (string, optional): Field containing JSON to flatten. If not specified or empty, flattens the entire record
+- `target_field` (string): Field to store flattened result (only used when source_field is specified, default: "@flatten")
 - `separator` (string): Separator for nested keys (default: ".")
+- `recursive` (bool): Recursively flatten nested structures (default: true)
 
 **Examples**:
 
 ```json
-// Flatten nested JSON
+// Flatten entire record (most common use case)
+{
+  "type": "json_flatten",
+  "config": {
+    "separator": ".",
+    "recursive": true
+  }
+}
+// Input: {
+//   "timestamp": "2025-01-22T10:00:00Z",
+//   "data": {
+//     "user": {
+//       "name": "John",
+//       "age": 30,
+//       "address": {"city": "NYC", "zip": "10001"}
+//     },
+//     "tags": ["web", "api"]
+//   },
+//   "FileDevice": ["1eh", "cgroup2", "/sys/fs/cgroup"],
+//   "FileEvents": {"ACCESS": 1, "OPEN": 1}
+// }
+// Output: {
+//   "timestamp": "2025-01-22T10:00:00Z",
+//   "data.user.name": "John",
+//   "data.user.age": 30,
+//   "data.user.address.city": "NYC",
+//   "data.user.address.zip": "10001",
+//   "data.tags.0": "web",
+//   "data.tags.1": "api",
+//   "FileDevice.0": "1eh",
+//   "FileDevice.1": "cgroup2",
+//   "FileDevice.2": "/sys/fs/cgroup",
+//   "FileEvents.ACCESS": 1,
+//   "FileEvents.OPEN": 1
+// }
+
+// Flatten specific field into target field
 {
   "type": "json_flatten",
   "config": {
@@ -1290,9 +1327,25 @@ This guide documents all available filters in ByteFreezer Piper with detailed us
     "separator": "."
   }
 }
-// Input: {"data": {"user": {"name": "John", "age": 30}}}
-// Output: {"flat": {"user.name": "John", "user.age": 30}}
+// Input: {"id": 1, "data": {"user": {"name": "John", "age": 30}}}
+// Output: {"id": 1, "flat": {"user.name": "John", "user.age": 30}}
+
+// Flatten with custom separator
+{
+  "type": "json_flatten",
+  "config": {
+    "separator": "_"
+  }
+}
+// Output keys: data_user_name, data_user_age, etc.
 ```
+
+**Use Cases**:
+- Flatten complex nested eBPF data structures
+- Convert hierarchical JSON to flat structure for analytics
+- Simplify deeply nested objects for easier querying
+- Flatten arrays with indexed keys (array.0, array.1, etc.)
+- Prepare data for systems that don't support nested structures
 
 ---
 

@@ -1,0 +1,10 @@
+[
+  {
+    "type": "json_flatten",
+    "config": {
+      "source_field": "data",
+      "target_field": "flattened",
+      "separator": "."
+    }
+  }
+]
