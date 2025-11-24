@@ -1049,6 +1049,25 @@ func (sm *PostgreSQLStateManager) CleanupExpiredTransformationJobs(ctx context.C
 	return nil
 }
 
+// GetEnricherData fetches enricher binary data from the database
+func (sm *PostgreSQLStateManager) GetEnricherData(ctx context.Context, tenantID, enricherID string) ([]byte, error) {
+	query := `
+		SELECT file_data
+		FROM enrichers
+		WHERE id = $1 AND tenant_id = $2 AND status = 'active' AND file_data IS NOT NULL`
+
+	var fileData []byte
+	err := sm.db.QueryRowContext(ctx, query, enricherID, tenantID).Scan(&fileData)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("enricher not found or no data available: tenant=%s enricher=%s", tenantID, enricherID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch enricher data: %w", err)
+	}
+
+	return fileData, nil
+}
+
 // GetDB returns the underlying database connection
 func (sm *PostgreSQLStateManager) GetDB() *sql.DB {
 	return sm.db

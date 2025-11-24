@@ -45,6 +45,7 @@ type FilterContext struct {
 	Timestamp    time.Time
 	Variables    map[string]string
 	GeoIPManager GeoIPManager
+	StateManager interface{} // Database state manager for enrichers and other data
 }
 
 // FilterResult represents the result of filter application

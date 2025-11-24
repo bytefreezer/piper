@@ -152,16 +152,18 @@ func (p *BasicPipeline) isFilterEnabled(filter Filter) bool {
 
 // BasicPipelineProcessor manages multiple pipelines
 type BasicPipelineProcessor struct {
-	pipelines map[string]Pipeline
-	filterReg FilterRegistry
-	mutex     sync.RWMutex
+	pipelines    map[string]Pipeline
+	filterReg    FilterRegistry
+	stateManager interface{} // Database state manager for enrichers and other data
+	mutex        sync.RWMutex
 }
 
 // NewBasicPipelineProcessor creates a new pipeline processor
-func NewBasicPipelineProcessor(filterRegistry FilterRegistry) *BasicPipelineProcessor {
+func NewBasicPipelineProcessor(filterRegistry FilterRegistry, stateManager interface{}) *BasicPipelineProcessor {
 	return &BasicPipelineProcessor{
-		pipelines: make(map[string]Pipeline),
-		filterReg: filterRegistry,
+		pipelines:    make(map[string]Pipeline),
+		filterReg:    filterRegistry,
+		stateManager: stateManager,
 	}
 }
 
@@ -203,10 +205,11 @@ func (pp *BasicPipelineProcessor) ProcessRecord(ctx context.Context, tenantID, d
 	}
 
 	filterCtx := &FilterContext{
-		TenantID:  tenantID,
-		DatasetID: datasetID,
-		Timestamp: time.Now(),
-		Variables: make(map[string]string),
+		TenantID:     tenantID,
+		DatasetID:    datasetID,
+		Timestamp:    time.Now(),
+		Variables:    make(map[string]string),
+		StateManager: pp.stateManager,
 	}
 
 	return pipeline.Process(filterCtx, record)

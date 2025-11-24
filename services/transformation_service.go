@@ -420,11 +420,12 @@ func (s *Services) applyFiltersToSample(sample api.TransformationSample, filters
 
 	// Create filter context
 	ctx := &pipeline.FilterContext{
-		TenantID:   tenantID,
-		DatasetID:  datasetID,
-		Timestamp:  time.Now(),
-		LineNumber: int64(sample.LineNumber),
-		Variables:  make(map[string]string),
+		TenantID:     tenantID,
+		DatasetID:    datasetID,
+		Timestamp:    time.Now(),
+		LineNumber:   int64(sample.LineNumber),
+		Variables:    make(map[string]string),
+		StateManager: s.StateManager,
 	}
 
 	// Apply each filter

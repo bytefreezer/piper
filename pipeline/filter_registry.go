@@ -117,6 +117,11 @@ func (r *DefaultFilterRegistry) registerBuiltInFilters() {
 		return NewUppercaseKeysFilter(config)
 	})
 
+	// Enricher filter
+	r.Register("enricher", func(config map[string]interface{}) (Filter, error) {
+		return NewEnricherFilter(config)
+	})
+
 	// Grok filter
 	r.Register("grok", func(config map[string]interface{}) (Filter, error) {
 		return NewGrokFilter(config)

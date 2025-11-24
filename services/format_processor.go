@@ -389,11 +389,12 @@ func (p *FormatProcessor) generateOutputKey(sourceKey string, formatHint *parser
 func (p *FormatProcessor) applyFilters(ctx context.Context, record map[string]interface{}, formatHint *parsers.FormatHint, lineNumber int64, pipelineConfig *domain.PipelineConfiguration) (map[string]interface{}, bool, error) {
 	// Create filter context
 	filterCtx := &pipeline.FilterContext{
-		TenantID:   formatHint.TenantID,
-		DatasetID:  formatHint.DatasetID,
-		LineNumber: lineNumber,
-		Timestamp:  time.Now(),
-		Variables:  make(map[string]string),
+		TenantID:     formatHint.TenantID,
+		DatasetID:    formatHint.DatasetID,
+		LineNumber:   lineNumber,
+		Timestamp:    time.Now(),
+		Variables:    make(map[string]string),
+		StateManager: p.stateManager,
 	}
 
 	currentRecord := record
