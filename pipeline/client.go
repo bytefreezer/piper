@@ -289,8 +289,55 @@ func (pc *PipelineClient) FetchPipelineConfiguration(ctx context.Context, tenant
 		return nil, fmt.Errorf("failed to decode dataset response: %w", err)
 	}
 
-	// Convert dataset config to pipeline configuration
+	// Fetch transformation configuration from Control Service API
+	transformURL := fmt.Sprintf("%s/api/v1/tenants/%s/datasets/%s/transformations", pc.baseURL, tenantID, datasetID)
+	transformReq, err := http.NewRequestWithContext(ctx, "GET", transformURL, nil)
+	if err != nil {
+		log.Warnf("Failed to create transformation request for %s/%s: %v", tenantID, datasetID, err)
+		// Continue without transformations
+		pipelineConfig := pc.convertDatasetToPipelineConfig(&dataset)
+		return pipelineConfig, nil
+	}
+
+	transformReq.Header.Set("User-Agent", fmt.Sprintf("%s/%s", pc.config.App.Name, pc.config.App.Version))
+	transformReq.Header.Set("Accept", "application/json")
+	if pc.apiKey != "" {
+		transformReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", pc.apiKey))
+	}
+
+	transformResp, err := pc.httpClient.Do(transformReq)
+	if err != nil {
+		log.Warnf("Failed to fetch transformations for %s/%s: %v", tenantID, datasetID, err)
+		// Continue without transformations
+		pipelineConfig := pc.convertDatasetToPipelineConfig(&dataset)
+		return pipelineConfig, nil
+	}
+	defer transformResp.Body.Close()
+
+	var transformConfig struct {
+		Enabled bool                   `json:"enabled"`
+		Filters []domain.FilterConfig  `json:"filters"`
+	}
+
+	if transformResp.StatusCode == http.StatusOK {
+		if err := sonic.ConfigDefault.NewDecoder(transformResp.Body).Decode(&transformConfig); err != nil {
+			log.Warnf("Failed to decode transformation config for %s/%s: %v", tenantID, datasetID, err)
+		} else if transformConfig.Enabled && len(transformConfig.Filters) > 0 {
+			log.Infof("Loaded %d transformation filters for %s/%s (enabled=%v)", len(transformConfig.Filters), tenantID, datasetID, transformConfig.Enabled)
+		}
+	} else {
+		log.Debugf("No transformation configuration found for %s/%s (status=%d)", tenantID, datasetID, transformResp.StatusCode)
+	}
+
+	// Convert dataset config to pipeline configuration with transformations
 	pipelineConfig := pc.convertDatasetToPipelineConfig(&dataset)
+
+	// Apply transformation filters if enabled
+	if transformConfig.Enabled && len(transformConfig.Filters) > 0 {
+		pipelineConfig.Configuration.Filters = transformConfig.Filters
+		pipelineConfig.Configuration.Enabled = true
+		log.Infof("Applied %d transformation filters to pipeline config for %s/%s", len(transformConfig.Filters), tenantID, datasetID)
+	}
 
 	return pipelineConfig, nil
 }
