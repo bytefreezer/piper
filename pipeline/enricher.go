@@ -16,39 +16,52 @@ import (
 
 // EnricherFilter enriches events with data from customer-uploaded lookup tables
 type EnricherFilter struct {
-	EnricherID      string
-	EnricherName    string
-	TenantID        string
-	MatchFields     map[string]string // incoming field -> enricher column mapping
-	TargetField     string
-	MultipleMatches string // "first", "array", "ignore"
-	CacheTTL        time.Duration
+	EnricherID   string
+	EnricherName string
+	TenantID     string
+	SourceField  string // field in event to match against enricher's index column
+	TargetField  string // where to store enriched data (defaults to src.{source_field}-{enricher_name_sanitized})
+	CacheTTL     time.Duration
 
 	// Runtime data
-	header       []string
-	data         [][]string
-	index        map[string][]int // index column value -> row indices
-	indexColumns []string
-	lastReload   time.Time
-	mutex        sync.RWMutex
+	header        []string
+	data          [][]string
+	index         map[string][]int // index column value -> row indices
+	indexColumn   string           // the enricher's index column (first index column)
+	lastReload    time.Time
+	mutex         sync.RWMutex
+	enricherReady bool
+}
+
+// sanitizeName replaces all non-alphanumeric characters with dashes
+func sanitizeName(name string) string {
+	var result strings.Builder
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			result.WriteRune(r)
+		} else {
+			result.WriteRune('-')
+		}
+	}
+	return strings.ToLower(result.String())
 }
 
 // NewEnricherFilter creates a new enricher filter
 func NewEnricherFilter(config map[string]interface{}) (Filter, error) {
 	filter := &EnricherFilter{
-		MatchFields:     make(map[string]string),
-		MultipleMatches: "first",
-		CacheTTL:        5 * time.Minute,
+		CacheTTL: 5 * time.Minute,
 	}
 
-	// Parse enricher_id
+	// Parse enricher_id (also accept "enrichment" as alias)
 	if enricherID, ok := config["enricher_id"].(string); ok {
+		filter.EnricherID = enricherID
+	} else if enricherID, ok := config["enrichment"].(string); ok {
 		filter.EnricherID = enricherID
 	} else {
 		return nil, fmt.Errorf("enricher filter requires 'enricher_id' parameter")
 	}
 
-	// Parse enricher_name (optional)
+	// Parse enricher_name (optional, used for target_field default)
 	if enricherName, ok := config["enricher_name"].(string); ok {
 		filter.EnricherName = enricherName
 	}
@@ -60,32 +73,18 @@ func NewEnricherFilter(config map[string]interface{}) (Filter, error) {
 		return nil, fmt.Errorf("enricher filter requires 'tenant_id' parameter")
 	}
 
-	// Parse match_fields
-	if matchFields, ok := config["match_fields"].(map[string]interface{}); ok {
-		for incomingField, enricherColumn := range matchFields {
-			if enricherColStr, ok := enricherColumn.(string); ok {
-				filter.MatchFields[incomingField] = enricherColStr
-			}
-		}
+	// Parse source_field (required - field in event to match against enricher's index column)
+	if sourceField, ok := config["source_field"].(string); ok {
+		filter.SourceField = sourceField
 	} else {
-		return nil, fmt.Errorf("enricher filter requires 'match_fields' parameter")
+		return nil, fmt.Errorf("enricher filter requires 'source_field' parameter")
 	}
 
-	if len(filter.MatchFields) == 0 {
-		return nil, fmt.Errorf("enricher filter requires at least one match field")
-	}
-
-	// Parse target_field
+	// Parse target_field (optional - defaults to src.{source_field}-{enricher_name_sanitized})
 	if targetField, ok := config["target_field"].(string); ok {
 		filter.TargetField = targetField
-	} else {
-		filter.TargetField = "enriched_data"
 	}
-
-	// Parse multiple_matches
-	if multipleMatches, ok := config["multiple_matches"].(string); ok {
-		filter.MultipleMatches = multipleMatches
-	}
+	// target_field default is set in loadEnricherDataFromDB when we know the enricher name
 
 	// Parse cache_ttl
 	if cacheTTL, ok := config["cache_ttl"].(float64); ok {
@@ -93,8 +92,6 @@ func NewEnricherFilter(config map[string]interface{}) (Filter, error) {
 	} else if cacheTTLInt, ok := config["cache_ttl"].(int); ok {
 		filter.CacheTTL = time.Duration(cacheTTLInt) * time.Second
 	}
-
-	// Note: enricher data will be loaded on first Apply() call with database access
 
 	return filter, nil
 }
@@ -106,14 +103,16 @@ func (f *EnricherFilter) Type() string {
 
 // Validate validates the filter configuration
 func (f *EnricherFilter) Validate(config map[string]interface{}) error {
-	if _, ok := config["enricher_id"].(string); !ok {
-		return fmt.Errorf("'enricher_id' parameter is required")
+	_, hasEnricherID := config["enricher_id"].(string)
+	_, hasEnrichment := config["enrichment"].(string)
+	if !hasEnricherID && !hasEnrichment {
+		return fmt.Errorf("'enricher_id' or 'enrichment' parameter is required")
 	}
 	if _, ok := config["tenant_id"].(string); !ok {
 		return fmt.Errorf("'tenant_id' parameter is required")
 	}
-	if _, ok := config["match_fields"].(map[string]interface{}); !ok {
-		return fmt.Errorf("'match_fields' parameter is required")
+	if _, ok := config["source_field"].(string); !ok {
+		return fmt.Errorf("'source_field' parameter is required")
 	}
 	return nil
 }
@@ -123,7 +122,7 @@ func (f *EnricherFilter) Apply(ctx *FilterContext, record map[string]interface{}
 	start := time.Now()
 
 	// Check if we need to reload data
-	if time.Since(f.lastReload) > f.CacheTTL {
+	if !f.enricherReady || time.Since(f.lastReload) > f.CacheTTL {
 		if err := f.loadEnricherDataFromDB(ctx); err != nil {
 			log.Warnf("Failed to reload enricher data: %v", err)
 		}
@@ -134,7 +133,7 @@ func (f *EnricherFilter) Apply(ctx *FilterContext, record map[string]interface{}
 	defer f.mutex.RUnlock()
 
 	// Check if data is loaded
-	if len(f.header) == 0 {
+	if !f.enricherReady || len(f.header) == 0 {
 		log.Debugf("Enricher %s has no data loaded, skipping", f.EnricherID)
 		return &FilterResult{
 			Record:   record,
@@ -144,10 +143,10 @@ func (f *EnricherFilter) Apply(ctx *FilterContext, record map[string]interface{}
 		}, nil
 	}
 
-	// Build lookup key from incoming record
-	lookupKey := f.buildLookupKey(record)
-	if lookupKey == "" {
-		// No match fields found in record
+	// Get source field value from record
+	sourceValue, exists := record[f.SourceField]
+	if !exists {
+		// Source field not in record
 		return &FilterResult{
 			Record:   record,
 			Skip:     false,
@@ -155,6 +154,9 @@ func (f *EnricherFilter) Apply(ctx *FilterContext, record map[string]interface{}
 			Duration: time.Since(start),
 		}, nil
 	}
+
+	// Convert source value to string for lookup
+	lookupKey := fmt.Sprintf("%v", sourceValue)
 
 	// Lookup matching rows
 	rowIndices, found := f.index[lookupKey]
@@ -168,41 +170,9 @@ func (f *EnricherFilter) Apply(ctx *FilterContext, record map[string]interface{}
 		}, nil
 	}
 
-	// Apply enrichment based on multiple_matches strategy
-	switch f.MultipleMatches {
-	case "first":
-		// Add first match
-		enrichedData := f.rowToMap(f.data[rowIndices[0]])
-		record[f.TargetField] = enrichedData
-
-	case "array":
-		// Add all matches as array
-		enrichedArray := make([]map[string]interface{}, 0, len(rowIndices))
-		for _, idx := range rowIndices {
-			enrichedData := f.rowToMap(f.data[idx])
-			enrichedArray = append(enrichedArray, enrichedData)
-		}
-		record[f.TargetField] = enrichedArray
-
-	case "ignore":
-		// Multiple matches found, ignore (don't enrich)
-		if len(rowIndices) > 1 {
-			return &FilterResult{
-				Record:   record,
-				Skip:     false,
-				Applied:  false,
-				Duration: time.Since(start),
-			}, nil
-		}
-		// Single match, add it
-		enrichedData := f.rowToMap(f.data[rowIndices[0]])
-		record[f.TargetField] = enrichedData
-
-	default:
-		// Default to first
-		enrichedData := f.rowToMap(f.data[rowIndices[0]])
-		record[f.TargetField] = enrichedData
-	}
+	// Add first match to target field
+	enrichedData := f.rowToMap(f.data[rowIndices[0]])
+	record[f.TargetField] = enrichedData
 
 	return &FilterResult{
 		Record:   record,
@@ -227,11 +197,11 @@ func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
 		return fmt.Errorf("state manager is not PostgreSQL type")
 	}
 
-	// Fetch enricher binary data from database
+	// Fetch enricher metadata and binary data from database
 	dbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	fileData, err := stateManager.GetEnricherData(dbCtx, f.TenantID, f.EnricherID)
+	enricherMeta, fileData, err := stateManager.GetEnricherWithData(dbCtx, f.TenantID, f.EnricherID)
 	if err != nil {
 		log.Warnf("Enricher data not available in database: %v", err)
 		return nil // Don't fail, just log
@@ -240,6 +210,24 @@ func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
 	if len(fileData) == 0 {
 		log.Warnf("Enricher %s has no data", f.EnricherID)
 		return nil
+	}
+
+	// Set enricher name if not already set
+	if f.EnricherName == "" && enricherMeta != nil {
+		f.EnricherName = enricherMeta.Name
+	}
+
+	// Set default target field if not specified
+	// Format: src.{source_field}-{enricher_name_sanitized}
+	if f.TargetField == "" {
+		sanitizedName := sanitizeName(f.EnricherName)
+		f.TargetField = fmt.Sprintf("src.%s-%s", f.SourceField, sanitizedName)
+	}
+
+	// Get index column from enricher metadata
+	var indexColumn string
+	if enricherMeta != nil && len(enricherMeta.IndexColumns) > 0 {
+		indexColumn = enricherMeta.IndexColumns[0] // Use first index column
 	}
 
 	// Parse JSON lines format from binary data
@@ -254,6 +242,24 @@ func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
 	var header []string
 	if err := json.Unmarshal(scanner.Bytes(), &header); err != nil {
 		return fmt.Errorf("failed to parse header: %w", err)
+	}
+
+	// If no index column from metadata, use first column
+	if indexColumn == "" && len(header) > 0 {
+		indexColumn = header[0]
+	}
+
+	// Find index column position in header
+	indexColIdx := -1
+	for i, col := range header {
+		if col == indexColumn {
+			indexColIdx = i
+			break
+		}
+	}
+
+	if indexColIdx == -1 {
+		return fmt.Errorf("index column %s not found in enricher data", indexColumn)
 	}
 
 	// Read data rows
@@ -271,18 +277,14 @@ func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
 		return fmt.Errorf("error reading data: %w", err)
 	}
 
-	// Determine index columns from match fields
-	indexColumns := make([]string, 0)
-	for _, enricherCol := range f.MatchFields {
-		indexColumns = append(indexColumns, enricherCol)
-	}
-
-	// Build index
+	// Build index using the index column
 	index := make(map[string][]int)
 	for i, row := range data {
-		key := f.buildRowKey(row, header, indexColumns)
-		if key != "" {
-			index[key] = append(index[key], i)
+		if indexColIdx < len(row) {
+			key := row[indexColIdx]
+			if key != "" {
+				index[key] = append(index[key], i)
+			}
 		}
 	}
 
@@ -290,51 +292,14 @@ func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
 	f.header = header
 	f.data = data
 	f.index = index
-	f.indexColumns = indexColumns
+	f.indexColumn = indexColumn
 	f.lastReload = time.Now()
+	f.enricherReady = true
 
-	log.Infof("Loaded enricher %s from database: %d rows, %d unique keys", f.EnricherID, len(data), len(index))
+	log.Infof("Loaded enricher %s from database: %d rows, %d unique keys, index column: %s, target field: %s",
+		f.EnricherID, len(data), len(index), indexColumn, f.TargetField)
 
 	return nil
-}
-
-// buildLookupKey builds a lookup key from incoming record
-func (f *EnricherFilter) buildLookupKey(record map[string]interface{}) string {
-	parts := make([]string, 0, len(f.MatchFields))
-
-	for incomingField := range f.MatchFields {
-		value, exists := record[incomingField]
-		if !exists {
-			return ""
-		}
-		parts = append(parts, fmt.Sprintf("%v", value))
-	}
-
-	return strings.Join(parts, "|||")
-}
-
-// buildRowKey builds an index key from a row
-func (f *EnricherFilter) buildRowKey(row []string, header []string, indexColumns []string) string {
-	parts := make([]string, 0, len(indexColumns))
-
-	for _, indexCol := range indexColumns {
-		// Find column index
-		colIdx := -1
-		for i, col := range header {
-			if col == indexCol {
-				colIdx = i
-				break
-			}
-		}
-
-		if colIdx == -1 || colIdx >= len(row) {
-			return ""
-		}
-
-		parts = append(parts, row[colIdx])
-	}
-
-	return strings.Join(parts, "|||")
 }
 
 // rowToMap converts a row to a map using header

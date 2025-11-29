@@ -9,6 +9,7 @@ import (
 	"github.com/n0needt0/go-goodies/log"
 
 	"github.com/n0needt0/bytefreezer-piper/config"
+	"github.com/n0needt0/bytefreezer-piper/errors"
 	"github.com/n0needt0/bytefreezer-piper/metrics"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
 	"github.com/n0needt0/bytefreezer-piper/storage"
@@ -27,10 +28,25 @@ type Services struct {
 	TransformationJobService   *TransformationJobService
 	MetricsTracker             *TransformationMetricsTracker
 	MetricsReporter            *MetricsReporter
+	ErrorReporter              *errors.ErrorReporter
 }
 
 // NewServices creates and initializes all services
 func NewServices(conf *config.Config) *Services {
+	// Initialize error reporter if configured
+	var errorReporter *errors.ErrorReporter
+	if conf.ErrorTracking.Enabled && conf.ControlService.BaseURL != "" {
+		errorReporter = errors.NewErrorReporter(
+			conf.ControlService.BaseURL,
+			conf.ControlService.APIKey,
+			"piper",
+			true,
+		)
+		log.Infof("Error reporter initialized - reporting to control service at %s", conf.ControlService.BaseURL)
+	} else {
+		log.Infof("Error reporting disabled (enabled: %v, control_service: %s)", conf.ErrorTracking.Enabled, conf.ControlService.BaseURL)
+	}
+
 	// Create state manager (use Control API)
 	stateManager, err := storage.NewControlAPIStateManager(&conf.ControlService, conf.App.InstanceID)
 	if err != nil {
@@ -77,7 +93,7 @@ func NewServices(conf *config.Config) *Services {
 	log.Info("Transformation metrics tracker initialized")
 
 	// Create piper service
-	piperService, err := NewPiperService(conf, datasetMetricsClient, schemaSubmissionClient, metricsTracker)
+	piperService, err := NewPiperService(conf, datasetMetricsClient, schemaSubmissionClient, metricsTracker, errorReporter)
 	if err != nil {
 		log.Fatalf("Failed to create piper service: %v", err)
 	}
@@ -92,6 +108,7 @@ func NewServices(conf *config.Config) *Services {
 		DatasetMetricsClient:   datasetMetricsClient,
 		SchemaSubmissionClient: schemaSubmissionClient,
 		MetricsTracker:         metricsTracker,
+		ErrorReporter:          errorReporter,
 	}
 
 	// Create transformation job service if state manager is available

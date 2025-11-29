@@ -1049,6 +1049,13 @@ func (sm *PostgreSQLStateManager) CleanupExpiredTransformationJobs(ctx context.C
 	return nil
 }
 
+// EnricherMeta holds enricher metadata
+type EnricherMeta struct {
+	ID           string
+	Name         string
+	IndexColumns []string
+}
+
 // GetEnricherData fetches enricher binary data from the database
 func (sm *PostgreSQLStateManager) GetEnricherData(ctx context.Context, tenantID, enricherID string) ([]byte, error) {
 	query := `
@@ -1066,6 +1073,37 @@ func (sm *PostgreSQLStateManager) GetEnricherData(ctx context.Context, tenantID,
 	}
 
 	return fileData, nil
+}
+
+// GetEnricherWithData fetches enricher metadata and binary data from the database
+func (sm *PostgreSQLStateManager) GetEnricherWithData(ctx context.Context, tenantID, enricherID string) (*EnricherMeta, []byte, error) {
+	query := `
+		SELECT id, name, index_columns, file_data
+		FROM enrichers
+		WHERE id = $1 AND tenant_id = $2 AND status = 'active' AND file_data IS NOT NULL`
+
+	var meta EnricherMeta
+	var indexColumnsJSON []byte
+	var fileData []byte
+
+	err := sm.db.QueryRowContext(ctx, query, enricherID, tenantID).Scan(
+		&meta.ID, &meta.Name, &indexColumnsJSON, &fileData,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil, fmt.Errorf("enricher not found or no data available: tenant=%s enricher=%s", tenantID, enricherID)
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch enricher data: %w", err)
+	}
+
+	// Parse index columns JSON
+	if len(indexColumnsJSON) > 0 {
+		if err := sonic.Unmarshal(indexColumnsJSON, &meta.IndexColumns); err != nil {
+			return nil, nil, fmt.Errorf("failed to parse index columns: %w", err)
+		}
+	}
+
+	return &meta, fileData, nil
 }
 
 // GetDB returns the underlying database connection

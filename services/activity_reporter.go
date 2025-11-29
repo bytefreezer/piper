@@ -109,8 +109,8 @@ func (r *ActivityReporter) UpdateProgress(operationID string, current int64, mes
 	op.ProgressCurrent = current
 	op.ProgressMessage = message
 
-	// Report if it's been more than 30 seconds since last report
-	shouldReport := time.Since(op.LastReported) > 30*time.Second
+	// Report if it's been more than 15 seconds since last report
+	shouldReport := time.Since(op.LastReported) > 15*time.Second
 	r.mutex.Unlock()
 
 	if shouldReport {

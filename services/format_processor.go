@@ -15,6 +15,7 @@ import (
 
 	"github.com/n0needt0/bytefreezer-piper/config"
 	"github.com/n0needt0/bytefreezer-piper/domain"
+	"github.com/n0needt0/bytefreezer-piper/errors"
 	"github.com/n0needt0/bytefreezer-piper/metrics"
 	"github.com/n0needt0/bytefreezer-piper/parsers"
 	"github.com/n0needt0/bytefreezer-piper/pipeline"
@@ -34,10 +35,11 @@ type FormatProcessor struct {
 	schemaSubmissionClient *metrics.SchemaSubmissionClient
 	metricsTracker         *TransformationMetricsTracker
 	previewRecorder        *PreviewRecorder
+	errorReporter          *errors.ErrorReporter
 }
 
 // NewFormatProcessor creates a new format processor
-func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager storage.StateManager, schemaSubmissionClient *metrics.SchemaSubmissionClient, metricsTracker *TransformationMetricsTracker) (*FormatProcessor, error) {
+func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateManager storage.StateManager, schemaSubmissionClient *metrics.SchemaSubmissionClient, metricsTracker *TransformationMetricsTracker, errorReporter *errors.ErrorReporter) (*FormatProcessor, error) {
 	// Create parser registry
 	parserRegistry := parsers.NewRegistry()
 
@@ -71,6 +73,7 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 		schemaSubmissionClient: schemaSubmissionClient,
 		metricsTracker:         metricsTracker,
 		previewRecorder:        previewRecorder,
+		errorReporter:          errorReporter,
 	}
 
 	return processor, nil
@@ -846,6 +849,17 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 	compressedReader := bytes.NewReader(compressedData)
 	err = p.s3Client.UploadProcessedFile(ctx, outputKey, compressedReader, processingMetadata)
 	if err != nil {
+		// Report error to control service for visibility in dashboard
+		if p.errorReporter != nil {
+			p.errorReporter.ReportErrorSimple(
+				ctx,
+				"s3_upload_failure",
+				fmt.Sprintf("S3 upload failed: %v", err),
+				"error",
+				job.TenantID,
+				job.DatasetID,
+			)
+		}
 		return nil, fmt.Errorf("failed to upload processed file: %w", err)
 	}
 
