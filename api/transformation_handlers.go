@@ -6,7 +6,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"github.com/bytedance/sonic"
 	"time"
 
 	"github.com/bytefreezer/goodies/log"
@@ -419,10 +418,4 @@ func (api *API) PreviewTransformation() usecase.Interactor {
 	u.SetTags("Transformations")
 
 	return u
-}
-
-// Helper function to convert filter configs to JSON for logging
-func filtersToJSON(filters []FilterConfig) string {
-	data, _ := sonic.Marshal(filters)
-	return string(data)
 }

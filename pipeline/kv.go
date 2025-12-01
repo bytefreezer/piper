@@ -120,14 +120,7 @@ func (f *KVFilter) Type() string {
 
 // Validate validates the filter configuration
 func (f *KVFilter) Validate(config map[string]interface{}) error {
-	// field_split and value_split are required
-	if _, ok := config["field_split"]; !ok {
-		// Use default
-	}
-	if _, ok := config["value_split"]; !ok {
-		// Use default
-	}
-
+	// field_split and value_split have defaults, so no validation needed
 	return nil
 }
 

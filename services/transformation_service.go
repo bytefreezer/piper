@@ -6,7 +6,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/bytedance/sonic"
@@ -245,10 +244,6 @@ func (s *Services) PreviewTransformation(ctx context.Context, tenantID, datasetI
 		return nil, false, 0, "", fmt.Errorf("failed to get pipeline config: %w", err)
 	}
 
-	if pipelineConfigInterface == nil {
-		return nil, false, 0, "", fmt.Errorf("no pipeline configured for %s/%s", tenantID, datasetID)
-	}
-
 	// Convert to domain.PipelineConfiguration
 	configJSON, err := sonic.Marshal(pipelineConfigInterface)
 	if err != nil {
@@ -298,32 +293,6 @@ func (s *Services) PreviewTransformation(ctx context.Context, tenantID, datasetI
 }
 
 // Helper functions
-
-func getRandomIndices(total, count int) []int {
-	if count >= total {
-		indices := make([]int, total)
-		for i := range indices {
-			indices[i] = i
-		}
-		return indices
-	}
-
-	// Use map to avoid duplicates
-	selected := make(map[int]bool)
-	indices := make([]int, 0, count)
-
-	rand.Seed(time.Now().UnixNano())
-
-	for len(indices) < count {
-		idx := rand.Intn(total) // #nosec G404 - weak random is acceptable for data sampling, not cryptographic use
-		if !selected[idx] {
-			selected[idx] = true
-			indices = append(indices, idx)
-		}
-	}
-
-	return indices
-}
 
 func buildSchema(samples []api.TransformationSample) []api.SchemaField {
 	// Collect all fields from all samples
