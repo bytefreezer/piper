@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/n0needt0/bytefreezer-piper/domain"
+	"github.com/bytefreezer/piper/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

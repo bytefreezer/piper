@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // SplitFilter splits a single event into multiple events

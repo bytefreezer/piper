@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 
-	"github.com/n0needt0/bytefreezer-piper/alerts"
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/bytefreezer-piper/domain"
-	"github.com/n0needt0/bytefreezer-piper/errors"
-	"github.com/n0needt0/bytefreezer-piper/metrics"
-	"github.com/n0needt0/bytefreezer-piper/storage"
+	"github.com/bytefreezer/piper/alerts"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/piper/domain"
+	"github.com/bytefreezer/piper/errors"
+	"github.com/bytefreezer/piper/metrics"
+	"github.com/bytefreezer/piper/storage"
 )
 
 // PiperService orchestrates the data processing pipeline

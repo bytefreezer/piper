@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 
-	"github.com/n0needt0/bytefreezer-piper/domain"
-	"github.com/n0needt0/bytefreezer-piper/storage"
+	"github.com/bytefreezer/piper/domain"
+	"github.com/bytefreezer/piper/storage"
 )
 
 // PipelineDatabase manages pipeline configurations and tenant information with local database caching

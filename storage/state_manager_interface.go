@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/n0needt0/bytefreezer-piper/domain"
+	"github.com/bytefreezer/piper/domain"
 )
 
 // StateManager defines the interface for state management operations

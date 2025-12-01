@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/n0needt0/bytefreezer-piper/config"
+	"github.com/bytefreezer/piper/config"
 )
 
 func TestConfigValidation(t *testing.T) {

@@ -11,10 +11,10 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/bytefreezer-piper/domain"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/piper/domain"
 )
 
 // S3Client provides S3 operations for both source and destination

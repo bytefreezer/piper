@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/bytefreezer-piper/domain"
-	"github.com/n0needt0/bytefreezer-piper/pipeline"
-	"github.com/n0needt0/bytefreezer-piper/storage"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/piper/domain"
+	"github.com/bytefreezer/piper/pipeline"
+	"github.com/bytefreezer/piper/storage"
 )
 
 // ConfigManager manages pipeline configurations using local database caching

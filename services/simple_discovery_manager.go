@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/bytefreezer-piper/domain"
-	"github.com/n0needt0/bytefreezer-piper/storage"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/piper/domain"
+	"github.com/bytefreezer/piper/storage"
 )
 
 // SimpleDiscoveryManager discovers files for processing using PostgreSQL and control service

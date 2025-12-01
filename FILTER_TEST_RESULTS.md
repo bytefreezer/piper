@@ -185,7 +185,7 @@ go test -v ./pipeline -run TestAllFilters/Mutate
 
 ### Exporting Test Cases as JSON
 ```go
-import "github.com/n0needt0/bytefreezer-piper/pipeline"
+import "github.com/bytefreezer/piper/pipeline"
 
 jsonData, err := pipeline.ExportTestCasesAsJSON()
 if err != nil {

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/goodies/log"
 	"github.com/swaggest/openapi-go/openapi3"
 	"github.com/swaggest/rest/web"
 	swgui "github.com/swaggest/swgui/v5emb"

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/n0needt0/bytefreezer-piper/api"
-	"github.com/n0needt0/bytefreezer-piper/domain"
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/piper/api"
+	"github.com/bytefreezer/piper/domain"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // TransformationJobService handles async transformation job processing

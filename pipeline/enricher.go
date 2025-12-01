@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/n0needt0/bytefreezer-piper/storage"
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/piper/storage"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // EnricherFilter enriches events with data from customer-uploaded lookup tables

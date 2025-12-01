@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // IncludeFilter keeps only events that match specified conditions (drops everything else)

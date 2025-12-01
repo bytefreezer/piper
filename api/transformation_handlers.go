@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 	"github.com/swaggest/usecase"
 	"github.com/swaggest/usecase/status"
 )

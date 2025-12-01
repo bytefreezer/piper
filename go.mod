@@ -1,4 +1,4 @@
-module github.com/n0needt0/bytefreezer-piper
+module github.com/bytefreezer/piper
 
 go 1.23.0
 
@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.11
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.88.0
 	github.com/bytedance/sonic v1.14.1
+	github.com/bytefreezer/goodies/log v0.1.0
 	github.com/google/uuid v1.6.0
 	github.com/knadh/koanf/parsers/yaml v1.1.0
 	github.com/knadh/koanf/providers/env v1.1.0
@@ -19,7 +20,6 @@ require (
 	github.com/knadh/koanf/providers/rawbytes v1.0.0
 	github.com/knadh/koanf/v2 v2.2.2
 	github.com/lib/pq v1.10.9
-	github.com/n0needt0/go-goodies/log v0.0.0-20250911153747-5be7cbbfc35a
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggest/openapi-go v0.2.60
@@ -73,5 +73,3 @@ require (
 	golang.org/x/sys v0.35.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
-
-replace github.com/n0needt0/bytefreezer-control => ../bytefreezer-control

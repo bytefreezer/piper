@@ -203,7 +203,7 @@ jobs:
         cat > pkg/etc/systemd/system/bytefreezer-piper.service << 'EOF'
         [Unit]
         Description=ByteFreezer Packer - Data Processing and S3 Management Service
-        Documentation=https://github.com/n0needt0/bytefreezer-piper
+        Documentation=https://github.com/bytefreezer/piper
         After=network-online.target
         Wants=network-online.target
         
@@ -318,7 +318,7 @@ jobs:
           -a amd64 \
           -m "ByteFreezer <noreply@bytefreezer.io>" \
           --description "ByteFreezer Packer - Data Processing and S3 Management Service" \
-          --url "https://github.com/n0needt0/bytefreezer-piper" \
+          --url "https://github.com/bytefreezer/piper" \
           --license "MIT" \
           --category "utils" \
           --depends "systemd" \

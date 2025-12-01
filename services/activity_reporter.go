@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // ActivityReporter reports operation progress to control service

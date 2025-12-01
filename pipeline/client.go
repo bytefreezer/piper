@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/bytefreezer-piper/domain"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/piper/domain"
 )
 
 // PipelineClient handles communication with the control service for pipeline configurations

@@ -11,15 +11,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/bytefreezer-piper/domain"
-	"github.com/n0needt0/bytefreezer-piper/errors"
-	"github.com/n0needt0/bytefreezer-piper/metrics"
-	"github.com/n0needt0/bytefreezer-piper/parsers"
-	"github.com/n0needt0/bytefreezer-piper/pipeline"
-	"github.com/n0needt0/bytefreezer-piper/storage"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/piper/domain"
+	"github.com/bytefreezer/piper/errors"
+	"github.com/bytefreezer/piper/metrics"
+	"github.com/bytefreezer/piper/parsers"
+	"github.com/bytefreezer/piper/pipeline"
+	"github.com/bytefreezer/piper/storage"
 )
 
 // FormatProcessor processes files with automatic format detection

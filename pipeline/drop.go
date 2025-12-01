@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // DropFilter conditionally drops events from the pipeline

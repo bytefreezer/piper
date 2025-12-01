@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/n0needt0/bytefreezer-piper/pipeline"
+	"github.com/bytefreezer/piper/pipeline"
 )
 
 // ParseFilter is a pipeline filter that can parse data using registered parsers

@@ -12,13 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 
-	"github.com/n0needt0/bytefreezer-piper/api"
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/bytefreezer-piper/geoip"
-	"github.com/n0needt0/bytefreezer-piper/services"
-	"github.com/n0needt0/bytefreezer-piper/storage"
+	"github.com/bytefreezer/piper/api"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/piper/geoip"
+	"github.com/bytefreezer/piper/services"
+	"github.com/bytefreezer/piper/storage"
 )
 
 var (

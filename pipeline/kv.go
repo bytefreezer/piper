@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // KVFilter parses key-value pairs from strings

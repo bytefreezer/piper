@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // GrokFilter performs pattern-based parsing of unstructured log data

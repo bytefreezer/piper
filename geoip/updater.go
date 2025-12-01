@@ -14,8 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // Updater handles automatic updates of GeoIP database files from S3

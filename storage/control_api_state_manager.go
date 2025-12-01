@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/n0needt0/bytefreezer-piper/config"
-	"github.com/n0needt0/bytefreezer-piper/domain"
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/piper/config"
+	"github.com/bytefreezer/piper/domain"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // ControlAPIStateManager manages file locks and job status using Control Service APIs

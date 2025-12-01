@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
-	"github.com/n0needt0/bytefreezer-piper/api"
-	"github.com/n0needt0/bytefreezer-piper/pipeline"
-	"github.com/n0needt0/go-goodies/log"
+	"github.com/bytefreezer/piper/api"
+	"github.com/bytefreezer/piper/pipeline"
+	"github.com/bytefreezer/goodies/log"
 )
 
 // GetSchemaAndSamples retrieves schema and sample data for a dataset from database
