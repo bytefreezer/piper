@@ -152,7 +152,6 @@ type Housekeeping struct {
 	Interval        time.Duration // Calculated from IntervalSeconds
 }
 
-
 // DLQ represents dead letter queue configuration following receiver pattern
 type DLQ struct {
 	Enabled                bool          `koanf:"enabled"`
@@ -184,10 +183,10 @@ type FailureThreshold struct {
 // HealthReporting represents health reporting configuration
 // Note: Uses control_service.base_url for the control service endpoint
 type HealthReporting struct {
-	Enabled           bool   `koanf:"enabled"`
-	ReportInterval    int    `koanf:"report_interval"` // Interval in seconds
-	TimeoutSeconds    int    `koanf:"timeout_seconds"`
-	RegisterOnStartup bool   `koanf:"register_on_startup"`
+	Enabled           bool `koanf:"enabled"`
+	ReportInterval    int  `koanf:"report_interval"` // Interval in seconds
+	TimeoutSeconds    int  `koanf:"timeout_seconds"`
+	RegisterOnStartup bool `koanf:"register_on_startup"`
 }
 
 // ErrorTracking represents error tracking configuration
@@ -316,11 +315,11 @@ func getDefaults() map[string]interface{} {
 		"s3_geoip.endpoint":    "192.168.86.125:9000",
 		"s3_geoip.ssl":         false,
 
-		"processing.max_concurrent_jobs":  10,
-		"processing.job_timeout_seconds":  600,  // 10 minutes
-		"processing.retry_attempts":       3,
-		"processing.retry_backoff":        "exponential",
-		"processing.buffer_size":          1000,
+		"processing.max_concurrent_jobs": 10,
+		"processing.job_timeout_seconds": 600, // 10 minutes
+		"processing.retry_attempts":      3,
+		"processing.retry_backoff":       "exponential",
+		"processing.buffer_size":         1000,
 
 		"pipeline.config_refresh_interval": "5m",
 		"pipeline.geoip_database_path":     "/opt/geoip",
@@ -342,7 +341,6 @@ func getDefaults() map[string]interface{} {
 		"housekeeping.enabled":         true,
 		"housekeeping.intervalseconds": 600,
 
-
 		"dlq.enabled":                  true,
 		"dlq.retry_attempts":           4,
 		"dlq.retry_interval_seconds":   60,
@@ -360,10 +358,10 @@ func getDefaults() map[string]interface{} {
 		"failure_threshold.check_interval":    "5m",
 		"failure_threshold.cooldown_period":   "30m",
 
-		"health_reporting.enabled":              false,
-		"health_reporting.report_interval":      30,
-		"health_reporting.timeout_seconds":      10,
-		"health_reporting.register_on_startup":  true,
+		"health_reporting.enabled":             false,
+		"health_reporting.report_interval":     30,
+		"health_reporting.timeout_seconds":     10,
+		"health_reporting.register_on_startup": true,
 
 		"error_tracking.enabled": true,
 

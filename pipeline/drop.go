@@ -13,12 +13,12 @@ import (
 // DropFilter conditionally drops events from the pipeline
 type DropFilter struct {
 	// Field-based conditions
-	IfField    string
-	Equals     interface{}
-	NotEquals  interface{}
-	Contains   string
-	Matches    string
-	MatchesRe  *regexp.Regexp
+	IfField   string
+	Equals    interface{}
+	NotEquals interface{}
+	Contains  string
+	Matches   string
+	MatchesRe *regexp.Regexp
 
 	// Percentage-based dropping
 	Percentage float64

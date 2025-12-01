@@ -2,8 +2,8 @@ package parsers
 
 import (
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"regexp"
 	"strconv"
 	"strings"
@@ -71,18 +71,18 @@ func (p *NDJSONParser) Parse(ctx context.Context, data []byte) (map[string]inter
 	if err != nil {
 		// Return raw data as valid object - no strict validation
 		return map[string]interface{}{
-			"message": jsonStr,
+			"message":   jsonStr,
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
-			"_source": "malformed_ndjson",
+			"_source":   "malformed_ndjson",
 		}, nil
 	}
 
 	if err := sonic.Unmarshal([]byte(fixedJSON), &result); err != nil {
 		// Return raw data as valid object - no strict validation
 		return map[string]interface{}{
-			"message": jsonStr,
+			"message":   jsonStr,
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
-			"_source": "malformed_ndjson",
+			"_source":   "malformed_ndjson",
 		}, nil
 	}
 

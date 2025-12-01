@@ -371,12 +371,12 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 				metricsCtx,
 				tenantID,
 				datasetID,
-				stats.InputSize,                                 // inputBytes
-				stats.OutputSize,                                // outputBytes
-				stats.OutputRecords,                             // linesProcessed
-				stats.ErrorRecords,                              // errorCount
+				stats.InputSize,     // inputBytes
+				stats.OutputSize,    // outputBytes
+				stats.OutputRecords, // linesProcessed
+				stats.ErrorRecords,  // errorCount
 				map[string]interface{}{
-					"filtered_records": stats.FilteredRecords,
+					"filtered_records":   stats.FilteredRecords,
 					"processing_time_ms": stats.ProcessingTime.Milliseconds(),
 				},
 			)

@@ -20,13 +20,13 @@ type HealthResponse struct {
 
 // ConfigResponse represents the current system configuration
 type ConfigResponse struct {
-	App        AppConfig              `json:"app"`
-	S3Source   S3ConfigMasked         `json:"s3_source"`
-	S3Dest     S3ConfigMasked         `json:"s3_destination"`
-	Processing ProcessingConfig       `json:"processing"`
-	Pipeline   PipelineConfig         `json:"pipeline"`
-	Monitoring MonitoringConfig       `json:"monitoring"`
-	DevMode    bool                   `json:"dev_mode"`
+	App        AppConfig        `json:"app"`
+	S3Source   S3ConfigMasked   `json:"s3_source"`
+	S3Dest     S3ConfigMasked   `json:"s3_destination"`
+	Processing ProcessingConfig `json:"processing"`
+	Pipeline   PipelineConfig   `json:"pipeline"`
+	Monitoring MonitoringConfig `json:"monitoring"`
+	DevMode    bool             `json:"dev_mode"`
 }
 
 // Configuration sections for response
@@ -45,7 +45,6 @@ type S3ConfigMasked struct {
 	Endpoint   string `json:"endpoint"`
 	SSL        bool   `json:"ssl"`
 }
-
 
 type ProcessingConfig struct {
 	MaxConcurrentJobs int    `json:"max_concurrent_jobs"`

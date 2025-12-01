@@ -2,8 +2,8 @@ package pipeline
 
 import (
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"sync"
 	"time"
 

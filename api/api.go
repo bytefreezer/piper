@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bytefreezer/piper/config"
 	"github.com/bytefreezer/goodies/log"
+	"github.com/bytefreezer/piper/config"
 	"github.com/swaggest/openapi-go/openapi3"
 	"github.com/swaggest/rest/web"
 	swgui "github.com/swaggest/swgui/v5emb"
@@ -31,10 +31,10 @@ type Services interface {
 }
 
 type API struct {
-	Services       Services
-	ApiMetrics     map[string]metric.Int64Counter
-	HttpServer     *http.Server
-	Config         *config.Config
+	Services   Services
+	ApiMetrics map[string]metric.Int64Counter
+	HttpServer *http.Server
+	Config     *config.Config
 	sync.RWMutex
 }
 

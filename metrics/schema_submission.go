@@ -28,9 +28,9 @@ type SampleData struct {
 
 // SchemaSubmissionRequest represents a schema submission request to control service
 type SchemaSubmissionRequest struct {
-	SchemaType string                 `json:"schema_type"` // "input" or "output"
-	Schema     interface{}            `json:"schema"`      // The inferred schema
-	Samples    []SampleData           `json:"samples"`     // Sample records (max 10)
+	SchemaType string       `json:"schema_type"` // "input" or "output"
+	Schema     interface{}  `json:"schema"`      // The inferred schema
+	Samples    []SampleData `json:"samples"`     // Sample records (max 10)
 }
 
 // SchemaSubmissionResponse represents the response from submitting schema

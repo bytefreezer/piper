@@ -16,23 +16,23 @@ import (
 
 // FingerprintFilter generates event fingerprints/hashes for deduplication
 type FingerprintFilter struct {
-	SourceFields  []string
-	TargetField   string
-	Method        string
-	KeySeparator  string
-	Base64Encode  bool
-	IncludeKeys   bool
+	SourceFields []string
+	TargetField  string
+	Method       string
+	KeySeparator string
+	Base64Encode bool
+	IncludeKeys  bool
 }
 
 // NewFingerprintFilter creates a new fingerprint filter
 func NewFingerprintFilter(config map[string]interface{}) (Filter, error) {
 	filter := &FingerprintFilter{
-		SourceFields:  make([]string, 0),
-		TargetField:   "fingerprint",
-		Method:        "SHA256",
-		KeySeparator:  "|",
-		Base64Encode:  false,
-		IncludeKeys:   false,
+		SourceFields: make([]string, 0),
+		TargetField:  "fingerprint",
+		Method:       "SHA256",
+		KeySeparator: "|",
+		Base64Encode: false,
+		IncludeKeys:  false,
 	}
 
 	// Parse source_fields

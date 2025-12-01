@@ -2,13 +2,13 @@ package services
 
 import (
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"time"
 
+	"github.com/bytefreezer/goodies/log"
 	"github.com/bytefreezer/piper/api"
 	"github.com/bytefreezer/piper/domain"
-	"github.com/bytefreezer/goodies/log"
 )
 
 // TransformationJobService handles async transformation job processing
@@ -149,9 +149,9 @@ func (s *TransformationJobService) processJob(ctx context.Context, job *domain.T
 func (s *TransformationJobService) executeTestJob(ctx context.Context, job *domain.TransformationJob) (interface{}, error) {
 	// Parse request
 	var request struct {
-		TenantID  string              `json:"tenant_id"`
-		DatasetID string              `json:"dataset_id"`
-		Filters   []api.FilterConfig  `json:"filters"`
+		TenantID  string                     `json:"tenant_id"`
+		DatasetID string                     `json:"dataset_id"`
+		Filters   []api.FilterConfig         `json:"filters"`
 		Samples   []api.TransformationSample `json:"samples"`
 	}
 

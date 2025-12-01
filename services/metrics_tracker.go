@@ -7,9 +7,9 @@ import (
 
 // TransformationMetricsTracker tracks transformation metrics for a piper instance
 type TransformationMetricsTracker struct {
-	mu             sync.RWMutex
-	metrics        map[string]*DatasetMetrics // key: tenantID:datasetID
-	startTime      time.Time
+	mu        sync.RWMutex
+	metrics   map[string]*DatasetMetrics // key: tenantID:datasetID
+	startTime time.Time
 }
 
 // DatasetMetrics holds metrics for a specific dataset

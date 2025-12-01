@@ -17,18 +17,18 @@ import (
 
 // Services encapsulates all service dependencies following receiver pattern
 type Services struct {
-	Config                     *config.Config
-	PiperService               *PiperService
-	PipelineDatabase           *pipeline.PipelineDatabase
-	StateManager               storage.StateManager
-	DatasetSampleClient        *storage.DatasetSampleClient
-	HealthReporter             *HealthReportingService
-	DatasetMetricsClient       *metrics.DatasetMetricsClient
-	SchemaSubmissionClient     *metrics.SchemaSubmissionClient
-	TransformationJobService   *TransformationJobService
-	MetricsTracker             *TransformationMetricsTracker
-	MetricsReporter            *MetricsReporter
-	ErrorReporter              *errors.ErrorReporter
+	Config                   *config.Config
+	PiperService             *PiperService
+	PipelineDatabase         *pipeline.PipelineDatabase
+	StateManager             storage.StateManager
+	DatasetSampleClient      *storage.DatasetSampleClient
+	HealthReporter           *HealthReportingService
+	DatasetMetricsClient     *metrics.DatasetMetricsClient
+	SchemaSubmissionClient   *metrics.SchemaSubmissionClient
+	TransformationJobService *TransformationJobService
+	MetricsTracker           *TransformationMetricsTracker
+	MetricsReporter          *MetricsReporter
+	ErrorReporter            *errors.ErrorReporter
 }
 
 // NewServices creates and initializes all services
@@ -247,9 +247,9 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 			"secret_key":  maskSensitive(conf.S3GeoIP.SecretKey),
 		},
 		"state_manager": map[string]interface{}{
-			"type":              "control_service_api",
-			"control_service":   conf.ControlService.BaseURL,
-			"control_enabled":   conf.ControlService.Enabled,
+			"type":            "control_service_api",
+			"control_service": conf.ControlService.BaseURL,
+			"control_enabled": conf.ControlService.Enabled,
 		},
 		"processing": map[string]interface{}{
 			"max_concurrent_jobs": conf.Processing.MaxConcurrentJobs,
@@ -270,9 +270,9 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 			"timeout":  conf.ControlService.TimeoutSeconds,
 		},
 		"monitoring": map[string]interface{}{
-			"metrics_port":    conf.Monitoring.MetricsPort,
-			"log_level":       conf.Monitoring.LogLevel,
-			"enable_tracing":  conf.Monitoring.EnableTracing,
+			"metrics_port":     conf.Monitoring.MetricsPort,
+			"log_level":        conf.Monitoring.LogLevel,
+			"enable_tracing":   conf.Monitoring.EnableTracing,
 			"tracing_endpoint": conf.Monitoring.TracingEndpoint,
 		},
 		"housekeeping": map[string]interface{}{
@@ -280,11 +280,11 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 			"interval_seconds": conf.Housekeeping.IntervalSeconds,
 		},
 		"dlq": map[string]interface{}{
-			"enabled":                   conf.DLQ.Enabled,
-			"retry_attempts":            conf.DLQ.RetryAttempts,
-			"retry_interval_seconds":    conf.DLQ.RetryIntervalSeconds,
-			"cleanup_interval_seconds":  conf.DLQ.CleanupIntervalSeconds,
-			"max_age_days":              conf.DLQ.MaxAgeDays,
+			"enabled":                  conf.DLQ.Enabled,
+			"retry_attempts":           conf.DLQ.RetryAttempts,
+			"retry_interval_seconds":   conf.DLQ.RetryIntervalSeconds,
+			"cleanup_interval_seconds": conf.DLQ.CleanupIntervalSeconds,
+			"max_age_days":             conf.DLQ.MaxAgeDays,
 		},
 		"soc": map[string]interface{}{
 			"enabled":  conf.SOC.Enabled,

@@ -10,34 +10,34 @@ import (
 
 // FailureThresholdConfig represents failure monitoring configuration
 type FailureThresholdConfig struct {
-	Enabled           bool    `mapstructure:"enabled"`
-	FailureThreshold  float64 `mapstructure:"failure_threshold"`  // Percentage threshold (e.g., 20.0 for 20%)
-	MinimumSamples    int     `mapstructure:"minimum_samples"`    // Minimum number of processed files before checking threshold
-	WindowSize        int     `mapstructure:"window_size"`        // Number of recent jobs to track
-	CheckInterval     string  `mapstructure:"check_interval"`     // How often to check thresholds (e.g., "5m")
-	CooldownPeriod    string  `mapstructure:"cooldown_period"`    // Minimum time between alerts for same tenant/dataset
+	Enabled          bool    `mapstructure:"enabled"`
+	FailureThreshold float64 `mapstructure:"failure_threshold"` // Percentage threshold (e.g., 20.0 for 20%)
+	MinimumSamples   int     `mapstructure:"minimum_samples"`   // Minimum number of processed files before checking threshold
+	WindowSize       int     `mapstructure:"window_size"`       // Number of recent jobs to track
+	CheckInterval    string  `mapstructure:"check_interval"`    // How often to check thresholds (e.g., "5m")
+	CooldownPeriod   string  `mapstructure:"cooldown_period"`   // Minimum time between alerts for same tenant/dataset
 }
 
 // FailureStats tracks processing statistics for a tenant/dataset
 type FailureStats struct {
-	TenantID        string
-	DatasetID       string
-	TotalProcessed  int
-	TotalFailed     int
-	RecentResults   []bool // true = success, false = failure (circular buffer)
-	LastAlertTime   time.Time
-	ResultIndex     int // Current index in circular buffer
-	mu              sync.RWMutex
+	TenantID       string
+	DatasetID      string
+	TotalProcessed int
+	TotalFailed    int
+	RecentResults  []bool // true = success, false = failure (circular buffer)
+	LastAlertTime  time.Time
+	ResultIndex    int // Current index in circular buffer
+	mu             sync.RWMutex
 }
 
 // FailureMonitor monitors processing failures and sends SOC alerts when thresholds are exceeded
 type FailureMonitor struct {
-	config      FailureThresholdConfig
-	socClient   *SOCAlertClient
-	stats       map[string]*FailureStats // key: "tenantID:datasetID"
-	statsMutex  sync.RWMutex
-	stopChan    chan struct{}
-	stopOnce    sync.Once
+	config     FailureThresholdConfig
+	socClient  *SOCAlertClient
+	stats      map[string]*FailureStats // key: "tenantID:datasetID"
+	statsMutex sync.RWMutex
+	stopChan   chan struct{}
+	stopOnce   sync.Once
 }
 
 // NewFailureMonitor creates a new failure monitor

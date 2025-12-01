@@ -3,14 +3,14 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/lib/pq"
 	"github.com/bytefreezer/goodies/log"
+	"github.com/lib/pq"
 
 	"github.com/bytefreezer/piper/config"
 	"github.com/bytefreezer/piper/domain"
@@ -878,7 +878,7 @@ func (sm *PostgreSQLStateManager) UpdateTransformationJob(ctx context.Context, j
 		}
 		resultJSON = resultBytes
 	} else {
-		resultJSON = nil  // Pass NULL to database when no result
+		resultJSON = nil // Pass NULL to database when no result
 	}
 
 	now := time.Now()

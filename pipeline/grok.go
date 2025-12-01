@@ -10,17 +10,17 @@ import (
 
 // GrokFilter performs pattern-based parsing of unstructured log data
 type GrokFilter struct {
-	SourceField        string
-	Pattern            string
-	Patterns           []string
-	BreakOnMatch       bool
-	KeepEmptyCaptures  bool
-	NamedCapturesOnly  bool
-	OverwriteKeys      bool
-	TargetField        string
-	PatternLibrary     *GrokPatternLibrary
-	CompiledPatterns   []*regexp.Regexp
-	FieldMaps          []map[int]string
+	SourceField       string
+	Pattern           string
+	Patterns          []string
+	BreakOnMatch      bool
+	KeepEmptyCaptures bool
+	NamedCapturesOnly bool
+	OverwriteKeys     bool
+	TargetField       string
+	PatternLibrary    *GrokPatternLibrary
+	CompiledPatterns  []*regexp.Regexp
+	FieldMaps         []map[int]string
 }
 
 // NewGrokFilter creates a new Grok filter

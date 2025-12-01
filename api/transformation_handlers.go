@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"time"
 
 	"github.com/bytefreezer/goodies/log"
@@ -53,20 +53,20 @@ type FilterConfig struct {
 
 // TestTransformationRequest represents a request to test transformation filters
 type TestTransformationRequest struct {
-	TenantID  string                   `json:"tenant_id" required:"true"`
-	DatasetID string                   `json:"dataset_id" required:"true"`
-	Filters   []FilterConfig           `json:"filters" required:"true" maxItems:"10" description:"Up to 10 filters to apply"`
-	Samples   []TransformationSample   `json:"samples" required:"true" description:"Sample data to test against"`
+	TenantID  string                 `json:"tenant_id" required:"true"`
+	DatasetID string                 `json:"dataset_id" required:"true"`
+	Filters   []FilterConfig         `json:"filters" required:"true" maxItems:"10" description:"Up to 10 filters to apply"`
+	Samples   []TransformationSample `json:"samples" required:"true" description:"Sample data to test against"`
 }
 
 // TransformationResult represents the result of applying a transformation
 type TransformationResult struct {
-	Input     map[string]interface{} `json:"input"`
-	Output    map[string]interface{} `json:"output"`
-	Applied   []string               `json:"applied"` // List of filters that were applied
-	Skipped   bool                   `json:"skipped"` // True if record was dropped
-	Duration  int64                  `json:"duration_ms"`
-	Error     string                 `json:"error,omitempty"`
+	Input    map[string]interface{} `json:"input"`
+	Output   map[string]interface{} `json:"output"`
+	Applied  []string               `json:"applied"` // List of filters that were applied
+	Skipped  bool                   `json:"skipped"` // True if record was dropped
+	Duration int64                  `json:"duration_ms"`
+	Error    string                 `json:"error,omitempty"`
 }
 
 // TestTransformationResponse represents the response from testing transformations

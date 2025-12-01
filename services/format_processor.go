@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"io"
 	"strings"
 	"time"
@@ -361,7 +361,6 @@ func (p *FormatProcessor) processNDJSONData(ctx context.Context, parser parsers.
 
 	return processedData, stats, nil
 }
-
 
 // generateOutputKey generates output key with proper NDJSON extension
 func (p *FormatProcessor) generateOutputKey(sourceKey string, formatHint *parsers.FormatHint) string {
@@ -803,13 +802,13 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 
 	processingMetadata := map[string]string{
 		"source-original-filename": filename, // Just filename, not full S3 key path
-		"tenant-id":               job.TenantID,
-		"dataset-id":              job.DatasetID,
-		"format":                  "ndjson",
-		"processed-at":            time.Now().Format(time.RFC3339),
-		"processor-type":          "bytefreezer-piper-streaming",
-		"input-records":           fmt.Sprintf("%d", stats.InputRecords),
-		"output-records":          fmt.Sprintf("%d", stats.OutputRecords),
+		"tenant-id":                job.TenantID,
+		"dataset-id":               job.DatasetID,
+		"format":                   "ndjson",
+		"processed-at":             time.Now().Format(time.RFC3339),
+		"processor-type":           "bytefreezer-piper-streaming",
+		"input-records":            fmt.Sprintf("%d", stats.InputRecords),
+		"output-records":           fmt.Sprintf("%d", stats.OutputRecords),
 	}
 
 	// Add pipeline info if used

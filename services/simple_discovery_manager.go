@@ -2,15 +2,15 @@ package services
 
 import (
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/bytefreezer/goodies/log"
+	"github.com/google/uuid"
 
 	"github.com/bytefreezer/piper/config"
 	"github.com/bytefreezer/piper/domain"

@@ -9,18 +9,18 @@ import (
 
 // KVFilter parses key-value pairs from strings
 type KVFilter struct {
-	SourceField   string
-	FieldSplit    string
-	ValueSplit    string
-	TargetField   string
-	Prefix        string
-	IncludeKeys   []string
-	ExcludeKeys   []string
-	TrimKey       string
-	TrimValue     string
+	SourceField    string
+	FieldSplit     string
+	ValueSplit     string
+	TargetField    string
+	Prefix         string
+	IncludeKeys    []string
+	ExcludeKeys    []string
+	TrimKey        string
+	TrimValue      string
 	AllowDuplicate bool
-	DefaultValues map[string]string
-	RemoveField   bool
+	DefaultValues  map[string]string
+	RemoveField    bool
 }
 
 // NewKVFilter creates a new KV filter

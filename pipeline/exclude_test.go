@@ -152,7 +152,7 @@ func TestExcludeFilter_Matches(t *testing.T) {
 
 func TestExcludeFilter_AnyField(t *testing.T) {
 	config := map[string]interface{}{
-		"any_field":  []interface{}{"user_agent", "client", "source"},
+		"any_field":   []interface{}{"user_agent", "client", "source"},
 		"any_matches": "bot",
 	}
 

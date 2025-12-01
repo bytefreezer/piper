@@ -76,7 +76,6 @@ func ParseTenantDatasetFromKey(key string) (tenant, dataset, filename string, er
 	return tenant, dataset, filename, nil
 }
 
-
 // BuildMalformedPath builds a path for quarantining malformed files
 func BuildMalformedPath(basePath string) string {
 	return filepath.Join(basePath, "malformed_local")

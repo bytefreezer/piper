@@ -2,8 +2,8 @@ package pipeline
 
 import (
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"net/http"
 	"time"
 
@@ -315,8 +315,8 @@ func (pc *PipelineClient) FetchPipelineConfiguration(ctx context.Context, tenant
 	defer transformResp.Body.Close()
 
 	var transformConfig struct {
-		Enabled bool                   `json:"enabled"`
-		Filters []domain.FilterConfig  `json:"filters"`
+		Enabled bool                  `json:"enabled"`
+		Filters []domain.FilterConfig `json:"filters"`
 	}
 
 	if transformResp.StatusCode == http.StatusOK {

@@ -1,8 +1,8 @@
 package pipeline
 
 import (
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"regexp"
 	"strings"
 	"time"

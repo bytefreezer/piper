@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bytefreezer/goodies/log"
 	"github.com/bytefreezer/piper/config"
 	"github.com/bytefreezer/piper/domain"
-	"github.com/bytefreezer/goodies/log"
 )
 
 // ControlAPIStateManager manages file locks and job status using Control Service APIs
@@ -605,7 +605,7 @@ func (sm *ControlAPIStateManager) ListPendingTransformationJobs(ctx context.Cont
 
 	var result struct {
 		Jobs  []*domain.TransformationJob `json:"jobs"`
-		Count int                          `json:"count"`
+		Count int                         `json:"count"`
 	}
 	if err := json.Unmarshal(bodyBytes, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
