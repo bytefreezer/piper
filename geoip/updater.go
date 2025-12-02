@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bytefreezer/goodies/log"
 	"github.com/bytefreezer/piper/config"
 )
@@ -24,41 +24,64 @@ import (
 // Updater handles automatic updates of GeoIP database files from S3
 type Updater struct {
 	config    *config.Config
-	s3Client  *s3.S3
+	s3Client  *s3.Client
 	localPath string
 }
 
 // NewUpdater creates a new GeoIP database updater
 func NewUpdater(cfg *config.Config) (*Updater, error) {
-	// Create S3 session for GeoIP bucket
-	s3Config := &aws.Config{
-		Region: aws.String(cfg.S3GeoIP.Region),
-	}
+	// Create S3 client for GeoIP bucket using AWS SDK v2
+	var awsCfg aws.Config
+	var err error
 
-	if cfg.S3GeoIP.Endpoint != "" {
-		s3Config.Endpoint = aws.String(fmt.Sprintf("http%s://%s",
-			map[bool]string{true: "s", false: ""}[cfg.S3GeoIP.SSL],
-			cfg.S3GeoIP.Endpoint))
-		s3Config.S3ForcePathStyle = aws.Bool(true)
-	}
-
-	if !cfg.S3GeoIP.UseIamRole {
+	if cfg.S3GeoIP.UseIamRole {
+		// Use default credential chain (IAM role, instance profile, etc.)
+		awsCfg, err = awsconfig.LoadDefaultConfig(context.Background(),
+			awsconfig.WithRegion(cfg.S3GeoIP.Region),
+		)
+	} else {
 		// Use static credentials (access key + secret key)
-		s3Config.Credentials = credentials.NewStaticCredentials(
-			cfg.S3GeoIP.AccessKey,
-			cfg.S3GeoIP.SecretKey,
-			"")
+		awsCfg, err = awsconfig.LoadDefaultConfig(context.Background(),
+			awsconfig.WithRegion(cfg.S3GeoIP.Region),
+			awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+				cfg.S3GeoIP.AccessKey,
+				cfg.S3GeoIP.SecretKey,
+				"",
+			)),
+		)
 	}
-	// If UseIamRole is true, credentials will use default credential chain (IAM role)
 
-	sess, err := session.NewSession(s3Config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create S3 session for GeoIP: %w", err)
+		return nil, fmt.Errorf("failed to load AWS config for GeoIP: %w", err)
+	}
+
+	// Create S3 client with custom endpoint if configured
+	var s3Client *s3.Client
+	if cfg.S3GeoIP.Endpoint != "" {
+		endpointURL := cfg.S3GeoIP.Endpoint
+		if !strings.HasPrefix(endpointURL, "http") {
+			if cfg.S3GeoIP.SSL {
+				endpointURL = "https://" + endpointURL
+			} else {
+				endpointURL = "http://" + endpointURL
+			}
+		}
+
+		s3Client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(endpointURL)
+			o.UsePathStyle = true
+			o.DisableLogOutputChecksumValidationSkipped = true
+		})
+	} else {
+		// Standard AWS S3
+		s3Client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			o.DisableLogOutputChecksumValidationSkipped = true
+		})
 	}
 
 	return &Updater{
 		config:    cfg,
-		s3Client:  s3.New(sess),
+		s3Client:  s3Client,
 		localPath: cfg.Pipeline.GeoIPDatabasePath,
 	}, nil
 }
@@ -100,12 +123,10 @@ func (u *Updater) updateDatabase(ctx context.Context, dbFile string) error {
 	tempFile := localFile + ".tmp"
 
 	// Get remote object metadata
-	headInput := &s3.HeadObjectInput{
+	remoteInfo, err := u.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(u.config.S3GeoIP.BucketName),
 		Key:    aws.String(dbFile),
-	}
-
-	remoteInfo, err := u.s3Client.HeadObjectWithContext(ctx, headInput)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get remote file info for %s: %w", dbFile, err)
 	}
@@ -125,12 +146,10 @@ func (u *Updater) updateDatabase(ctx context.Context, dbFile string) error {
 	}
 
 	// Download to temporary file first (atomic update)
-	getInput := &s3.GetObjectInput{
+	result, err := u.s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(u.config.S3GeoIP.BucketName),
 		Key:    aws.String(dbFile),
-	}
-
-	result, err := u.s3Client.GetObjectWithContext(ctx, getInput)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", dbFile, err)
 	}
