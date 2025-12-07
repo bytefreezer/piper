@@ -90,7 +90,7 @@ config:
   # Control Service configuration - Demo deployment (process all Demo accounts)
   control_service:
     enabled: true
-    base_url: "https://api.bytefreezer.com:8082"
+    base_url: "https://api.bytefreezer.com"
     api_key: "bytefreezer-service-api-key-8f4a2d1b-3c5e-4f6a-9b8c-7d2e1f3a4b5c"
     timeout_seconds: 30
     account_id: ""  # Empty = process all Demo accounts (deployment_type: Demo)
