@@ -4,17 +4,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
 	"io"
 	stdlog "log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/bytefreezer/goodies/log"
 
 	"github.com/bytefreezer/piper/api"
@@ -85,6 +88,10 @@ func Run() error {
 	} else {
 		log.Warnf("Failed to create state manager for lock cleanup: %v", err)
 	}
+
+	// Cleanup stale operations from previous runs (self-healing)
+	log.Infof("Cleaning up stale operations from previous runs...")
+	cleanupStaleOperations(cfg)
 
 	// Initialize GeoIP updater
 	geoipUpdater, err := geoip.NewUpdater(cfg)
@@ -237,6 +244,10 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 			log.Debug("exiting service")
 			timer.Stop()
 
+			// Cleanup operations immediately - don't wait for completion
+			log.Info("Cleaning up in-progress operations before shutdown...")
+			cleanupStaleOperations(svc.Config)
+
 			if quitterFn != nil {
 				quitterFn(timeout)
 			}
@@ -290,5 +301,55 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to start: %s\n", err.Error())
 		os.Exit(11)
+	}
+}
+
+// cleanupStaleOperations marks all in-progress operations for this instance as interrupted
+// This allows the system to self-heal on restart - files will be picked up on next processing cycle
+func cleanupStaleOperations(cfg *config.Config) {
+	if cfg.ControlService.BaseURL == "" {
+		log.Debug("Control service URL not configured, skipping operation cleanup")
+		return
+	}
+
+	payload := map[string]string{
+		"service_type": "piper",
+		"instance_id":  cfg.App.InstanceID,
+	}
+
+	body, err := sonic.Marshal(payload)
+	if err != nil {
+		log.Warnf("Failed to marshal cleanup request: %v", err)
+		return
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("POST", cfg.ControlService.BaseURL+"/api/v1/activity/operations/cleanup", bytes.NewBuffer(body))
+	if err != nil {
+		log.Warnf("Failed to create cleanup request: %v", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if cfg.ControlService.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.ControlService.APIKey)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Warnf("Failed to cleanup stale operations: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		var result struct {
+			OperationsCleaned int `json:"operations_cleaned"`
+		}
+		if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&result); err == nil && result.OperationsCleaned > 0 {
+			log.Infof("Cleaned up %d stale operations from previous run", result.OperationsCleaned)
+		}
+	} else {
+		log.Warnf("Failed to cleanup stale operations: HTTP %d", resp.StatusCode)
 	}
 }
