@@ -34,7 +34,7 @@ config:
     name: "bytefreezer-piper"
     version: "1.0.0"
     log_level: "info"
-    deployment_type: "Demo"
+    deployment_type: "managed"
 
   server:
     api_port: 8084
