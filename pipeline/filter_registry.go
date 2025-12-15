@@ -100,6 +100,11 @@ func (r *DefaultFilterRegistry) registerBuiltInFilters() {
 		return NewConditionalFilter(config)
 	})
 
+	// Conditional field filter (remove/replace field based on value)
+	r.Register("conditional_field", func(config map[string]interface{}) (Filter, error) {
+		return NewConditionalFieldFilter(config)
+	})
+
 	// GeoIP filter
 	r.Register("geoip", func(config map[string]interface{}) (Filter, error) {
 		return NewGeoIPFilter(config)
