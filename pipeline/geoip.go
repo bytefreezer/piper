@@ -26,7 +26,7 @@ func NewGeoIPFilterComplete(config map[string]interface{}) (Filter, error) {
 	filter := &GeoIPFilter{
 		SourceField:  "ip_address",
 		TargetField:  "geoip",
-		DatabasePath: "/var/lib/geoip/GeoLite2-City.mmdb",
+		DatabasePath: "/opt/geoip/GeoLite2-City.mmdb",
 		Fields:       []string{"country_name", "city_name", "latitude", "longitude"},
 	}
 

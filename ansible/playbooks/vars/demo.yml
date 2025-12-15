@@ -85,7 +85,7 @@ config:
     geoip_database_path: "/opt/geoip"
     geoip_city_database: "GeoLite2-City.mmdb"
     geoip_country_database: "GeoLite2-Country.mmdb"
-    enable_geoip: false
+    enable_geoip: true
 
   # Control Service configuration - Demo deployment (process all Demo accounts)
   control_service:

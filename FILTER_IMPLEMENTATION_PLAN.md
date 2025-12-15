@@ -314,7 +314,7 @@ Output:
   "config": {
     "source_field": "ip_address",
     "target_field": "geoip",
-    "database": "/var/lib/geoip/GeoLite2-City.mmdb",
+    "database": "/opt/geoip/GeoLite2-City.mmdb",
     "fields": ["country_name", "city_name", "latitude", "longitude"]
   }
 }

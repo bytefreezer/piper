@@ -66,6 +66,15 @@
         group: root
         mode: '0755'
 
+    - name: Ensure GeoIP database directory exists
+      ansible.builtin.file:
+        path: "{{ config.pipeline.geoip_database_path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      when: config.pipeline.enable_geoip | default(false) | bool
+
     - name: Generate configuration file
       ansible.builtin.template:
         src: templates/config.yaml.j2
