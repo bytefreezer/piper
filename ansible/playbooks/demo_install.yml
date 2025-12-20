@@ -161,7 +161,7 @@
           - "Service: systemctl status {{ service.name }}"
           - ""
           - "Configuration Notes:"
-          - "- Control service endpoint: {{ config.control_service.base_url }}"
+          - "- Control service endpoint: {{ bytefreezer_control_url }}"
           - "- S3 source bucket: {{ config.s3_source.bucket_name }}"
           - "- S3 destination bucket: {{ config.s3_destination.bucket_name }}"
           - "- Metrics endpoint: http://{{ ansible_default_ipv4.address }}:{{ config.monitoring.metrics_port }}/metrics"
