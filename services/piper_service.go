@@ -94,9 +94,9 @@ func NewPiperService(cfg *config.Config, datasetMetricsClient *metrics.DatasetMe
 
 	// Initialize activity reporter if control service is configured
 	var activityReporter *ActivityReporter
-	if cfg.ControlService.Enabled && cfg.ControlService.BaseURL != "" {
+	if cfg.ControlService.Enabled && cfg.ControlService.ControlURL != "" {
 		activityReporter = NewActivityReporter(
-			cfg.ControlService.BaseURL,
+			cfg.ControlService.ControlURL,
 			cfg.ControlService.APIKey,
 			cfg.App.InstanceID,
 		)

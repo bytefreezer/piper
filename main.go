@@ -307,7 +307,7 @@ func main() {
 // cleanupStaleOperations marks all in-progress operations for this instance as interrupted
 // This allows the system to self-heal on restart - files will be picked up on next processing cycle
 func cleanupStaleOperations(cfg *config.Config) {
-	if cfg.ControlService.BaseURL == "" {
+	if cfg.ControlService.ControlURL == "" {
 		log.Debug("Control service URL not configured, skipping operation cleanup")
 		return
 	}
@@ -324,7 +324,7 @@ func cleanupStaleOperations(cfg *config.Config) {
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("POST", cfg.ControlService.BaseURL+"/api/v1/activity/operations/cleanup", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", cfg.ControlService.ControlURL+"/api/v1/activity/operations/cleanup", bytes.NewBuffer(body))
 	if err != nil {
 		log.Warnf("Failed to create cleanup request: %v", err)
 		return

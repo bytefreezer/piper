@@ -82,9 +82,9 @@ config:
     enable_geoip: true
 
   # Control Service configuration - Demo deployment (process all Demo accounts)
+  # control_url comes from AWX variable: bytefreezer_control_url
   control_service:
     enabled: true
-    base_url: "https://api.bytefreezer.com"
     # api_key comes from AWX variable: bytefreezer_api_key
     timeout_seconds: 30
     account_id: ""  # Empty = process all Demo accounts (deployment_type: Demo)
@@ -133,11 +133,6 @@ config:
     metrics_port: 9092
     log_level: "info"
     enable_tracing: false
-
-  # Secrets management
-  secrets:
-    provider: "aws"
-    region: "us-east-1"
 
   # Housekeeping configuration
   housekeeping:

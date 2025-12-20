@@ -59,7 +59,7 @@ type DatasetResponse struct {
 
 // NewPipelineClient creates a new pipeline client
 func NewPipelineClient(cfg *config.Config) *PipelineClient {
-	baseURL := cfg.ControlService.BaseURL
+	baseURL := cfg.ControlService.ControlURL
 	apiKey := cfg.ControlService.APIKey
 
 	return &PipelineClient{

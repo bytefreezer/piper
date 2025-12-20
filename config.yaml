@@ -58,7 +58,7 @@ pipeline:
 # Control Service configuration (replaces dev mode)
 control_service:
   enabled: true
-  base_url: "http://192.168.86.103:8082"
+  control_url: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_control_url"
   api_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_api_key"  # System-wide service API key
   timeout_seconds: 30
 
@@ -128,11 +128,6 @@ monitoring:
   enable_tracing: false
   # tracing_endpoint: ""    # Optional - OpenTelemetry endpoint
 
-# Secrets management
-secrets:
-  provider: "aws"         # "aws", "env", "file"
-  region: "us-east-1"
-
 # Dead Letter Queue configuration
 dlq:
   enabled: true
@@ -146,7 +141,7 @@ housekeeping:
   enabled: true
   intervalseconds: 300  # 5 minutes
 
-# Health reporting configuration (uses control_service.base_url)
+# Health reporting configuration (uses control_service.control_url)
 health_reporting:
   enabled: true  # Enable health reporting to control service
   report_interval: 30  # How often to send health reports (seconds)

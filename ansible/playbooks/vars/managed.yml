@@ -83,9 +83,9 @@ config:
     enable_geoip: false
 
   # Control Service configuration - Managed deployment (process all managed accounts)
+  # control_url comes from AWX variable: bytefreezer_control_url
   control_service:
     enabled: true
-    base_url: "http://192.168.86.103:8082"
     # api_key comes from AWX variable: bytefreezer_api_key
     timeout_seconds: 30
     account_id: ""  # Empty = process all managed accounts (deployment_type: managed)
@@ -134,11 +134,6 @@ config:
     metrics_port: 9092
     log_level: "info"
     enable_tracing: false
-
-  # Secrets management
-  secrets:
-    provider: "aws"
-    region: "us-east-1"
 
   # Housekeeping configuration
   housekeeping:

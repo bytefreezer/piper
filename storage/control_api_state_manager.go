@@ -32,8 +32,8 @@ func NewControlAPIStateManager(cfg *config.ControlService, instanceID string) (*
 		return nil, fmt.Errorf("control service is not enabled")
 	}
 
-	if cfg.BaseURL == "" {
-		return nil, fmt.Errorf("control service base_url is required")
+	if cfg.ControlURL == "" {
+		return nil, fmt.Errorf("control service control_url is required")
 	}
 
 	timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
@@ -45,7 +45,7 @@ func NewControlAPIStateManager(cfg *config.ControlService, instanceID string) (*
 		client: &http.Client{
 			Timeout: timeout,
 		},
-		baseURL:    cfg.BaseURL,
+		baseURL:    cfg.ControlURL,
 		apiKey:     cfg.APIKey,
 		instanceID: instanceID,
 	}, nil

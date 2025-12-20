@@ -37,16 +37,16 @@ type Services struct {
 func NewServices(conf *config.Config) *Services {
 	// Initialize error reporter if configured
 	var errorReporter *errors.ErrorReporter
-	if conf.ErrorTracking.Enabled && conf.ControlService.BaseURL != "" {
+	if conf.ErrorTracking.Enabled && conf.ControlService.ControlURL != "" {
 		errorReporter = errors.NewErrorReporter(
-			conf.ControlService.BaseURL,
+			conf.ControlService.ControlURL,
 			conf.ControlService.APIKey,
 			"piper",
 			true,
 		)
-		log.Infof("Error reporter initialized - reporting to control service at %s", conf.ControlService.BaseURL)
+		log.Infof("Error reporter initialized - reporting to control service at %s", conf.ControlService.ControlURL)
 	} else {
-		log.Infof("Error reporting disabled (enabled: %v, control_service: %s)", conf.ErrorTracking.Enabled, conf.ControlService.BaseURL)
+		log.Infof("Error reporting disabled (enabled: %v, control_service: %s)", conf.ErrorTracking.Enabled, conf.ControlService.ControlURL)
 	}
 
 	// Create state manager (use Control API)
@@ -64,23 +64,23 @@ func NewServices(conf *config.Config) *Services {
 
 	// Create dataset metrics client
 	datasetMetricsClient := metrics.NewDatasetMetricsClient(
-		conf.ControlService.BaseURL,
+		conf.ControlService.ControlURL,
 		conf.ControlService.APIKey,
 		conf.ControlService.TimeoutSeconds,
 		conf.ControlService.Enabled,
 	)
 	log.Infof("Dataset metrics client initialized (enabled: %v, endpoint: %s)",
-		conf.ControlService.Enabled, conf.ControlService.BaseURL)
+		conf.ControlService.Enabled, conf.ControlService.ControlURL)
 
 	// Create schema submission client
 	schemaSubmissionClient := metrics.NewSchemaSubmissionClient(
-		conf.ControlService.BaseURL,
+		conf.ControlService.ControlURL,
 		conf.ControlService.APIKey,
 		conf.ControlService.TimeoutSeconds,
 		conf.ControlService.Enabled,
 	)
 	log.Infof("Schema submission client initialized (enabled: %v, endpoint: %s)",
-		conf.ControlService.Enabled, conf.ControlService.BaseURL)
+		conf.ControlService.Enabled, conf.ControlService.ControlURL)
 
 	// Create metrics tracker
 	metricsTracker := NewTransformationMetricsTracker()
@@ -138,9 +138,9 @@ func NewServices(conf *config.Config) *Services {
 		// Build configuration data with masked sensitive fields
 		configuration := buildHealthConfiguration(conf, instanceAPI)
 
-		// Create health reporting service (uses control_service.base_url and api_key)
+		// Create health reporting service (uses control_service.control_url and api_key)
 		services.HealthReporter = NewHealthReportingService(
-			conf.ControlService.BaseURL,
+			conf.ControlService.ControlURL,
 			"bytefreezer-piper",
 			instanceAPI,
 			conf.ControlService.APIKey, // Pass API key for Bearer token authentication
@@ -148,19 +148,19 @@ func NewServices(conf *config.Config) *Services {
 			timeout,
 			configuration,
 		)
-		log.Infof("Health reporting service initialized (reporting to %s)", conf.ControlService.BaseURL)
+		log.Infof("Health reporting service initialized (reporting to %s)", conf.ControlService.ControlURL)
 	} else {
 		log.Info("Health reporting disabled")
 	}
 
 	// Create and start metrics reporter if control service is enabled
-	if conf.ControlService.Enabled && conf.ControlService.BaseURL != "" {
+	if conf.ControlService.Enabled && conf.ControlService.ControlURL != "" {
 		// Use 30 second reporting interval and 10 second timeout
 		metricsReportInterval := 30 * time.Second
 		metricsTimeout := 10 * time.Second
 
 		services.MetricsReporter = NewMetricsReporter(
-			conf.ControlService.BaseURL,
+			conf.ControlService.ControlURL,
 			conf.ControlService.APIKey,
 			metricsTracker,
 			metricsReportInterval,
@@ -168,7 +168,7 @@ func NewServices(conf *config.Config) *Services {
 			true, // enabled
 		)
 		log.Infof("Transformation metrics reporter initialized (reporting to %s every %v)",
-			conf.ControlService.BaseURL, metricsReportInterval)
+			conf.ControlService.ControlURL, metricsReportInterval)
 	} else {
 		log.Info("Transformation metrics reporting disabled (control service not configured)")
 	}
@@ -241,7 +241,7 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 		},
 		"state_manager": map[string]interface{}{
 			"type":            "control_service_api",
-			"control_service": conf.ControlService.BaseURL,
+			"control_url":     conf.ControlService.ControlURL,
 			"control_enabled": conf.ControlService.Enabled,
 		},
 		"processing": map[string]interface{}{
@@ -257,10 +257,10 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 			"enable_geoip":            conf.Pipeline.EnableGeoIP,
 		},
 		"control_service": map[string]interface{}{
-			"enabled":  conf.ControlService.Enabled,
-			"base_url": conf.ControlService.BaseURL,
-			"api_key":  maskSensitive(conf.ControlService.APIKey),
-			"timeout":  conf.ControlService.TimeoutSeconds,
+			"enabled":     conf.ControlService.Enabled,
+			"control_url": conf.ControlService.ControlURL,
+			"api_key":     maskSensitive(conf.ControlService.APIKey),
+			"timeout":     conf.ControlService.TimeoutSeconds,
 		},
 		"monitoring": map[string]interface{}{
 			"metrics_port":     conf.Monitoring.MetricsPort,

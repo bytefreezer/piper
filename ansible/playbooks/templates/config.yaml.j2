@@ -62,7 +62,7 @@ pipeline:
 # Control Service configuration (replaces dev mode and legacy controller)
 control_service:
   enabled: {{ config.control_service.enabled | lower }}
-  base_url: {{ config.control_service.base_url }}
+  control_url: "{{ bytefreezer_control_url }}"
   api_key: "{{ bytefreezer_api_key }}"
   timeout_seconds: {{ config.control_service.timeout_seconds }}
   account_id: {{ config.control_service.account_id | default('') }}
@@ -119,11 +119,6 @@ monitoring:
   log_level: {{ config.monitoring.log_level }}
   enable_tracing: {{ config.monitoring.enable_tracing | lower }}
 
-# Secrets management
-secrets:
-  provider: {{ config.secrets.provider }}
-  region: {{ config.secrets.region }}
-
 # Housekeeping configuration
 housekeeping:
   enabled: {{ config.housekeeping.enabled | lower }}
@@ -133,7 +128,7 @@ housekeeping:
 soc:
   enabled: {{ config.soc.enabled | lower }}
 
-# Health reporting configuration (uses control_service.base_url)
+# Health reporting configuration (uses control_service.control_url)
 health_reporting:
   enabled: {{ config.health_reporting.enabled | default(true) | lower }}
   report_interval: {{ config.health_reporting.report_interval | default(30) }}

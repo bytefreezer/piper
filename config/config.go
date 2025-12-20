@@ -27,7 +27,6 @@ type Config struct {
 	Pipeline         Pipeline         `koanf:"pipeline"`
 	ControlService   ControlService   `koanf:"control_service"`
 	Monitoring       Monitoring       `koanf:"monitoring"`
-	Secrets          Secrets          `koanf:"secrets"`
 	Housekeeping     Housekeeping     `koanf:"housekeeping"`
 	DLQ              DLQ              `koanf:"dlq"`
 	SOC              SOC              `koanf:"soc"`
@@ -111,7 +110,7 @@ type Pipeline struct {
 // ControlService represents Control Service configuration
 type ControlService struct {
 	Enabled        bool   `koanf:"enabled"`
-	BaseURL        string `koanf:"base_url"`
+	ControlURL     string `koanf:"control_url"`
 	APIKey         string `koanf:"api_key"`
 	TimeoutSeconds int    `koanf:"timeout_seconds"`
 	AccountID      string `koanf:"account_id"` // Optional: for on-prem deployments, only process this account
@@ -123,12 +122,6 @@ type Monitoring struct {
 	LogLevel        string `koanf:"log_level"`
 	EnableTracing   bool   `koanf:"enable_tracing"`
 	TracingEndpoint string `koanf:"tracing_endpoint"`
-}
-
-// Secrets represents secrets management configuration
-type Secrets struct {
-	Provider string `koanf:"provider"` // "aws", "env", "file"
-	Region   string `koanf:"region"`
 }
 
 // Housekeeping represents housekeeping configuration

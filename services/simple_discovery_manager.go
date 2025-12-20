@@ -284,12 +284,12 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 	}
 
 	// Check if Control Service is configured
-	if !sdm.config.ControlService.Enabled || sdm.config.ControlService.BaseURL == "" {
+	if !sdm.config.ControlService.Enabled || sdm.config.ControlService.ControlURL == "" {
 		log.Warnf("Control Service not configured, no tenants will be processed")
 		return []TenantInfo{}, nil
 	}
 
-	log.Infof("Fetching tenants from Control Service: %s", sdm.config.ControlService.BaseURL)
+	log.Infof("Fetching tenants from Control Service: %s", sdm.config.ControlService.ControlURL)
 
 	// Determine which accounts to fetch based on deployment configuration
 	var accountsURL string
@@ -301,11 +301,11 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 	if sdm.config.ControlService.AccountID != "" {
 		// On-prem deployment: fetch only the specific account
 		log.Infof("On-prem mode: processing only account %s (deployment_type: %s)", sdm.config.ControlService.AccountID, deploymentType)
-		accountsURL = fmt.Sprintf("%s/api/v1/accounts/%s", sdm.config.ControlService.BaseURL, sdm.config.ControlService.AccountID)
+		accountsURL = fmt.Sprintf("%s/api/v1/accounts/%s", sdm.config.ControlService.ControlURL, sdm.config.ControlService.AccountID)
 	} else {
 		// Managed deployment: fetch all accounts (will filter by deployment_type)
 		log.Infof("Managed mode: processing accounts with deployment_type '%s'", deploymentType)
-		accountsURL = fmt.Sprintf("%s/api/v1/accounts?limit=1000", sdm.config.ControlService.BaseURL)
+		accountsURL = fmt.Sprintf("%s/api/v1/accounts?limit=1000", sdm.config.ControlService.ControlURL)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", accountsURL, nil)
@@ -387,7 +387,7 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 		log.Debugf("Processing account %s (deployment_type: %s)", account.ID, account.DeploymentType)
 
 		tenantsURL := fmt.Sprintf("%s/api/v1/accounts/%s/tenants?limit=1000",
-			sdm.config.ControlService.BaseURL, account.ID)
+			sdm.config.ControlService.ControlURL, account.ID)
 		req, err := http.NewRequestWithContext(ctx, "GET", tenantsURL, nil)
 		if err != nil {
 			log.Warnf("Failed to create tenants request for account %s: %v", account.ID, err)
@@ -428,7 +428,7 @@ func (sdm *SimpleDiscoveryManager) getActiveTenants(ctx context.Context) ([]Tena
 
 			// Fetch datasets for this tenant
 			datasetsURL := fmt.Sprintf("%s/api/v1/tenants/%s/datasets?limit=1000",
-				sdm.config.ControlService.BaseURL, tenant.ID)
+				sdm.config.ControlService.ControlURL, tenant.ID)
 			datasetReq, err := http.NewRequestWithContext(ctx, "GET", datasetsURL, nil)
 			if err != nil {
 				log.Warnf("Failed to create datasets request for tenant %s: %v", tenant.ID, err)
