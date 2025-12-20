@@ -13,9 +13,9 @@ s3_source:
   bucket_name: "intake"  # Dedicated intake bucket from bytefreezer-receiver
   region: "us-east-1"
   poll_interval: "30s"
-  access_key: "AKIAQNXBAHUKIMJP26P6"
-  secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
-  endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
+  access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
+  secret_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_secret_key"
+  endpoint: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_endpoint"
   ssl: false
   use_iam_role: false
 
@@ -23,9 +23,9 @@ s3_source:
 s3_destination:
   bucket_name: "piper"  # Dedicated piper output bucket for bytefreezer-packer
   region: "us-east-1"
-  access_key: "AKIAQNXBAHUKIMJP26P6"
-  secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
-  endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
+  access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
+  secret_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_secret_key"
+  endpoint: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_endpoint"
   ssl: false
   use_iam_role: false
 
@@ -33,26 +33,11 @@ s3_destination:
 s3_geoip:
   bucket_name: "geoip"  # Dedicated GeoIP bucket for database files
   region: "us-east-1"
-  access_key: "AKIAQNXBAHUKIMJP26P6"
-  secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
-  endpoint: "192.168.86.125:9000"  # MinIO endpoint (matches receiver config)
+  access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
+  secret_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_secret_key"
+  endpoint: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_endpoint"
   ssl: false
   use_iam_role: false
-
-# PostgreSQL configuration for state management
-postgresql:
-  host: "192.168.86.137"
-  port: 5432
-  database: "bytefreezer"
-  username: "bytefreezer"
-  password: "bytefreezer123"
-  ssl_mode: "disable"
-  schema: "public"
-  # Connection pool settings (prevents "context deadline exceeded" errors)
-  max_open_conns: 25       # Maximum open connections (enough for 10 workers + overhead)
-  max_idle_conns: 10       # Maximum idle connections (matches max_concurrent_jobs)
-  conn_max_lifetime: "5m"  # Rotate connections every 5 minutes
-  conn_max_idle_time: "5m" # Close idle connections after 5 minutes
 
 # Processing engine configuration
 processing:
@@ -74,7 +59,7 @@ pipeline:
 control_service:
   enabled: true
   base_url: "http://192.168.86.103:8082"
-  api_key: "bytefreezer-service-api-key-8f4a2d1b-3c5e-4f6a-9b8c-7d2e1f3a4b5c"  # System-wide service API key
+  api_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_api_key"  # System-wide service API key
   timeout_seconds: 30
 
 # Parser configuration for log parsing (Logstash-style)

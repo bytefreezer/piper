@@ -16,30 +16,30 @@ s3_source:
   bucket_name: {{ config.s3_source.bucket_name }}
   region: {{ config.s3_source.region }}
   poll_interval: {{ config.s3_source.poll_interval }}
-  endpoint: {{ config.s3_source.endpoint }}
+  endpoint: "{{ bytefreezer_s3_endpoint }}"
   ssl: {{ config.s3_source.ssl | lower }}
-  access_key: {{ config.s3_source.access_key }}
-  secret_key: {{ config.s3_source.secret_key }}
+  access_key: "{{ bytefreezer_s3_access_key }}"
+  secret_key: "{{ bytefreezer_s3_secret_key }}"
   use_iam_role: {{ config.s3_source.use_iam_role | default(false) | lower }}
 
 # S3 destination configuration (piper bucket for bytefreezer-packer)
 s3_destination:
   bucket_name: {{ config.s3_destination.bucket_name }}
   region: {{ config.s3_destination.region }}
-  endpoint: {{ config.s3_destination.endpoint }}
+  endpoint: "{{ bytefreezer_s3_endpoint }}"
   ssl: {{ config.s3_destination.ssl | lower }}
-  access_key: {{ config.s3_destination.access_key }}
-  secret_key: {{ config.s3_destination.secret_key }}
+  access_key: "{{ bytefreezer_s3_access_key }}"
+  secret_key: "{{ bytefreezer_s3_secret_key }}"
   use_iam_role: {{ config.s3_destination.use_iam_role | default(false) | lower }}
 
 # S3 GeoIP configuration (GeoIP database updates)
 s3_geoip:
   bucket_name: {{ config.s3_geoip.bucket_name }}
   region: {{ config.s3_geoip.region }}
-  endpoint: {{ config.s3_geoip.endpoint }}
+  endpoint: "{{ bytefreezer_s3_endpoint }}"
   ssl: {{ config.s3_geoip.ssl | lower }}
-  access_key: {{ config.s3_geoip.access_key }}
-  secret_key: {{ config.s3_geoip.secret_key }}
+  access_key: "{{ bytefreezer_s3_access_key }}"
+  secret_key: "{{ bytefreezer_s3_secret_key }}"
   use_iam_role: {{ config.s3_geoip.use_iam_role | default(false) | lower }}
 
 # Processing engine configuration
@@ -63,7 +63,7 @@ pipeline:
 control_service:
   enabled: {{ config.control_service.enabled | lower }}
   base_url: {{ config.control_service.base_url }}
-  api_key: "{{ config.control_service.api_key | default('bytefreezer-service-api-key-8f4a2d1b-3c5e-4f6a-9b8c-7d2e1f3a4b5c') }}"
+  api_key: "{{ bytefreezer_api_key }}"
   timeout_seconds: {{ config.control_service.timeout_seconds }}
   account_id: {{ config.control_service.account_id | default('') }}
   tenant_id: "{{ config.control_service.tenant_id | default('') }}"

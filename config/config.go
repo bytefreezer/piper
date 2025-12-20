@@ -89,22 +89,6 @@ type S3GeoIP struct {
 	UseIamRole bool   `koanf:"use_iam_role"`
 }
 
-// PostgreSQL represents PostgreSQL configuration for state management
-type PostgreSQL struct {
-	Host     string `koanf:"host"`
-	Port     int    `koanf:"port"`
-	Database string `koanf:"database"`
-	Username string `koanf:"username"`
-	Password string `koanf:"password"`
-	SSLMode  string `koanf:"ssl_mode"`
-	Schema   string `koanf:"schema"`
-	// Connection pool settings
-	MaxOpenConns    int           `koanf:"max_open_conns"`     // Maximum number of open connections (0 = unlimited)
-	MaxIdleConns    int           `koanf:"max_idle_conns"`     // Maximum number of idle connections
-	ConnMaxLifetime time.Duration `koanf:"conn_max_lifetime"`  // Maximum connection lifetime
-	ConnMaxIdleTime time.Duration `koanf:"conn_max_idle_time"` // Maximum connection idle time
-}
-
 // Processing represents processing engine configuration
 type Processing struct {
 	MaxConcurrentJobs int           `koanf:"max_concurrent_jobs"`

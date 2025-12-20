@@ -14,36 +14,36 @@ import (
 	"github.com/bytefreezer/piper/pipeline"
 )
 
-// GetSchemaAndSamples retrieves schema and sample data for a dataset from database
+// GetSchemaAndSamples retrieves schema and sample data for a dataset from Control API
 func (s *Services) GetSchemaAndSamples(ctx context.Context, tenantID, datasetID string, count int) ([]api.SchemaField, []api.TransformationSample, int, error) {
-	if s.DatasetSampleClient == nil {
-		return nil, nil, 0, fmt.Errorf("dataset sample client not available")
+	if s.SchemaSubmissionClient == nil {
+		return nil, nil, 0, fmt.Errorf("schema submission client not available")
 	}
 
-	// Get input samples from database (these are the raw samples before transformation)
-	dbSamples, err := s.DatasetSampleClient.GetLatestSamples(ctx, tenantID, datasetID, "input", count)
+	// Get input samples from Control API
+	metricsSamples, err := s.SchemaSubmissionClient.GetSamples(ctx, tenantID, datasetID, "input", count)
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to get samples from database: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to get samples from control service: %w", err)
 	}
 
-	if len(dbSamples) == 0 {
+	if len(metricsSamples) == 0 {
 		return nil, nil, 0, fmt.Errorf("no samples found for %s/%s - please process some data first", tenantID, datasetID)
 	}
 
-	// Convert database samples to API format
-	samples := make([]api.TransformationSample, 0, len(dbSamples))
-	for _, dbSample := range dbSamples {
+	// Convert metrics samples to API format
+	samples := make([]api.TransformationSample, 0, len(metricsSamples))
+	for _, ms := range metricsSamples {
 		// Marshal sample data back to JSON string for RawData
-		rawData, err := sonic.Marshal(dbSample.SampleData)
+		rawData, err := sonic.Marshal(ms.SampleData)
 		if err != nil {
 			log.Warnf("Failed to marshal sample data: %v", err)
 			continue
 		}
 
 		samples = append(samples, api.TransformationSample{
-			LineNumber: dbSample.LineNumber,
+			LineNumber: ms.LineNumber,
 			RawData:    string(rawData),
-			ParsedData: dbSample.SampleData,
+			ParsedData: ms.SampleData,
 		})
 	}
 
@@ -54,14 +54,7 @@ func (s *Services) GetSchemaAndSamples(ctx context.Context, tenantID, datasetID 
 	// Build schema from samples
 	schema := buildSchema(samples)
 
-	// Get total sample count (including both input and output)
-	totalCount, err := s.DatasetSampleClient.GetSampleCount(ctx, tenantID, datasetID)
-	if err != nil {
-		log.Warnf("Failed to get total sample count: %v", err)
-		totalCount = len(samples)
-	}
-
-	return schema, samples, totalCount, nil
+	return schema, samples, len(samples), nil
 }
 
 // TestTransformation tests transformation filters on sample data
@@ -95,36 +88,36 @@ func (s *Services) TestTransformation(ctx context.Context, tenantID, datasetID s
 	return results, nil
 }
 
-// ValidateFreshData validates transformation on fresh data from database
+// ValidateFreshData validates transformation on fresh data from Control API
 func (s *Services) ValidateFreshData(ctx context.Context, tenantID, datasetID string, filters []api.FilterConfig, count int) ([]api.TransformationResult, string, int, error) {
-	if s.DatasetSampleClient == nil {
-		return nil, "", 0, fmt.Errorf("dataset sample client not available")
+	if s.SchemaSubmissionClient == nil {
+		return nil, "", 0, fmt.Errorf("schema submission client not available")
 	}
 
-	// Get input samples from database (raw data before transformation)
-	dbSamples, err := s.DatasetSampleClient.GetLatestSamples(ctx, tenantID, datasetID, "input", count)
+	// Get input samples from Control API
+	metricsSamples, err := s.SchemaSubmissionClient.GetSamples(ctx, tenantID, datasetID, "input", count)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("failed to get samples from database: %w", err)
+		return nil, "", 0, fmt.Errorf("failed to get samples from control service: %w", err)
 	}
 
-	if len(dbSamples) == 0 {
+	if len(metricsSamples) == 0 {
 		return nil, "", 0, fmt.Errorf("no samples found for %s/%s - please process some data first", tenantID, datasetID)
 	}
 
-	// Convert database samples to API format
-	samples := make([]api.TransformationSample, 0, len(dbSamples))
-	for _, dbSample := range dbSamples {
+	// Convert metrics samples to API format
+	samples := make([]api.TransformationSample, 0, len(metricsSamples))
+	for _, ms := range metricsSamples {
 		// Marshal sample data back to JSON string for RawData
-		rawData, err := sonic.Marshal(dbSample.SampleData)
+		rawData, err := sonic.Marshal(ms.SampleData)
 		if err != nil {
 			log.Warnf("Failed to marshal sample data: %v", err)
 			continue
 		}
 
 		samples = append(samples, api.TransformationSample{
-			LineNumber: dbSample.LineNumber,
+			LineNumber: ms.LineNumber,
 			RawData:    string(rawData),
-			ParsedData: dbSample.SampleData,
+			ParsedData: ms.SampleData,
 		})
 	}
 
@@ -132,21 +125,14 @@ func (s *Services) ValidateFreshData(ctx context.Context, tenantID, datasetID st
 		return nil, "", 0, fmt.Errorf("no valid samples found")
 	}
 
-	// Get total sample count
-	totalCount, err := s.DatasetSampleClient.GetSampleCount(ctx, tenantID, datasetID)
-	if err != nil {
-		log.Warnf("Failed to get total sample count: %v", err)
-		totalCount = len(samples)
-	}
-
 	// Test transformation on samples
 	results, err := s.TestTransformation(ctx, tenantID, datasetID, filters, samples)
 	if err != nil {
-		return nil, "database", totalCount, err
+		return nil, "control_api", len(samples), err
 	}
 
-	sourceInfo := fmt.Sprintf("database (%d samples)", len(samples))
-	return results, sourceInfo, totalCount, nil
+	sourceInfo := fmt.Sprintf("control_api (%d samples)", len(samples))
+	return results, sourceInfo, len(samples), nil
 }
 
 // ActivateTransformation activates or deactivates transformation for a dataset
@@ -170,45 +156,6 @@ func (s *Services) ActivateTransformation(ctx context.Context, tenantID, dataset
 	// Store in state manager if available
 	if s.StateManager != nil {
 		log.Infof("Would store transformation config: %s", string(configJSON))
-	}
-
-	// Compute and cache schema from stored samples
-	if s.DatasetSampleClient != nil {
-		schema, _, _, err := s.GetSchemaAndSamples(ctx, tenantID, datasetID, 10)
-		if err != nil {
-			log.Warnf("Failed to compute schema for %s/%s: %v", tenantID, datasetID, err)
-		} else {
-			// Cache the input schema
-			if err := s.DatasetSampleClient.UpsertSchema(ctx, tenantID, datasetID, "input", schema); err != nil {
-				log.Errorf("Failed to cache input schema for %s/%s: %v", tenantID, datasetID, err)
-			} else {
-				log.Infof("Cached input schema for %s/%s (%d fields)", tenantID, datasetID, len(schema))
-			}
-
-			// Also compute and cache output schema if transformation is enabled
-			if enabled && len(filters) > 0 {
-				// Get output samples and compute output schema
-				dbSamples, err := s.DatasetSampleClient.GetLatestSamples(ctx, tenantID, datasetID, "output", 10)
-				if err == nil && len(dbSamples) > 0 {
-					// Convert to TransformationSample format
-					outputSamples := make([]api.TransformationSample, 0, len(dbSamples))
-					for _, dbSample := range dbSamples {
-						outputSamples = append(outputSamples, api.TransformationSample{
-							LineNumber: dbSample.LineNumber,
-							ParsedData: dbSample.SampleData,
-						})
-					}
-
-					// Build output schema
-					outputSchema := buildSchema(outputSamples)
-					if err := s.DatasetSampleClient.UpsertSchema(ctx, tenantID, datasetID, "output", outputSchema); err != nil {
-						log.Errorf("Failed to cache output schema for %s/%s: %v", tenantID, datasetID, err)
-					} else {
-						log.Infof("Cached output schema for %s/%s (%d fields)", tenantID, datasetID, len(outputSchema))
-					}
-				}
-			}
-		}
 	}
 
 	version := pipelineConfig["version"].(string)

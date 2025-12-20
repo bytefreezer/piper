@@ -41,34 +41,28 @@ config:
     api_port: 8082
 
   # S3 source configuration (raw data input from bytefreezer-receiver)
+  # Credentials come from AWX variables: bytefreezer_s3_endpoint, bytefreezer_s3_access_key, bytefreezer_s3_secret_key
   s3_source:
     bucket_name: "intake-onprem"
     region: "us-east-1"
     poll_interval: "30s"
-    endpoint: "192.168.86.125:9000"
     ssl: false
-    access_key: "AKIAQNXBAHUKIMJP26P6"
-    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
     use_iam_role: false
 
   # S3 destination configuration (processed data output for bytefreezer-packer)
+  # Credentials come from AWX variables: bytefreezer_s3_endpoint, bytefreezer_s3_access_key, bytefreezer_s3_secret_key
   s3_destination:
     bucket_name: "piper-onprem"
     region: "us-east-1"
-    endpoint: "192.168.86.125:9000"
     ssl: false
-    access_key: "AKIAQNXBAHUKIMJP26P6"
-    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
     use_iam_role: false
 
   # S3 GeoIP configuration (GeoIP database updates)
+  # Credentials come from AWX variables: bytefreezer_s3_endpoint, bytefreezer_s3_access_key, bytefreezer_s3_secret_key
   s3_geoip:
     bucket_name: "geoip"
     region: "us-east-1"
-    endpoint: "192.168.86.125:9000"
     ssl: false
-    access_key: "AKIAQNXBAHUKIMJP26P6"
-    secret_key: "SECRET_KEY_AKIAQNXBAHUKIMJP26P6"
     use_iam_role: false
 
   # Processing engine configuration
@@ -92,7 +86,7 @@ config:
   control_service:
     enabled: true
     base_url: "http://192.168.86.103:8082"
-    api_key: "bytefreezer-service-api-key-8f4a2d1b-3c5e-4f6a-9b8c-7d2e1f3a4b5c"
+    # api_key comes from AWX variable: bytefreezer_api_key
     timeout_seconds: 30
     account_id: "s2jeovtia7zn"  # On-prem account - only process this account
     tenant_id: ""                # Empty = process all tenants in this account

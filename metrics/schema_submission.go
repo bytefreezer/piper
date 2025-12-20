@@ -117,3 +117,107 @@ func (c *SchemaSubmissionClient) SubmitSchema(ctx context.Context, tenantID, dat
 	log.Infof("Successfully submitted %s schema and %d samples for %s/%s", schemaType, len(samples), tenantID, datasetID)
 	return nil
 }
+
+// GetSamplesResponse represents the response from retrieving samples
+type GetSamplesResponse struct {
+	Samples    []SampleData `json:"samples"`
+	TotalCount int          `json:"total_count"`
+	TenantID   string       `json:"tenant_id"`
+	DatasetID  string       `json:"dataset_id"`
+	SampleType string       `json:"sample_type"`
+}
+
+// GetStoredSchemaResponse represents the response from retrieving stored schema
+type GetStoredSchemaResponse struct {
+	Schema     interface{} `json:"schema"`
+	TenantID   string      `json:"tenant_id"`
+	DatasetID  string      `json:"dataset_id"`
+	SchemaType string      `json:"schema_type"`
+	UpdatedAt  string      `json:"updated_at"`
+}
+
+// GetSamples retrieves stored samples from the control service
+func (c *SchemaSubmissionClient) GetSamples(ctx context.Context, tenantID, datasetID, sampleType string, limit int) ([]SampleData, error) {
+	if !c.enabled {
+		return nil, fmt.Errorf("sample retrieval is disabled")
+	}
+
+	if limit <= 0 {
+		limit = 10
+	}
+
+	// Build the URL - matches control service API
+	url := fmt.Sprintf("%s/api/v1/tenants/%s/datasets/%s/samples?type=%s&limit=%d",
+		c.controlURL, tenantID, datasetID, sampleType, limit)
+
+	log.Debugf("Retrieving %s samples from %s", sampleType, url)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create samples request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve samples from control service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("control service returned status %d", resp.StatusCode)
+	}
+
+	var response GetSamplesResponse
+	if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode samples response: %w", err)
+	}
+
+	log.Debugf("Retrieved %d %s samples for %s/%s", len(response.Samples), sampleType, tenantID, datasetID)
+	return response.Samples, nil
+}
+
+// GetStoredSchema retrieves stored schema from the control service
+func (c *SchemaSubmissionClient) GetStoredSchema(ctx context.Context, tenantID, datasetID, schemaType string) (interface{}, error) {
+	if !c.enabled {
+		return nil, fmt.Errorf("schema retrieval is disabled")
+	}
+
+	// Build the URL - matches control service API
+	url := fmt.Sprintf("%s/api/v1/tenants/%s/datasets/%s/schema/stored?type=%s",
+		c.controlURL, tenantID, datasetID, schemaType)
+
+	log.Debugf("Retrieving %s schema from %s", schemaType, url)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create schema request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve schema from control service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("control service returned status %d", resp.StatusCode)
+	}
+
+	var response GetStoredSchemaResponse
+	if err := sonic.ConfigDefault.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode schema response: %w", err)
+	}
+
+	log.Debugf("Retrieved %s schema for %s/%s", schemaType, tenantID, datasetID)
+	return response.Schema, nil
+}

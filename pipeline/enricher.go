@@ -6,7 +6,6 @@ package pipeline
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/bytefreezer/goodies/log"
-	"github.com/bytefreezer/piper/storage"
 )
 
 // EnricherFilter enriches events with data from customer-uploaded lookup tables
@@ -186,7 +184,18 @@ func (f *EnricherFilter) Apply(ctx *FilterContext, record map[string]interface{}
 }
 
 // loadEnricherDataFromDB loads enricher data from database
+// Note: This feature requires PostgreSQL database access which is not available
+// in Control API mode. Enricher data must be pre-loaded or fetched from Control API.
 func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
+	// Enricher data loading from database is not available without PostgreSQL
+	// This is expected in Control API mode - enricher data should be loaded differently
+	log.Debugf("Enricher %s: database loading not available (using Control API mode)", f.EnricherID)
+	return nil // Don't fail, just skip database loading
+}
+
+// loadEnricherDataFromDBLegacy is the original PostgreSQL-based implementation
+// kept for reference but no longer used since PostgreSQL is not available
+func (f *EnricherFilter) loadEnricherDataFromDBLegacy(ctx *FilterContext) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -195,44 +204,20 @@ func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
 		return fmt.Errorf("no state manager available")
 	}
 
-	stateManager, ok := ctx.StateManager.(*storage.PostgreSQLStateManager)
-	if !ok {
-		return fmt.Errorf("state manager is not PostgreSQL type")
-	}
+	// Note: PostgreSQL state manager is no longer available
+	// This function is kept for reference only
+	return fmt.Errorf("enricher data loading requires PostgreSQL which is not available")
+}
 
-	// Fetch enricher metadata and binary data from database
-	dbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+// loadEnricherDataFromControl would load enricher data from Control API
+// TODO: Implement when enricher API is added to Control service
+func (f *EnricherFilter) loadEnricherDataFromControl(ctx *FilterContext) error {
+	// Placeholder for future implementation
+	log.Debugf("Enricher %s: Control API enricher loading not yet implemented", f.EnricherID)
+	return nil
+}
 
-	enricherMeta, fileData, err := stateManager.GetEnricherWithData(dbCtx, f.TenantID, f.EnricherID)
-	if err != nil {
-		log.Warnf("Enricher data not available in database: %v", err)
-		return nil // Don't fail, just log
-	}
-
-	if len(fileData) == 0 {
-		log.Warnf("Enricher %s has no data", f.EnricherID)
-		return nil
-	}
-
-	// Set enricher name if not already set
-	if f.EnricherName == "" && enricherMeta != nil {
-		f.EnricherName = enricherMeta.Name
-	}
-
-	// Set default target field if not specified
-	// Format: src.{source_field}-{enricher_name_sanitized}
-	if f.TargetField == "" {
-		sanitizedName := sanitizeName(f.EnricherName)
-		f.TargetField = fmt.Sprintf("src.%s-%s", f.SourceField, sanitizedName)
-	}
-
-	// Get index column from enricher metadata
-	var indexColumn string
-	if enricherMeta != nil && len(enricherMeta.IndexColumns) > 0 {
-		indexColumn = enricherMeta.IndexColumns[0] // Use first index column
-	}
-
+func (f *EnricherFilter) parseEnricherData(fileData []byte, indexColumn string) error {
 	// Parse JSON lines format from binary data
 	reader := bytes.NewReader(fileData)
 	scanner := bufio.NewScanner(reader)
@@ -299,7 +284,7 @@ func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
 	f.lastReload = time.Now()
 	f.enricherReady = true
 
-	log.Infof("Loaded enricher %s from database: %d rows, %d unique keys, index column: %s, target field: %s",
+	log.Infof("Loaded enricher %s: %d rows, %d unique keys, index column: %s, target field: %s",
 		f.EnricherID, len(data), len(index), indexColumn, f.TargetField)
 
 	return nil

@@ -30,14 +30,12 @@ type FormatProcessor struct {
 	cfg                    *config.Config
 	s3Client               *storage.S3Client
 	stateManager           storage.StateManager
-	sampleClient           *storage.DatasetSampleClient
 	parserRegistry         parsers.ParserRegistry
 	formatDetector         *parsers.FormatDetector
 	filterRegistry         pipeline.FilterRegistry
 	configManager          *ConfigManager
 	schemaSubmissionClient *metrics.SchemaSubmissionClient
 	metricsTracker         *TransformationMetricsTracker
-	previewRecorder        *PreviewRecorder
 	errorReporter          *errors.ErrorReporter
 }
 
@@ -55,27 +53,16 @@ func NewFormatProcessor(cfg *config.Config, s3Client *storage.S3Client, stateMan
 	// Create configuration manager
 	configManager := NewConfigManager(cfg, stateManager)
 
-	// Create dataset sample client for storing input/output samples
-	sampleClient := storage.NewDatasetSampleClient(stateManager)
-
-	// Create preview recorder if state manager is PostgreSQL
-	var previewRecorder *PreviewRecorder
-	if psqlState, ok := stateManager.(*storage.PostgreSQLStateManager); ok {
-		previewRecorder = NewPreviewRecorder(psqlState.GetDB())
-	}
-
 	processor := &FormatProcessor{
 		cfg:                    cfg,
 		s3Client:               s3Client,
 		stateManager:           stateManager,
-		sampleClient:           sampleClient,
 		parserRegistry:         parserRegistry,
 		formatDetector:         formatDetector,
 		filterRegistry:         filterRegistry,
 		configManager:          configManager,
 		schemaSubmissionClient: schemaSubmissionClient,
 		metricsTracker:         metricsTracker,
-		previewRecorder:        previewRecorder,
 		errorReporter:          errorReporter,
 	}
 
@@ -258,8 +245,8 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 	var errorCount int64
 
 	// Collect samples for schema inference (keep first 10 input and output samples)
-	var inputSamples []storage.DatasetSample
-	var outputSamples []storage.DatasetSample
+	var inputSamples []metrics.SampleData
+	var outputSamples []metrics.SampleData
 	const maxSamples = 10
 	batchID := fmt.Sprintf("batch-%d", time.Now().Unix())
 
@@ -283,14 +270,10 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 						sampleData[k] = v
 					}
 				}
-				inputSamples = append(inputSamples, storage.DatasetSample{
-					TenantID:   job.TenantID,
-					DatasetID:  job.DatasetID,
-					SampleType: "input",
+				inputSamples = append(inputSamples, metrics.SampleData{
 					LineNumber: int(lineCount),
 					SampleData: sampleData,
 					BatchID:    batchID,
-					CreatedAt:  time.Now(),
 				})
 			}
 		}
@@ -330,14 +313,10 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 						sampleData[k] = v
 					}
 				}
-				outputSamples = append(outputSamples, storage.DatasetSample{
-					TenantID:   job.TenantID,
-					DatasetID:  job.DatasetID,
-					SampleType: "output",
+				outputSamples = append(outputSamples, metrics.SampleData{
 					LineNumber: int(lineCount),
 					SampleData: sampleData,
 					BatchID:    batchID,
-					CreatedAt:  time.Now(),
 				})
 			}
 		}
@@ -355,44 +334,12 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 		return nil, fmt.Errorf("scanner error at line %d: %w", lineCount, err)
 	}
 
-	// Store samples in database for schema inference
-	if p.sampleClient != nil && (len(inputSamples) > 0 || len(outputSamples) > 0) {
-		// Store input samples
-		if len(inputSamples) > 0 {
-			if err := p.sampleClient.UpsertSamples(ctx, job.TenantID, job.DatasetID, "input", inputSamples, maxSamples); err != nil {
-				log.Warnf("Failed to store input samples: %v", err)
-			} else {
-				log.Infof("Stored %d input samples for %s/%s", len(inputSamples), job.TenantID, job.DatasetID)
-			}
-		}
-
-		// Store output samples
-		if len(outputSamples) > 0 {
-			if err := p.sampleClient.UpsertSamples(ctx, job.TenantID, job.DatasetID, "output", outputSamples, maxSamples); err != nil {
-				log.Warnf("Failed to store output samples: %v", err)
-			} else {
-				log.Infof("Stored %d output samples for %s/%s", len(outputSamples), job.TenantID, job.DatasetID)
-			}
-		}
-	}
-
 	// Submit schemas and samples to control service
 	if p.schemaSubmissionClient != nil && (len(inputSamples) > 0 || len(outputSamples) > 0) {
 		// Submit input schema and samples
 		if len(inputSamples) > 0 {
 			inputSchema := p.inferSchemaFromSamples(inputSamples)
-
-			// Convert samples to metrics.SampleData format
-			metricsSamples := make([]metrics.SampleData, len(inputSamples))
-			for i, sample := range inputSamples {
-				metricsSamples[i] = metrics.SampleData{
-					LineNumber: sample.LineNumber,
-					SampleData: sample.SampleData,
-					BatchID:    sample.BatchID,
-				}
-			}
-
-			if err := p.schemaSubmissionClient.SubmitSchema(ctx, job.TenantID, job.DatasetID, "input", inputSchema, metricsSamples); err != nil {
+			if err := p.schemaSubmissionClient.SubmitSchema(ctx, job.TenantID, job.DatasetID, "input", inputSchema, inputSamples); err != nil {
 				log.Warnf("Failed to submit input schema to control: %v", err)
 			}
 		}
@@ -400,18 +347,7 @@ func (p *FormatProcessor) processStreamingNDJSON(ctx context.Context, dataReader
 		// Submit output schema and samples
 		if len(outputSamples) > 0 {
 			outputSchema := p.inferSchemaFromSamples(outputSamples)
-
-			// Convert samples to metrics.SampleData format
-			metricsSamples := make([]metrics.SampleData, len(outputSamples))
-			for i, sample := range outputSamples {
-				metricsSamples[i] = metrics.SampleData{
-					LineNumber: sample.LineNumber,
-					SampleData: sample.SampleData,
-					BatchID:    sample.BatchID,
-				}
-			}
-
-			if err := p.schemaSubmissionClient.SubmitSchema(ctx, job.TenantID, job.DatasetID, "output", outputSchema, metricsSamples); err != nil {
+			if err := p.schemaSubmissionClient.SubmitSchema(ctx, job.TenantID, job.DatasetID, "output", outputSchema, outputSamples); err != nil {
 				log.Warnf("Failed to submit output schema to control: %v", err)
 			}
 		}
@@ -591,17 +527,6 @@ func (p *FormatProcessor) processLineWithPipeline(ctx context.Context, line stri
 		currentRecord = result.Record
 	}
 
-	// Sample every 100th record for preview (to avoid performance impact)
-	if p.previewRecorder != nil && lineNumber%100 == 0 {
-		p.previewRecorder.RecordSample(PreviewSample{
-			TenantID:        tenantID,
-			DatasetID:       datasetID,
-			LineNumber:      lineNumber,
-			OriginalData:    originalRecord,
-			TransformedData: currentRecord,
-		})
-	}
-
 	// Marshal back to JSON string
 	processedJSON, err := sonic.Marshal(currentRecord)
 	if err != nil {
@@ -613,7 +538,7 @@ func (p *FormatProcessor) processLineWithPipeline(ctx context.Context, line stri
 
 // inferSchemaFromSamples creates a unified schema from multiple samples
 // The schema is a union of all fields found across all samples
-func (p *FormatProcessor) inferSchemaFromSamples(samples []storage.DatasetSample) map[string]interface{} {
+func (p *FormatProcessor) inferSchemaFromSamples(samples []metrics.SampleData) map[string]interface{} {
 	schema := make(map[string]interface{})
 	fields := make(map[string]map[string]bool) // field -> types seen
 
