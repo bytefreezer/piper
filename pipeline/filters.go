@@ -5,10 +5,11 @@ package pipeline
 
 import (
 	"fmt"
-	"github.com/bytedance/sonic"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/bytedance/sonic"
 )
 
 // AddFieldFilter adds a field to the record
