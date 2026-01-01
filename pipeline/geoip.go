@@ -6,11 +6,33 @@ package pipeline
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/bytefreezer/goodies/log"
 	"github.com/oschwald/geoip2-golang"
 )
+
+// getNestedValue retrieves a value from a nested map using dot notation
+// e.g., "firewall.SRC" will get record["firewall"]["SRC"]
+func getNestedValue(record map[string]interface{}, path string) (interface{}, bool) {
+	parts := strings.Split(path, ".")
+	current := interface{}(record)
+
+	for _, part := range parts {
+		if m, ok := current.(map[string]interface{}); ok {
+			val, exists := m[part]
+			if !exists {
+				return nil, false
+			}
+			current = val
+		} else {
+			return nil, false
+		}
+	}
+
+	return current, true
+}
 
 // GeoIPFilter adds geographic information for IP addresses
 type GeoIPFilter struct {
@@ -79,9 +101,10 @@ func (f *GeoIPFilter) Validate(config map[string]interface{}) error {
 func (f *GeoIPFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*FilterResult, error) {
 	start := time.Now()
 
-	// Get source field value
-	sourceValue, exists := record[f.SourceField]
+	// Get source field value (supports nested fields with dot notation, e.g., "firewall.SRC")
+	sourceValue, exists := getNestedValue(record, f.SourceField)
 	if !exists {
+		log.Debugf("GeoIP filter: source field '%s' not found in record", f.SourceField)
 		return &FilterResult{
 			Record:   record,
 			Skip:     false,
@@ -132,10 +155,10 @@ func (f *GeoIPFilter) Apply(ctx *FilterContext, record map[string]interface{}) (
 	// Extract requested fields
 	for _, field := range f.Fields {
 		switch field {
-		case "country_name":
+		case "country", "country_name":
 			if city.Country.Names != nil {
 				if name, ok := city.Country.Names["en"]; ok {
-					geoInfo["country_name"] = name
+					geoInfo["country"] = name
 				}
 			}
 
@@ -149,10 +172,10 @@ func (f *GeoIPFilter) Apply(ctx *FilterContext, record map[string]interface{}) (
 			// GeoIP2 uses ISO 3166-1 alpha-2, not alpha-3
 			geoInfo["country_code3"] = city.Country.IsoCode
 
-		case "city_name":
+		case "city", "city_name":
 			if city.City.Names != nil {
 				if name, ok := city.City.Names["en"]; ok {
-					geoInfo["city_name"] = name
+					geoInfo["city"] = name
 				}
 			}
 
