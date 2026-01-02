@@ -118,6 +118,8 @@ type ControlService struct {
 
 // Monitoring represents monitoring and observability configuration
 type Monitoring struct {
+	Enabled         bool   `koanf:"enabled"`
+	MetricsHost     string `koanf:"metrics_host"`
 	MetricsPort     int    `koanf:"metrics_port"`
 	LogLevel        string `koanf:"log_level"`
 	EnableTracing   bool   `koanf:"enable_tracing"`
@@ -275,7 +277,9 @@ func getDefaults() map[string]interface{} {
 		"control_service.api_key":         "",
 		"control_service.timeout_seconds": 30,
 
-		"monitoring.metrics_port":   9090,
+		"monitoring.enabled":        true,
+		"monitoring.metrics_host":   "0.0.0.0",
+		"monitoring.metrics_port":   9092,
 		"monitoring.log_level":      "info",
 		"monitoring.enable_tracing": false,
 

@@ -1,5 +1,27 @@
 # ByteFreezer Piper - Release Notes
 
+## 2026-01-02 - GeoIP Nested Field Access Fix
+
+### Bug Fix
+
+#### GeoIP Filter: Nested Field Access Support
+- **Issue**: GeoIP filter could not access nested fields using dot notation (e.g., `firewall.SRC`)
+  - Filter looked for literal key `record["firewall.SRC"]` instead of traversing `record["firewall"]["SRC"]`
+  - Transformation with `source_field: "firewall.SRC"` produced no geoip output
+- **Fix**: Added `getNestedValue()` helper function to support dot-notation field access
+  - Traverses nested maps using path parts split by `.`
+  - Returns value and existence flag for proper handling
+- **Additional Fix**: Added field name aliases
+  - `country` now works as alias for `country_name`
+  - `city` now works as alias for `city_name`
+- **Files Changed**:
+  - `pipeline/geoip.go:16-35` - Added `getNestedValue()` helper function
+  - `pipeline/geoip.go:105` - Updated to use `getNestedValue()` for source field lookup
+  - `pipeline/geoip.go:158,175` - Added field name aliases
+- **Impact**: GeoIP enrichment now works with nested source fields from KV filter output
+
+---
+
 ## 2025-11-01 - Async Transformation Job Processing with Distributed Locking
 
 ### Major Architecture Change: Async Job-Based Transformation Workflow

@@ -70,6 +70,12 @@ func Run() error {
 	log.Infof("Configuration loaded successfully")
 	log.Infof("Instance ID: %s", cfg.App.InstanceID)
 
+	// Initialize OpenTelemetry with Prometheus metrics
+	otelShutdown := InitOtelProvider(cfg)
+	if otelShutdown != nil {
+		defer otelShutdown()
+	}
+
 	log.Infof("Source bucket: %s (prefix: %s)", cfg.S3Source.BucketName, "(none)")
 	log.Infof("Destination bucket: %s (prefix: %s)", cfg.S3Dest.BucketName, "(none)")
 
