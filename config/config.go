@@ -118,12 +118,16 @@ type ControlService struct {
 
 // Monitoring represents monitoring and observability configuration
 type Monitoring struct {
-	Enabled         bool   `koanf:"enabled"`
-	MetricsHost     string `koanf:"metrics_host"`
-	MetricsPort     int    `koanf:"metrics_port"`
-	LogLevel        string `koanf:"log_level"`
-	EnableTracing   bool   `koanf:"enable_tracing"`
-	TracingEndpoint string `koanf:"tracing_endpoint"`
+	Enabled             bool   `koanf:"enabled"`
+	Mode                string `koanf:"mode"` // "prometheus" (pull), "otlp_http" (push to Prometheus), "otlp_grpc" (push to collector)
+	OTLPEndpoint        string `koanf:"otlp_endpoint"`
+	PushIntervalSeconds int    `koanf:"push_interval_seconds"`
+	MetricsHost         string `koanf:"metrics_host"`
+	MetricsPort         int    `koanf:"metrics_port"`
+	ServiceName         string `koanf:"service_name"`
+	LogLevel            string `koanf:"log_level"`
+	EnableTracing       bool   `koanf:"enable_tracing"`
+	TracingEndpoint     string `koanf:"tracing_endpoint"`
 }
 
 // Housekeeping represents housekeeping configuration
@@ -277,11 +281,15 @@ func getDefaults() map[string]interface{} {
 		"control_service.api_key":         "",
 		"control_service.timeout_seconds": 30,
 
-		"monitoring.enabled":        true,
-		"monitoring.metrics_host":   "0.0.0.0",
-		"monitoring.metrics_port":   9092,
-		"monitoring.log_level":      "info",
-		"monitoring.enable_tracing": false,
+		"monitoring.enabled":               true,
+		"monitoring.mode":                  "prometheus",
+		"monitoring.otlp_endpoint":         "",
+		"monitoring.push_interval_seconds": 15,
+		"monitoring.metrics_host":          "0.0.0.0",
+		"monitoring.metrics_port":          9092,
+		"monitoring.service_name":          "bytefreezer-piper",
+		"monitoring.log_level":             "info",
+		"monitoring.enable_tracing":        false,
 
 		"secrets.provider": "aws",
 
