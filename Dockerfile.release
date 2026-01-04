@@ -1,0 +1,42 @@
+# Dockerfile for release builds using pre-built binary
+FROM alpine:3.19
+
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+RUN addgroup -g 1000 -S bytefreezer && \
+    adduser -u 1000 -S bytefreezer -G bytefreezer -s /bin/sh -D
+
+RUN mkdir -p /etc/bytefreezer-piper \
+             /var/log/bytefreezer-piper \
+             /opt/geoip && \
+    chown -R bytefreezer:bytefreezer /etc/bytefreezer-piper \
+                                    /var/log/bytefreezer-piper \
+                                    /opt/geoip
+
+COPY bytefreezer-piper /bytefreezer-piper
+RUN chmod +x /bytefreezer-piper
+
+COPY --chown=bytefreezer:bytefreezer config.yaml /etc/bytefreezer-piper/config.yaml
+
+USER bytefreezer
+
+ENV CONFIG_FILE=/etc/bytefreezer-piper/config.yaml
+
+EXPOSE 8082/tcp 9092/tcp
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8082/api/v1/health || exit 1
+
+WORKDIR /
+
+CMD ["/bytefreezer-piper", "--config", "/etc/bytefreezer-piper/config.yaml"]
+
+LABEL maintainer="ByteFreezer Team" \
+      org.opencontainers.image.title="ByteFreezer Piper" \
+      org.opencontainers.image.description="Data pipeline processor for ByteFreezer platform" \
+      org.opencontainers.image.vendor="ByteFreezer" \
+      org.opencontainers.image.source="https://github.com/bytefreezer/bytefreezer"
