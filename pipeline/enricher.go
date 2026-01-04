@@ -4,11 +4,7 @@
 package pipeline
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -28,23 +24,9 @@ type EnricherFilter struct {
 	header        []string
 	data          [][]string
 	index         map[string][]int // index column value -> row indices
-	indexColumn   string           // the enricher's index column (first index column)
 	lastReload    time.Time
 	mutex         sync.RWMutex
 	enricherReady bool
-}
-
-// sanitizeName replaces all non-alphanumeric characters with dashes
-func sanitizeName(name string) string {
-	var result strings.Builder
-	for _, r := range name {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
-			result.WriteRune(r)
-		} else {
-			result.WriteRune('-')
-		}
-	}
-	return strings.ToLower(result.String())
 }
 
 // NewEnricherFilter creates a new enricher filter
@@ -191,103 +173,6 @@ func (f *EnricherFilter) loadEnricherDataFromDB(ctx *FilterContext) error {
 	// This is expected in Control API mode - enricher data should be loaded differently
 	log.Debugf("Enricher %s: database loading not available (using Control API mode)", f.EnricherID)
 	return nil // Don't fail, just skip database loading
-}
-
-// loadEnricherDataFromDBLegacy is the original PostgreSQL-based implementation
-// kept for reference but no longer used since PostgreSQL is not available
-func (f *EnricherFilter) loadEnricherDataFromDBLegacy(ctx *FilterContext) error {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	// Get state manager from context
-	if ctx == nil || ctx.StateManager == nil {
-		return fmt.Errorf("no state manager available")
-	}
-
-	// Note: PostgreSQL state manager is no longer available
-	// This function is kept for reference only
-	return fmt.Errorf("enricher data loading requires PostgreSQL which is not available")
-}
-
-// loadEnricherDataFromControl would load enricher data from Control API
-// TODO: Implement when enricher API is added to Control service
-func (f *EnricherFilter) loadEnricherDataFromControl(ctx *FilterContext) error {
-	// Placeholder for future implementation
-	log.Debugf("Enricher %s: Control API enricher loading not yet implemented", f.EnricherID)
-	return nil
-}
-
-func (f *EnricherFilter) parseEnricherData(fileData []byte, indexColumn string) error {
-	// Parse JSON lines format from binary data
-	reader := bytes.NewReader(fileData)
-	scanner := bufio.NewScanner(reader)
-
-	// First line is header
-	if !scanner.Scan() {
-		return fmt.Errorf("empty enricher data")
-	}
-
-	var header []string
-	if err := json.Unmarshal(scanner.Bytes(), &header); err != nil {
-		return fmt.Errorf("failed to parse header: %w", err)
-	}
-
-	// If no index column from metadata, use first column
-	if indexColumn == "" && len(header) > 0 {
-		indexColumn = header[0]
-	}
-
-	// Find index column position in header
-	indexColIdx := -1
-	for i, col := range header {
-		if col == indexColumn {
-			indexColIdx = i
-			break
-		}
-	}
-
-	if indexColIdx == -1 {
-		return fmt.Errorf("index column %s not found in enricher data", indexColumn)
-	}
-
-	// Read data rows
-	data := make([][]string, 0)
-	for scanner.Scan() {
-		var row []string
-		if err := json.Unmarshal(scanner.Bytes(), &row); err != nil {
-			log.Warnf("Failed to parse row: %v", err)
-			continue
-		}
-		data = append(data, row)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading data: %w", err)
-	}
-
-	// Build index using the index column
-	index := make(map[string][]int)
-	for i, row := range data {
-		if indexColIdx < len(row) {
-			key := row[indexColIdx]
-			if key != "" {
-				index[key] = append(index[key], i)
-			}
-		}
-	}
-
-	// Update filter data
-	f.header = header
-	f.data = data
-	f.index = index
-	f.indexColumn = indexColumn
-	f.lastReload = time.Now()
-	f.enricherReady = true
-
-	log.Infof("Loaded enricher %s: %d rows, %d unique keys, index column: %s, target field: %s",
-		f.EnricherID, len(data), len(index), indexColumn, f.TargetField)
-
-	return nil
 }
 
 // rowToMap converts a row to a map using header
