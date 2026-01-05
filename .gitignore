@@ -33,4 +33,4 @@ CLAUDE.md
 #ignore DS_STORE
 *.DS_Store
 
-distribution/docker/bytefreezer-cache
+distribution/docker/bytefreezer-cacheansible/playbooks/dist/
