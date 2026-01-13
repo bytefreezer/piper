@@ -175,8 +175,6 @@ func NewServer(services *services.Services, conf *config.Config) *Server {
 }
 
 func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
-	// Capture geoipUpdater from Run() function scope
-	geoipUpdater, _ := geoip.NewUpdater(svc.Config)
 	// exit cleanly on signal
 	signalC := make(chan os.Signal, 1)
 	signal.Notify(signalC, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGTERM)
@@ -219,20 +217,10 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 
 	log.Infof("Starting housekeeping with interval %v", baseInterval)
 
-	// Run initial housekeeping immediately on startup
+	// Run initial housekeeping immediately on startup (includes GeoIP update)
 	log.Info("Running initial housekeeping on startup...")
 	if housekeepingFn != nil && svc.Config.Housekeeping.Enabled {
 		housekeepingFn()
-	}
-
-	// Run initial GeoIP update on startup (separate from housekeeping)
-	if geoipUpdater != nil {
-		log.Info("Running initial GeoIP database update on startup...")
-		if err := geoipUpdater.CheckAndUpdate(svc.ctx); err != nil {
-			log.Errorf("Failed to update GeoIP databases on startup: %v", err)
-		} else {
-			log.Info("Initial GeoIP database update completed successfully")
-		}
 	}
 
 	// Continue with regular intervals
