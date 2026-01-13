@@ -803,11 +803,6 @@ func (f *RegexReplaceFilter) Apply(ctx *FilterContext, record map[string]interfa
 	}, nil
 }
 
-// NewJSONParseFilter creates a JSON parse filter (not implemented - use NDJSON format instead)
-func NewJSONParseFilter(config map[string]interface{}) (Filter, error) {
-	return nil, fmt.Errorf("json_parse filter not implemented - bytefreezer-piper only supports NDJSON format")
-}
-
 // NewDateParseFilter creates a date parse filter
 func NewDateParseFilter(config map[string]interface{}) (Filter, error) {
 	return NewDateParseFilterComplete(config)
