@@ -168,6 +168,8 @@ func (g *GrokPatternLibrary) CompilePattern(pattern string) (*regexp.Regexp, map
 }
 
 // resolvePattern recursively resolves pattern references
+// It expands nested patterns like %{MAC} -> %{CISCOMAC}|%{WINDOWSMAC}|%{COMMONMAC}
+// For patterns with field names like %{IP:source_ip}, it preserves the field name syntax
 func (g *GrokPatternLibrary) resolvePattern(pattern string, visited map[string]bool) (string, error) {
 	// Detect circular references
 	if visited[pattern] {
@@ -176,9 +178,10 @@ func (g *GrokPatternLibrary) resolvePattern(pattern string, visited map[string]b
 	visited[pattern] = true
 
 	result := pattern
-	re := regexp.MustCompile(`%\{([A-Z0-9_]+)(?::[a-z0-9_]+)?\}`)
+	// Match both %{PATTERN} and %{PATTERN:fieldname} forms
+	re := regexp.MustCompile(`%\{([A-Z0-9_]+)(:[a-z0-9_]+)?\}`)
 
-	// Keep resolving until no more pattern references
+	// Keep resolving until no more pattern references (except those with field names at the top level)
 	maxIterations := 100 // Prevent infinite loops
 	for i := 0; i < maxIterations; i++ {
 		matches := re.FindAllStringSubmatch(result, -1)
@@ -188,11 +191,25 @@ func (g *GrokPatternLibrary) resolvePattern(pattern string, visited map[string]b
 
 		changed := false
 		for _, match := range matches {
-			patternName := match[1]
+			fullMatch := match[0]   // e.g., %{IP:actop_ip} or %{IP}
+			patternName := match[1] // e.g., IP
+			fieldSuffix := match[2] // e.g., :actop_ip or empty
+
 			if patternDef, exists := g.patterns[patternName]; exists {
-				// Replace pattern reference with actual pattern
-				old := fmt.Sprintf("%%{%s}", patternName)
-				result = strings.ReplaceAll(result, old, patternDef)
+				var replacement string
+				if fieldSuffix != "" {
+					// Has field name - keep the grok syntax but with fully expanded pattern stored
+					// First, fully resolve the pattern definition (expand all nested patterns)
+					fullyResolved := g.fullyResolvePattern(patternDef)
+					// Create a unique resolved pattern name
+					resolvedName := "RESOLVED_" + patternName
+					g.patterns[resolvedName] = fullyResolved
+					replacement = fmt.Sprintf("%%{%s%s}", resolvedName, fieldSuffix)
+				} else {
+					// No field name - just expand the pattern inline
+					replacement = patternDef
+				}
+				result = strings.Replace(result, fullMatch, replacement, 1)
 				changed = true
 			}
 		}
@@ -203,6 +220,38 @@ func (g *GrokPatternLibrary) resolvePattern(pattern string, visited map[string]b
 	}
 
 	return result, nil
+}
+
+// fullyResolvePattern expands all pattern references without field names
+// Used to get the raw regex for a pattern like IP -> actual IPv4/IPv6 regex
+func (g *GrokPatternLibrary) fullyResolvePattern(pattern string) string {
+	result := pattern
+	re := regexp.MustCompile(`%\{([A-Z0-9_]+)\}`) // Only match patterns WITHOUT field names
+
+	maxIterations := 100
+	for i := 0; i < maxIterations; i++ {
+		matches := re.FindAllStringSubmatch(result, -1)
+		if len(matches) == 0 {
+			break
+		}
+
+		changed := false
+		for _, match := range matches {
+			fullMatch := match[0]
+			patternName := match[1]
+
+			if patternDef, exists := g.patterns[patternName]; exists {
+				result = strings.Replace(result, fullMatch, patternDef, 1)
+				changed = true
+			}
+		}
+
+		if !changed {
+			break
+		}
+	}
+
+	return result
 }
 
 // GetPattern retrieves a pattern by name
