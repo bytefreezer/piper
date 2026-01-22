@@ -13,40 +13,6 @@ import (
 	"time"
 )
 
-// JSONParser parses JSON log entries
-type JSONParser struct {
-	name string
-}
-
-func NewJSONParser(config map[string]interface{}) (Parser, error) {
-	return &JSONParser{
-		name: "json-logs",
-	}, nil
-}
-
-func (p *JSONParser) Parse(ctx context.Context, data []byte) (map[string]interface{}, error) {
-	var result map[string]interface{}
-	if err := sonic.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
-	}
-	return result, nil
-}
-
-func (p *JSONParser) Name() string {
-	return p.name
-}
-
-func (p *JSONParser) Type() string {
-	return "json"
-}
-
-func (p *JSONParser) Configure(config map[string]interface{}) error {
-	if name, ok := config["name"].(string); ok {
-		p.name = name
-	}
-	return nil
-}
-
 // NDJSONParser parses NDJSON (newline-delimited JSON) entries with robust handling of malformed files
 type NDJSONParser struct {
 	name string
@@ -130,14 +96,6 @@ func (p *NDJSONParser) reconstructJSONObject(input string) (string, error) {
 func (p *NDJSONParser) isCompleteJSON(s string) bool {
 	var temp map[string]interface{}
 	return sonic.Unmarshal([]byte(s), &temp) == nil
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func (p *NDJSONParser) Name() string {

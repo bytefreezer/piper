@@ -21,7 +21,6 @@ func NewRegistry() ParserRegistry {
 	}
 
 	// Register built-in parsers
-	// registry.Register("json-logs", NewJSONParser) // Removed - only NDJSON supported
 	registry.Register("ndjson-logs", NewNDJSONParser)
 	registry.Register("syslog-rfc3164", NewSyslogParser)
 	registry.Register("plaintext", NewPlaintextParser)
