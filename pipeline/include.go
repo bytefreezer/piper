@@ -122,7 +122,7 @@ func (f *IncludeFilter) Apply(ctx *FilterContext, record map[string]interface{})
 		if exists {
 			// Check equals condition
 			if f.Equals != nil {
-				if f.compareValues(fieldValue, f.Equals) {
+				if CompareValues(fieldValue, f.Equals) {
 					shouldKeep = true
 				}
 			}
@@ -157,7 +157,7 @@ func (f *IncludeFilter) Apply(ctx *FilterContext, record map[string]interface{})
 
 			// Check any_equals
 			if f.AnyEquals != nil {
-				if f.compareValues(fieldValue, f.AnyEquals) {
+				if CompareValues(fieldValue, f.AnyEquals) {
 					shouldKeep = true
 					break
 				}
@@ -192,18 +192,4 @@ func (f *IncludeFilter) Apply(ctx *FilterContext, record map[string]interface{})
 		Applied:  true,
 		Duration: time.Since(start),
 	}, nil
-}
-
-// compareValues compares two values for equality
-func (f *IncludeFilter) compareValues(a, b interface{}) bool {
-	// Try direct comparison first
-	if a == b {
-		return true
-	}
-
-	// Convert both to strings for comparison
-	aStr := fmt.Sprintf("%v", a)
-	bStr := fmt.Sprintf("%v", b)
-
-	return aStr == bStr
 }

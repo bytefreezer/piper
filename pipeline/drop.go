@@ -168,7 +168,7 @@ func (f *DropFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*
 
 		if exists {
 			// Check unless_equals
-			if f.UnlessEquals != nil && f.compareValues(fieldValue, f.UnlessEquals) {
+			if f.UnlessEquals != nil && CompareValues(fieldValue, f.UnlessEquals) {
 				log.Debugf("Drop filter: unless_equals condition matched, NOT dropping")
 				return &FilterResult{
 					Record:   record,
@@ -213,14 +213,14 @@ func (f *DropFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*
 
 		// Check equals condition
 		if f.Equals != nil {
-			if f.compareValues(fieldValue, f.Equals) {
+			if CompareValues(fieldValue, f.Equals) {
 				shouldDrop = true
 			}
 		}
 
 		// Check not_equals condition
 		if f.NotEquals != nil {
-			if !f.compareValues(fieldValue, f.NotEquals) {
+			if !CompareValues(fieldValue, f.NotEquals) {
 				shouldDrop = true
 			}
 		}
@@ -279,18 +279,4 @@ func (f *DropFilter) Apply(ctx *FilterContext, record map[string]interface{}) (*
 		Applied:  false,
 		Duration: time.Since(start),
 	}, nil
-}
-
-// compareValues compares two values for equality
-func (f *DropFilter) compareValues(a, b interface{}) bool {
-	// Try direct comparison first
-	if a == b {
-		return true
-	}
-
-	// Convert both to strings for comparison
-	aStr := fmt.Sprintf("%v", a)
-	bStr := fmt.Sprintf("%v", b)
-
-	return aStr == bStr
 }

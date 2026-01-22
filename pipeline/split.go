@@ -18,14 +18,6 @@ type SplitFilter struct {
 	Target     string
 }
 
-// SplitFilterResult extends FilterResult to support multiple output records
-type SplitFilterResult struct {
-	Records  []map[string]interface{}
-	Skip     bool
-	Applied  bool
-	Duration time.Duration
-}
-
 // NewSplitFilter creates a new split filter
 func NewSplitFilter(config map[string]interface{}) (Filter, error) {
 	filter := &SplitFilter{
