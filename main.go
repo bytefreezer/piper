@@ -99,12 +99,23 @@ func Run() error {
 	log.Infof("Cleaning up stale operations from previous runs...")
 	cleanupStaleOperations(cfg)
 
-	// Initialize GeoIP updater
+	// Initialize GeoIP updater and download databases BEFORE starting API
+	// This ensures geoip filters can be created immediately on startup
 	geoipUpdater, err := geoip.NewUpdater(cfg)
 	if err != nil {
 		log.Errorf("Failed to initialize GeoIP updater: %v", err)
 		// Continue without GeoIP updates rather than failing completely
 		geoipUpdater = nil
+	} else {
+		// Download GeoIP databases synchronously on startup
+		log.Info("Downloading GeoIP databases on startup (if needed)...")
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		if err := geoipUpdater.CheckAndUpdate(ctx); err != nil {
+			log.Warnf("Failed to download GeoIP databases on startup: %v (will retry during housekeeping)", err)
+		} else {
+			log.Info("GeoIP databases are ready")
+		}
+		cancel()
 	}
 
 	// Business Logic - Initialize services
