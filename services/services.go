@@ -204,7 +204,7 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 		return value[:2] + "****" + value[len(value)-2:]
 	}
 
-	return map[string]interface{}{
+	configMap := map[string]interface{}{
 		"service_type":    "bytefreezer-piper",
 		"version":         conf.App.Version,
 		"instance_id":     conf.App.InstanceID,
@@ -301,4 +301,11 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 			"multi_format_support",
 		},
 	}
+
+	// Add account_id at root level if configured (for on-prem installs)
+	if conf.ControlService.AccountID != "" {
+		configMap["account_id"] = conf.ControlService.AccountID
+	}
+
+	return configMap
 }
