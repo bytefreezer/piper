@@ -126,10 +126,16 @@ func NewServices(conf *config.Config) *Services {
 		timeout := time.Duration(conf.HealthReporting.TimeoutSeconds) * time.Second
 
 		// Get actual hostname
+		// If running in Kubernetes with POD_NAME env var, use hostname.podname format
+		// This helps operators identify both the host and specific pod for debugging
 		hostname, err := os.Hostname()
 		if err != nil {
 			log.Warnf("Failed to get hostname, using 'localhost': %v", err)
 			hostname = "localhost"
+		}
+		if podName := os.Getenv("POD_NAME"); podName != "" {
+			hostname = fmt.Sprintf("%s.%s", hostname, podName)
+			log.Infof("Running in Kubernetes, instance ID: %s", hostname)
 		}
 
 		// Create instance API URL without protocol
