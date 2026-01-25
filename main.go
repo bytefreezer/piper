@@ -67,6 +67,9 @@ func Run() error {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
+	// Set runtime build info
+	cfg.App.GitCommit = gitCommit
+
 	log.Infof("Configuration loaded successfully")
 	log.Infof("Instance ID: %s", cfg.App.InstanceID)
 

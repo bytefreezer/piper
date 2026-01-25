@@ -40,6 +40,7 @@ type Config struct {
 type App struct {
 	Name           string `koanf:"name"`
 	Version        string `koanf:"version"`
+	GitCommit      string `koanf:"-"` // Set at runtime from build flags
 	InstanceID     string `koanf:"instance_id"`
 	LogLevel       string `koanf:"log_level"`
 	Dev            bool   `koanf:"dev"`
