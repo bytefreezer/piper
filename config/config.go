@@ -235,11 +235,16 @@ func LoadConfig(configPath string) (*Config, error) {
 
 // generateInstanceID creates a stable identifier for this service instance based on hostname
 // This remains constant across restarts, allowing detection and cleanup of abandoned locks
+// If running in Kubernetes with NODE_NAME env var, returns node.pod format
 func generateInstanceID() string {
 	hostname, err := os.Hostname()
 	if err != nil {
 		// Fallback to a default if hostname can't be determined
 		return "piper-unknown"
+	}
+	// In K8s: hostname is the pod name, NODE_NAME is the actual node
+	if nodeName := os.Getenv("NODE_NAME"); nodeName != "" {
+		return nodeName + "." + hostname
 	}
 	return hostname
 }
