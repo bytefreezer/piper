@@ -243,7 +243,7 @@ func generateInstanceID() string {
 		return "piper-unknown"
 	}
 	// In K8s: hostname is the pod name, NODE_NAME is the actual node
-	if nodeName := os.Getenv("NODE_NAME"); nodeName != "" {
+	if nodeName := os.Getenv("NODE_NAME"); nodeName != "" && nodeName != hostname {
 		return nodeName + "." + hostname
 	}
 	return hostname
