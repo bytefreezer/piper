@@ -90,7 +90,7 @@ config:
     enabled: true
     # api_key comes from AWX variable: bytefreezer_api_key
     timeout_seconds: 30
-    account_id: ""  # Empty = process all Demo accounts (deployment_type: Demo)
+    account_id: "managed"
     tenant_id: ""   # Empty = process all tenants
 
   # Parser configuration for log parsing (Logstash-style)

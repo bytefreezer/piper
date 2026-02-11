@@ -91,7 +91,7 @@ config:
     enabled: true
     # api_key comes from AWX variable: bytefreezer_api_key
     timeout_seconds: 30
-    account_id: ""  # Empty = process all managed accounts (deployment_type: managed)
+    account_id: "managed"
     tenant_id: ""   # Empty = process all tenants
 
   # Parser configuration for log parsing (Logstash-style)
