@@ -213,7 +213,6 @@ func buildHealthConfiguration(conf *config.Config, instanceAPI string) map[strin
 	configMap := map[string]interface{}{
 		"service_type":    "bytefreezer-piper",
 		"version":         conf.App.Version,
-		"git_commit":      conf.App.GitCommit,
 		"instance_id":     conf.App.InstanceID,
 		"instance_api":    instanceAPI,
 		"report_interval": conf.HealthReporting.ReportInterval,

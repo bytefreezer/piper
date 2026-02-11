@@ -68,7 +68,6 @@ func Run() error {
 	}
 
 	// Set runtime build info from ldflags (overrides config file values)
-	cfg.App.GitCommit = gitCommit
 	cfg.App.Version = version
 
 	log.Infof("Configuration loaded successfully")
