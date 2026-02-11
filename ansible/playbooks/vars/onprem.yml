@@ -37,7 +37,6 @@ logrotate:
 config:
   app:
     name: "bytefreezer-piper"
-    version: "1.0.0"
     log_level: "info"
     deployment_type: "on_prem"
 
