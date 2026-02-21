@@ -5,7 +5,6 @@ package pipeline
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -14,75 +13,16 @@ import (
 
 // ExcludeFilter drops events that match specified conditions (keeps everything else)
 type ExcludeFilter struct {
-	// Field-based conditions
-	Field    string
-	Equals   interface{}
-	Contains string
-	Matches  string
-	MatchRe  *regexp.Regexp
-
-	// Multiple field matching (OR logic)
-	AnyField   []string
-	AnyEquals  interface{}
-	AnyMatches string
-	AnyMatchRe *regexp.Regexp
+	FieldMatcher
 }
 
 // NewExcludeFilter creates a new exclude filter
 func NewExcludeFilter(config map[string]interface{}) (Filter, error) {
-	filter := &ExcludeFilter{}
-
-	// Parse field condition
-	if field, ok := config["field"].(string); ok {
-		filter.Field = field
+	fm, err := ParseFieldMatcher(config)
+	if err != nil {
+		return nil, err
 	}
-
-	// Parse equals condition
-	if equals, ok := config["equals"]; ok {
-		filter.Equals = equals
-	}
-
-	// Parse contains condition
-	if contains, ok := config["contains"].(string); ok {
-		filter.Contains = contains
-	}
-
-	// Parse matches condition (regex)
-	if matches, ok := config["matches"].(string); ok {
-		filter.Matches = matches
-		compiled, err := regexp.Compile(matches)
-		if err != nil {
-			return nil, fmt.Errorf("failed to compile matches pattern '%s': %w", matches, err)
-		}
-		filter.MatchRe = compiled
-	}
-
-	// Parse any_field condition (array of fields)
-	if anyFieldInterface, ok := config["any_field"].([]interface{}); ok {
-		filter.AnyField = make([]string, 0, len(anyFieldInterface))
-		for _, fieldInterface := range anyFieldInterface {
-			if field, ok := fieldInterface.(string); ok {
-				filter.AnyField = append(filter.AnyField, field)
-			}
-		}
-	}
-
-	// Parse any_equals condition
-	if anyEquals, ok := config["any_equals"]; ok {
-		filter.AnyEquals = anyEquals
-	}
-
-	// Parse any_matches condition
-	if anyMatches, ok := config["any_matches"].(string); ok {
-		filter.AnyMatches = anyMatches
-		compiled, err := regexp.Compile(anyMatches)
-		if err != nil {
-			return nil, fmt.Errorf("failed to compile any_matches pattern '%s': %w", anyMatches, err)
-		}
-		filter.AnyMatchRe = compiled
-	}
-
-	return filter, nil
+	return &ExcludeFilter{FieldMatcher: *fm}, nil
 }
 
 // Type returns the filter type

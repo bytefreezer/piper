@@ -230,16 +230,12 @@ func NewConditionalFilter(config map[string]interface{}) (Filter, error) {
 	}
 
 	// Validate operator
-	validOperators := []string{"eq", "ne", "gt", "lt", "gte", "lte", "contains", "not_contains", "exists", "not_exists"}
-	isValidOperator := false
-	for _, validOp := range validOperators {
-		if operator == validOp {
-			isValidOperator = true
-			break
-		}
+	validOperators := map[string]bool{
+		"eq": true, "ne": true, "gt": true, "lt": true, "gte": true, "lte": true,
+		"contains": true, "not_contains": true, "exists": true, "not_exists": true,
 	}
-	if !isValidOperator {
-		return nil, fmt.Errorf("invalid operator '%s', valid operators: %v", operator, validOperators)
+	if !validOperators[operator] {
+		return nil, fmt.Errorf("invalid operator '%s'", operator)
 	}
 
 	return &ConditionalFilter{
