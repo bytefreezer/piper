@@ -63,10 +63,6 @@ func (p *BasicPipeline) Process(ctx *FilterContext, record map[string]interface{
 
 	// Process through each filter
 	for _, filter := range p.filters {
-		if !p.isFilterEnabled(filter) {
-			continue
-		}
-
 		filterResult, err := filter.Apply(ctx, result.Record)
 		if err != nil {
 			p.stats.RecordsErrored++
@@ -144,13 +140,6 @@ func (p *BasicPipeline) loadFilters() error {
 	}
 
 	return nil
-}
-
-// isFilterEnabled checks if a filter should be processed
-func (p *BasicPipeline) isFilterEnabled(filter Filter) bool {
-	// For now, all loaded filters are enabled
-	// This could be extended to support runtime enable/disable
-	return true
 }
 
 // BasicPipelineProcessor manages multiple pipelines
