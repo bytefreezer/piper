@@ -6,7 +6,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/bytefreezer/goodies/log"
@@ -125,21 +124,8 @@ func NewServices(conf *config.Config) *Services {
 		// Parse timeout
 		timeout := time.Duration(conf.HealthReporting.TimeoutSeconds) * time.Second
 
-		// Get actual hostname
-		// If running in Kubernetes with NODE_NAME env var, use node.pod format
-		// This helps operators identify both the node and specific pod for debugging
-		hostname, err := os.Hostname()
-		if err != nil {
-			log.Warnf("Failed to get hostname, using 'localhost': %v", err)
-			hostname = "localhost"
-		}
-		if nodeName := os.Getenv("NODE_NAME"); nodeName != "" && nodeName != hostname {
-			hostname = fmt.Sprintf("%s.%s", nodeName, hostname)
-			log.Infof("Running in Kubernetes on node %s, instance ID: %s", nodeName, hostname)
-		}
-
-		// Create instance API URL without protocol
-		instanceAPI := fmt.Sprintf("%s:%d", hostname, conf.Server.ApiPort)
+		// Use instance ID from config (already handles Docker container ID and K8s NODE_NAME)
+		instanceAPI := fmt.Sprintf("%s:%d", conf.App.InstanceID, conf.Server.ApiPort)
 
 		// Build configuration data with masked sensitive fields
 		configuration := buildHealthConfiguration(conf, instanceAPI)

@@ -6,6 +6,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/knadh/koanf/parsers/yaml"
@@ -232,13 +234,50 @@ func LoadConfig(configPath string) (*Config, error) {
 	return &config, nil
 }
 
-// generateInstanceID creates a stable identifier for this service instance based on hostname
-// This remains constant across restarts, allowing detection and cleanup of abandoned locks
-// If running in Kubernetes with NODE_NAME env var, returns node.pod format
+// getDockerContainerID returns the short container ID if running inside Docker, empty string otherwise.
+func getDockerContainerID() string {
+	if _, err := os.Stat("/.dockerenv"); err != nil {
+		return ""
+	}
+	data, err := os.ReadFile("/proc/self/cgroup")
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if idx := strings.LastIndex(line, "/docker/"); idx != -1 {
+			id := line[idx+len("/docker/"):]
+			if len(id) >= 12 {
+				return id[:12]
+			}
+		}
+		if idx := strings.LastIndex(line, "/docker-"); idx != -1 {
+			id := strings.TrimSuffix(line[idx+len("/docker-"):], ".scope")
+			if len(id) >= 12 {
+				return id[:12]
+			}
+		}
+	}
+	data, err = os.ReadFile("/proc/1/cpuset")
+	if err != nil {
+		return ""
+	}
+	cpuset := strings.TrimSpace(string(data))
+	id := filepath.Base(cpuset)
+	if len(id) >= 12 && id != "/" {
+		return id[:12]
+	}
+	return ""
+}
+
+// generateInstanceID creates a stable identifier for this service instance.
+// Prefers Docker container ID when running in Docker, then hostname.
+// If running in Kubernetes with NODE_NAME env var, returns node.pod format.
 func generateInstanceID() string {
+	if containerID := getDockerContainerID(); containerID != "" {
+		return containerID
+	}
 	hostname, err := os.Hostname()
 	if err != nil {
-		// Fallback to a default if hostname can't be determined
 		return "piper-unknown"
 	}
 	// In K8s: hostname is the pod name, NODE_NAME is the actual node
