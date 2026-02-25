@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -220,6 +221,18 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 			selfCleanup("bytefreezer-piper")
 			os.Exit(0)
 		}()
+
+		// Listen for upgrade directive from control plane
+		go func() {
+			tag := <-svc.Services.HealthReporter.UpgradeChan()
+			log.Warnf("Upgrade directive received — upgrading to %s", tag)
+			if err := selfUpgrade("piper", tag); err != nil {
+				log.Errorf("Self-upgrade failed: %v", err)
+				return
+			}
+			svc.Services.HealthReporter.Stop()
+			os.Exit(0) // systemd restarts with new binary
+		}()
 	}
 
 	// Start transformation metrics reporter if enabled
@@ -311,6 +324,48 @@ func (svc *Server) Stop(timeout time.Duration) error {
 		close(svc.quitterC)
 		log.Debug("forced close of quitterC channel")
 	}
+	return nil
+}
+
+// selfUpgrade downloads a .deb from GitHub releases and installs it via dpkg
+func selfUpgrade(repoName, tag string) error {
+	ver := strings.TrimPrefix(tag, "v")
+	url := fmt.Sprintf("https://github.com/bytefreezer/%s/releases/download/%s/bytefreezer-%s_%s_amd64.deb",
+		repoName, tag, repoName, ver)
+
+	log.Infof("Downloading upgrade package from %s", url)
+
+	resp, err := http.Get(url) // #nosec G107 -- URL constructed from trusted release tag
+	if err != nil {
+		return fmt.Errorf("failed to download .deb: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed with HTTP %d", resp.StatusCode)
+	}
+
+	tmpFile, err := os.CreateTemp("", "bytefreezer-upgrade-*.deb")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write .deb to disk: %w", err)
+	}
+	tmpFile.Close()
+
+	log.Infof("Installing upgrade package %s", tmpPath)
+	// #nosec G204 -- tmpPath is a temp file we just created, not user input
+	out, err := exec.Command("dpkg", "-i", tmpPath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("dpkg -i failed: %w — output: %s", err, string(out))
+	}
+
+	log.Infof("Upgrade package installed — dpkg output: %s", string(out))
 	return nil
 }
 
