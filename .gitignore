@@ -24,8 +24,8 @@ go.work
 # sqllite db file or local testing.
 gorm.db
 
-#ignore build file
-#bytefreezer-piper
+# Build binaries
+bytefreezer-piper
 
 #ignore claude
 CLAUDE.md
@@ -36,4 +36,4 @@ CLAUDE.md
 distribution/docker/bytefreezer-cache
 
 # Ansible build artifacts
-#ansible/playbooks/dist/
+ansible/playbooks/dist/
