@@ -320,13 +320,9 @@ func (s *PiperService) processJob(ctx context.Context, job *domain.ProcessingJob
 	jobCtx, cancel := context.WithTimeout(ctx, s.cfg.Processing.JobTimeout)
 	defer cancel()
 
-	// Update job status to processing
+	// Update job status to processing (non-fatal — status tracking is telemetry, not a gate)
 	if err := s.stateManager.UpdateJobStatus(jobCtx, job.JobID, domain.JobStatusProcessing); err != nil {
-		log.Errorf("Failed to update job status to processing: %v", err)
-		if s.activityReporter != nil {
-			s.activityReporter.FailOperation(operationID, fmt.Sprintf("Failed to update status: %v", err))
-		}
-		return
+		log.Warnf("Failed to update job status to processing (continuing anyway): %v", err)
 	}
 
 	// Process the file using pipeline
