@@ -270,19 +270,24 @@ func getDockerContainerID() string {
 }
 
 // generateInstanceID creates a stable identifier for this service instance.
-// Prefers Docker container ID when running in Docker, then hostname.
-// If running in Kubernetes with NODE_NAME env var, returns node.pod format.
+// Docker: host:containerID (uses HOST_HOSTNAME env var for host).
+// Kubernetes: node.pod format (uses NODE_NAME env var).
+// Bare metal: hostname.
 func generateInstanceID() string {
-	if containerID := getDockerContainerID(); containerID != "" {
-		return containerID
+	containerID := getDockerContainerID()
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "piper-unknown"
 	}
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "piper-unknown"
+	if containerID != "" {
+		if hostHostname := os.Getenv("HOST_HOSTNAME"); hostHostname != "" {
+			hostname = fmt.Sprintf("%s:%s", hostHostname, containerID)
+		} else {
+			hostname = containerID
+		}
 	}
-	// In K8s: hostname is the pod name, NODE_NAME is the actual node
 	if nodeName := os.Getenv("NODE_NAME"); nodeName != "" && nodeName != hostname {
-		return nodeName + "." + hostname
+		hostname = fmt.Sprintf("%s.%s", nodeName, hostname)
 	}
 	return hostname
 }
