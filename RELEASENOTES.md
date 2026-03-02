@@ -1,5 +1,15 @@
 # ByteFreezer Piper - Release Notes
 
+## 2026-03-01 - Non-fatal Job Status Updates
+
+### Bug Fix
+
+#### UpdateJobStatus failure no longer blocks processing
+- **Issue**: `processJob()` called `UpdateJobStatus("processing")` before processing. If this control API call failed (e.g., timeout, network issue), the entire job was abandoned with `return`. This blocked ALL file processing when the control plane was slow or unreachable.
+- **Fix**: Made the status update non-fatal — log a warning and continue processing. Status tracking is telemetry, not a processing gate.
+- **File Changed**: `services/piper_service.go:324-330`
+- **Impact**: Piper now processes files even when the control plane status endpoint is unreachable. The `failed` and `completed` status updates were already non-fatal.
+
 ## 2026-01-02 - GeoIP Nested Field Access Fix
 
 ### Bug Fix
