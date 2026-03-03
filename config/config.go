@@ -6,8 +6,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/knadh/koanf/parsers/yaml"
@@ -234,39 +232,10 @@ func LoadConfig(configPath string) (*Config, error) {
 	return &config, nil
 }
 
-// getDockerContainerID returns the short container ID if running inside Docker, empty string otherwise.
-func getDockerContainerID() string {
-	if _, err := os.Stat("/.dockerenv"); err != nil {
-		return ""
-	}
-	data, err := os.ReadFile("/proc/self/cgroup")
-	if err != nil {
-		return ""
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if idx := strings.LastIndex(line, "/docker/"); idx != -1 {
-			id := line[idx+len("/docker/"):]
-			if len(id) >= 12 {
-				return id[:12]
-			}
-		}
-		if idx := strings.LastIndex(line, "/docker-"); idx != -1 {
-			id := strings.TrimSuffix(line[idx+len("/docker-"):], ".scope")
-			if len(id) >= 12 {
-				return id[:12]
-			}
-		}
-	}
-	data, err = os.ReadFile("/proc/1/cpuset")
-	if err != nil {
-		return ""
-	}
-	cpuset := strings.TrimSpace(string(data))
-	id := filepath.Base(cpuset)
-	if len(id) >= 12 && id != "/" {
-		return id[:12]
-	}
-	return ""
+// isDockerContainer returns true if running inside a Docker container.
+func isDockerContainer() bool {
+	_, err := os.Stat("/.dockerenv")
+	return err == nil
 }
 
 // generateInstanceID creates a stable identifier for this service instance.
@@ -274,16 +243,13 @@ func getDockerContainerID() string {
 // Kubernetes: node.pod format (uses NODE_NAME env var).
 // Bare metal: hostname.
 func generateInstanceID() string {
-	containerID := getDockerContainerID()
 	hostname, _ := os.Hostname()
 	if hostname == "" {
 		hostname = "piper-unknown"
 	}
-	if containerID != "" {
+	if isDockerContainer() {
 		if hostHostname := os.Getenv("HOST_HOSTNAME"); hostHostname != "" {
-			hostname = fmt.Sprintf("%s:%s", hostHostname, containerID)
-		} else {
-			hostname = containerID
+			hostname = fmt.Sprintf("%s:%s", hostHostname, hostname)
 		}
 	}
 	if nodeName := os.Getenv("NODE_NAME"); nodeName != "" && nodeName != hostname {
