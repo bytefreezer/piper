@@ -141,7 +141,7 @@ config:
   # Housekeeping configuration
   housekeeping:
     enabled: true
-    intervalseconds: 300
+    interval_seconds: 300
 
   soc:
     enabled: false

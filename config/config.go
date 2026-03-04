@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/bytefreezer/goodies/log"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
@@ -133,7 +134,7 @@ type Monitoring struct {
 // Housekeeping represents housekeeping configuration
 type Housekeeping struct {
 	Enabled         bool          `koanf:"enabled"`
-	IntervalSeconds int           `koanf:"intervalseconds"`
+	IntervalSeconds int           `koanf:"interval_seconds"`
 	Interval        time.Duration // Calculated from IntervalSeconds
 }
 
@@ -309,7 +310,7 @@ func getDefaults() map[string]interface{} {
 		"secrets.provider": "aws",
 
 		"housekeeping.enabled":         true,
-		"housekeeping.intervalseconds": 600,
+		"housekeeping.interval_seconds": 600,
 
 		"dlq.enabled":                  true,
 		"dlq.retry_attempts":           4,
@@ -353,6 +354,10 @@ func validateConfig(config *Config) error {
 		return fmt.Errorf("processing.max_concurrent_jobs must be greater than 0")
 	}
 
+	if config.Processing.JobTimeoutSeconds <= 0 {
+		return fmt.Errorf("processing.job_timeout_seconds is required and must be > 0 (recommended: 600). Without it, all S3 and API operations during processing will fail with instant context deadline exceeded")
+	}
+
 	if config.Processing.RetryAttempts < 0 {
 		return fmt.Errorf("processing.retry_attempts must be non-negative")
 	}
@@ -360,6 +365,26 @@ func validateConfig(config *Config) error {
 	if config.Monitoring.MetricsPort <= 0 || config.Monitoring.MetricsPort > 65535 {
 		return fmt.Errorf("monitoring.metrics_port must be between 1 and 65535")
 	}
+
+	// Warn on misconfigured health reporting
+	if config.HealthReporting.Enabled && config.HealthReporting.ReportInterval <= 0 {
+		log.Warnf("CONFIG WARNING: health_reporting.enabled=true but report_interval=%d — health reports will use default interval", config.HealthReporting.ReportInterval)
+	}
+
+	// Warn on missing API port
+	if config.Server.ApiPort <= 0 {
+		log.Warnf("CONFIG WARNING: server.api_port=%d — API server will bind to random port, health checks will fail", config.Server.ApiPort)
+	}
+
+	// Log effective config summary
+	log.Infof("=== EFFECTIVE CONFIG ===")
+	log.Infof("  server.api_port: %d", config.Server.ApiPort)
+	log.Infof("  s3_source.bucket: %s, endpoint: %s", config.S3Source.BucketName, config.S3Source.Endpoint)
+	log.Infof("  s3_destination.bucket: %s, endpoint: %s", config.S3Dest.BucketName, config.S3Dest.Endpoint)
+	log.Infof("  processing.job_timeout_seconds: %d, max_concurrent_jobs: %d", config.Processing.JobTimeoutSeconds, config.Processing.MaxConcurrentJobs)
+	log.Infof("  housekeeping.enabled: %v, interval_seconds: %d", config.Housekeeping.Enabled, config.Housekeeping.IntervalSeconds)
+	log.Infof("  health_reporting.enabled: %v, report_interval: %ds", config.HealthReporting.Enabled, config.HealthReporting.ReportInterval)
+	log.Infof("  control_service.enabled: %v, url: %s", config.ControlService.Enabled, config.ControlService.ControlURL)
 
 	return nil
 }
