@@ -249,7 +249,8 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 
 	baseInterval := time.Duration(svc.Config.Housekeeping.IntervalSeconds) * time.Second
 	if baseInterval <= 0 {
-		baseInterval = 10 * time.Minute
+		baseInterval = 60 * time.Second
+		log.Infof("housekeeping interval not set — defaulting to %v", baseInterval)
 	}
 
 	log.Infof("Starting housekeeping with interval %v", baseInterval)

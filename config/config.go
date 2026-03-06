@@ -309,8 +309,8 @@ func getDefaults() map[string]interface{} {
 
 		"secrets.provider": "aws",
 
-		"housekeeping.enabled":          true,
-		"housekeeping.interval_seconds": 600,
+		"housekeeping.enabled":         true,
+		"housekeeping.interval_seconds": 60,
 
 		"dlq.enabled":                  true,
 		"dlq.retry_attempts":           4,

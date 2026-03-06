@@ -1,8 +1,8 @@
-# ByteFreezer Piper Configuration — Docker-ready defaults
+# ByteFreezer Piper Configuration — AWX/Ansible deployment
 #
-# This config ships inside the Docker image. Secrets (S3 credentials,
-# control API key) are empty and MUST be supplied via environment variables
-# or a volume-mounted config file override.
+# This file contains AWX placeholder values for systemd/Ansible deployments.
+# Ansible replaces REPLACE_WITH_AWX_VARIABLE_* at deploy time.
+# For Docker deployments, use config.yaml instead.
 
 app:
   name: "bytefreezer-piper"
@@ -12,38 +12,34 @@ app:
 server:
   api_port: 8082
 
-# S3 source (raw data from receiver)
 s3_source:
   bucket_name: "bytefreezer-intake"
   region: "us-east-1"
   poll_interval: "30s"
-  access_key: ""
-  secret_key: ""
-  endpoint: "minio:9000"
+  access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
+  secret_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_secret_key"
+  endpoint: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_endpoint"
   ssl: false
   use_iam_role: false
 
-# S3 destination (processed data for packer)
 s3_destination:
   bucket_name: "bytefreezer-piper"
   region: "us-east-1"
-  access_key: ""
-  secret_key: ""
-  endpoint: "minio:9000"
+  access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
+  secret_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_secret_key"
+  endpoint: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_endpoint"
   ssl: false
   use_iam_role: false
 
-# S3 GeoIP database
 s3_geoip:
   bucket_name: "bytefreezer-geoip"
   region: "us-east-1"
-  access_key: ""
-  secret_key: ""
-  endpoint: "minio:9000"
+  access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
+  secret_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_secret_key"
+  endpoint: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_endpoint"
   ssl: false
   use_iam_role: false
 
-# Processing engine — job_timeout_seconds is REQUIRED (zero = instant deadline exceeded)
 processing:
   max_concurrent_jobs: 10
   job_timeout_seconds: 600
@@ -51,7 +47,6 @@ processing:
   retry_backoff: "exponential"
   buffer_size: 1000
 
-# Pipeline configuration
 pipeline:
   config_refresh_interval: "5m"
   geoip_database_path: "/tmp/geoip"
@@ -59,15 +54,13 @@ pipeline:
   geoip_country_database: "GeoLite2-Country.mmdb"
   enable_geoip: false
 
-# Control Service configuration
 control_service:
   enabled: true
-  control_url: ""
-  api_key: ""
-  account_id: ""
+  control_url: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_control_url"
+  api_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_api_key"
+  account_id: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_account_id"
   timeout_seconds: 30
 
-# Parser configuration
 parsers:
   enabled: false
   load_defaults: true
@@ -105,15 +98,13 @@ parsers:
           source_field: "message"
           on_parse_failure: "pass_through"
 
-# Monitoring
 monitoring:
-  enabled: false
+  enabled: true
   metrics_host: "0.0.0.0"
   metrics_port: 9092
   log_level: "info"
   enable_tracing: false
 
-# Dead Letter Queue
 dlq:
   enabled: true
   retry_attempts: 4
@@ -125,14 +116,12 @@ housekeeping:
   enabled: true
   interval_seconds: 300
 
-# Health reporting to control plane
 health_reporting:
   enabled: true
   report_interval: 30
   timeout_seconds: 10
   register_on_startup: true
 
-# Error tracking
 error_tracking:
   enabled: true
 
