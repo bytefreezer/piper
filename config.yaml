@@ -5,7 +5,7 @@
 # or a volume-mounted config file override.
 
 app:
-  name: "bytefreezer-piper"
+  name: "piper"
   version: "1.0.0"
   log_level: "info"
 
@@ -14,7 +14,7 @@ server:
 
 # S3 source (raw data from receiver)
 s3_source:
-  bucket_name: "bytefreezer-intake"
+  bucket_name: "intake"
   region: "us-east-1"
   poll_interval: "30s"
   access_key: ""
@@ -25,7 +25,7 @@ s3_source:
 
 # S3 destination (processed data for packer)
 s3_destination:
-  bucket_name: "bytefreezer-piper"
+  bucket_name: "piper"
   region: "us-east-1"
   access_key: ""
   secret_key: ""
@@ -35,7 +35,7 @@ s3_destination:
 
 # S3 GeoIP database
 s3_geoip:
-  bucket_name: "bytefreezer-geoip"
+  bucket_name: "geoip"
   region: "us-east-1"
   access_key: ""
   secret_key: ""

@@ -5,7 +5,7 @@
 # For Docker deployments, use config.yaml instead.
 
 app:
-  name: "bytefreezer-piper"
+  name: "piper"
   version: "1.0.0"
   log_level: "info"
 
@@ -13,7 +13,7 @@ server:
   api_port: 8082
 
 s3_source:
-  bucket_name: "bytefreezer-intake"
+  bucket_name: "intake"
   region: "us-east-1"
   poll_interval: "30s"
   access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
@@ -23,7 +23,7 @@ s3_source:
   use_iam_role: false
 
 s3_destination:
-  bucket_name: "bytefreezer-piper"
+  bucket_name: "piper"
   region: "us-east-1"
   access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
   secret_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_secret_key"
@@ -32,7 +32,7 @@ s3_destination:
   use_iam_role: false
 
 s3_geoip:
-  bucket_name: "bytefreezer-geoip"
+  bucket_name: "geoip"
   region: "us-east-1"
   access_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_access_key"
   secret_key: "REPLACE_WITH_AWX_VARIABLE_bytefreezer_s3_secret_key"
