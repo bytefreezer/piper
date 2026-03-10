@@ -13,7 +13,6 @@ import (
 	"github.com/bytefreezer/piper/config"
 	"github.com/bytefreezer/piper/errors"
 	"github.com/bytefreezer/piper/metrics"
-	"github.com/bytefreezer/piper/pipeline"
 	"github.com/bytefreezer/piper/storage"
 )
 
@@ -21,7 +20,6 @@ import (
 type Services struct {
 	Config                   *config.Config
 	PiperService             *PiperService
-	PipelineDatabase         *pipeline.PipelineDatabase
 	StateManager             storage.StateManager
 	HealthReporter           *HealthReportingService
 	DatasetMetricsClient     *metrics.DatasetMetricsClient
@@ -54,12 +52,6 @@ func NewServices(conf *config.Config) *Services {
 		// Continue without state manager for development
 		log.Warnf("Failed to create state manager: %v - continuing without state manager", err)
 	}
-
-	// Create pipeline client
-	pipelineClient := pipeline.NewPipelineClient(conf)
-
-	// Create pipeline database
-	pipelineDatabase := pipeline.NewPipelineDatabase(pipelineClient, stateManager, conf.App.InstanceID)
 
 	// Create dataset metrics client
 	datasetMetricsClient := metrics.NewDatasetMetricsClient(
@@ -95,7 +87,6 @@ func NewServices(conf *config.Config) *Services {
 	services := &Services{
 		Config:                 conf,
 		PiperService:           piperService,
-		PipelineDatabase:       pipelineDatabase,
 		StateManager:           stateManager,
 		DatasetMetricsClient:   datasetMetricsClient,
 		SchemaSubmissionClient: schemaSubmissionClient,
@@ -170,17 +161,17 @@ func NewServices(conf *config.Config) *Services {
 
 // GetPipelineConfigAsInterface returns pipeline config as interface for API
 func (s *Services) GetPipelineConfigAsInterface(ctx context.Context, tenantID, datasetID string) (interface{}, error) {
-	return s.PipelineDatabase.GetPipelineConfiguration(ctx, tenantID, datasetID)
+	return s.PiperService.GetPipelineConfigAsInterface(ctx, tenantID, datasetID)
 }
 
 // GetCacheStats returns cache statistics
 func (s *Services) GetCacheStats() map[string]interface{} {
-	return s.PipelineDatabase.GetCacheStats()
+	return s.PiperService.GetCacheStats()
 }
 
 // GetCachedPipelineList returns all cached pipeline configurations
 func (s *Services) GetCachedPipelineList(ctx context.Context) ([]map[string]interface{}, error) {
-	return s.PipelineDatabase.GetCachedPipelineList(ctx)
+	return s.PiperService.GetCachedPipelineList(ctx)
 }
 
 // buildHealthConfiguration builds comprehensive configuration for health reporting

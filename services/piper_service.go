@@ -168,11 +168,7 @@ func (s *PiperService) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go s.cleanupLoop(ctx)
 
-	// Start housekeeping goroutine
-	if s.cfg.Housekeeping.Enabled {
-		s.wg.Add(1)
-		go s.housekeepingLoop(ctx)
-	}
+	// Housekeeping is driven by main.go's loop — not started here to avoid duplicate loops
 
 	log.Infof("ByteFreezer Piper service started successfully")
 	return nil
@@ -438,54 +434,9 @@ func (s *PiperService) cleanupLoop(ctx context.Context) {
 	}
 }
 
-// housekeepingLoop periodically updates pipeline configurations and tenant information
-func (s *PiperService) housekeepingLoop(ctx context.Context) {
-	defer s.wg.Done()
-
-	// Initial delay to allow system to start up
-	initialDelay := 30 * time.Second
-	time.Sleep(initialDelay)
-
-	// Perform initial update
-	s.performHousekeeping(ctx)
-
-	// Create ticker with randomized interval (like receiver)
-	baseInterval := s.cfg.Housekeeping.Interval
-	log.Infof("Starting housekeeping loop with base interval: %v", baseInterval)
-
-	failureCount := 0
-	for {
-		// Randomized interval between 1x and 2x base interval for load balancing
-		randomMultiplier := 1.0 + (0.5 * float64(time.Now().UnixNano()%1000) / 1000.0)
-		nextInterval := time.Duration(float64(baseInterval) * randomMultiplier)
-
-		timer := time.NewTimer(nextInterval)
-
-		select {
-		case <-s.stopChan:
-			timer.Stop()
-			log.Infof("Housekeeping loop stopping")
-			return
-		case <-ctx.Done():
-			timer.Stop()
-			log.Infof("Housekeeping loop stopped due to context cancellation")
-			return
-		case <-timer.C:
-			if err := s.performHousekeeping(ctx); err != nil {
-				failureCount++
-				log.Errorf("Housekeeping failed (attempt %d): %v", failureCount, err)
-			} else {
-				if failureCount > 0 {
-					log.Infof("Housekeeping recovered after %d failures", failureCount)
-					failureCount = 0
-				}
-			}
-		}
-	}
-}
-
-// performHousekeeping performs a single housekeeping cycle
-func (s *PiperService) performHousekeeping(ctx context.Context) error {
+// PerformHousekeeping performs a single housekeeping cycle.
+// Called by main.go's housekeeping loop on a timed interval.
+func (s *PiperService) PerformHousekeeping(ctx context.Context) error {
 	log.Debugf("Starting housekeeping cycle...")
 
 	// Update pipeline configuration database
@@ -497,4 +448,19 @@ func (s *PiperService) performHousekeeping(ctx context.Context) error {
 	log.Infof("Housekeeping completed successfully. Cache stats: %+v", cacheStats)
 
 	return nil
+}
+
+// GetCacheStats returns pipeline database cache statistics
+func (s *PiperService) GetCacheStats() map[string]interface{} {
+	return s.configManager.GetCacheStats()
+}
+
+// GetPipelineConfigAsInterface returns pipeline config for API responses
+func (s *PiperService) GetPipelineConfigAsInterface(ctx context.Context, tenantID, datasetID string) (interface{}, error) {
+	return s.configManager.GetPipelineConfigAsInterface(ctx, tenantID, datasetID)
+}
+
+// GetCachedPipelineList returns all cached pipeline configurations
+func (s *PiperService) GetCachedPipelineList(ctx context.Context) ([]map[string]interface{}, error) {
+	return s.configManager.GetCachedPipelineList(ctx)
 }

@@ -132,29 +132,19 @@ func Run() error {
 	// Create API server
 	server.HttpApi = api.NewAPI(servicesInstance, cfg)
 
-	// Define housekeeping function for pipeline database updates and GeoIP updates
+	// Define housekeeping function — delegates to PiperService (single source of truth)
 	housekeepingFn := func() {
-		log.Debug("Starting housekeeping cycle...")
-
-		// Update pipeline database during housekeeping
-		log.Debug("Updating pipeline database during housekeeping...")
-		if err := servicesInstance.PipelineDatabase.UpdateDatabase(server.ctx); err != nil {
-			log.Errorf("Failed to update pipeline database during housekeeping: %v", err)
-			return
+		// Update pipeline database via PiperService's config manager
+		if err := servicesInstance.PiperService.PerformHousekeeping(server.ctx); err != nil {
+			log.Errorf("Failed piper housekeeping: %v", err)
 		}
-		log.Debug("Pipeline database updated successfully")
 
-		// Update GeoIP databases during housekeeping
+		// Update GeoIP databases
 		if geoipUpdater != nil {
-			log.Debug("Checking for GeoIP database updates during housekeeping...")
 			if err := geoipUpdater.CheckAndUpdate(server.ctx); err != nil {
-				log.Errorf("Failed to update GeoIP databases during housekeeping: %v", err)
-			} else {
-				log.Debug("GeoIP database update check completed successfully")
+				log.Errorf("Failed to update GeoIP databases: %v", err)
 			}
 		}
-
-		log.Debug("Housekeeping cycle completed")
 	}
 
 	// Start background services
