@@ -1,5 +1,14 @@
 # ByteFreezer Piper - Release Notes
 
+## 2026-03-09 - Fix Infinite Housekeeping Loop
+
+### Bug Fix
+
+#### Remove duplicate housekeeping loop causing 100% CPU
+- **Issue**: Piper had two independent housekeeping loops — one in `main.go` (with zero-interval safety guard) and one in `piper_service.go` (without guard). When `Housekeeping.Interval` was zero (koanf config issue), `time.NewTimer(0)` fired instantly, creating an infinite loop consuming 100% CPU.
+- **Fix**: Removed the duplicate loop from `piper_service.go`. `main.go` now delegates to `PiperService.PerformHousekeeping()` as single source of truth. Also removed duplicate `PipelineDatabase` from `Services` struct — `ConfigManager` inside `PiperService` is the real one.
+- **Files Changed**: `main.go`, `services/piper_service.go`, `services/services.go`
+
 ## 2026-03-01 - Non-fatal Job Status Updates
 
 ### Bug Fix

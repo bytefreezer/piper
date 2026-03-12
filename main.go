@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	stdlog "log"
+	mathrand "math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -239,11 +240,11 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 
 	baseInterval := time.Duration(svc.Config.Housekeeping.IntervalSeconds) * time.Second
 	if baseInterval <= 0 {
-		baseInterval = 60 * time.Second
+		baseInterval = 30 * time.Second
 		log.Infof("housekeeping interval not set — defaulting to %v", baseInterval)
 	}
 
-	log.Infof("Starting housekeeping with interval %v", baseInterval)
+	log.Infof("Starting housekeeping with base interval %v (randomized 1x-1.5x for load balancing)", baseInterval)
 
 	// Run initial housekeeping immediately on startup (includes GeoIP update)
 	log.Info("Running initial housekeeping on startup...")
@@ -251,9 +252,14 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 		housekeepingFn()
 	}
 
-	// Continue with regular intervals
+	// Continue with randomized intervals for subsequent cycles
 	for {
-		timer := time.NewTimer(baseInterval)
+		// Generate random interval between baseInterval and 1.5*baseInterval
+		// #nosec G404 - Using math/rand for timing jitter, not cryptographic purposes
+		randomMultiplier := 1.0 + mathrand.Float64()*0.5 // Random between 1.0 and 1.5
+		nextInterval := time.Duration(float64(baseInterval) * randomMultiplier)
+		log.Debugf("Next housekeeping in %v (base: %v, multiplier: %.2f)", nextInterval, baseInterval, randomMultiplier)
+		timer := time.NewTimer(nextInterval)
 
 		select {
 		case <-timer.C:
