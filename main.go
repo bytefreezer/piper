@@ -34,7 +34,7 @@ var (
 	configPath  = flag.String("config", "config.yaml", "Path to configuration file")
 	showVersion = flag.Bool("version", false, "Show version and exit")
 	showHelp    = flag.Bool("help", false, "Show help and exit")
-	version     = "1.0.0" // Will be set during build
+	version     = "dev"
 	buildTime   = "unknown"
 	gitCommit   = "unknown"
 )
