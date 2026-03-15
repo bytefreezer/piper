@@ -8,21 +8,21 @@ version: "{{ bytefreezer_piper_version | default('latest') }}"
 
 # Service configuration
 service:
-  name: "piper"
+  name: "bytefreezer-piper"
   user: "root"
   group: "root"
 
 # File paths
 paths:
   binary_dir: "/usr/local/bin"
-  binary_path: "/usr/local/bin/piper"
-  config_dir: "/etc/piper"
-  config_path: "/etc/piper/config.yaml"
-  log_dir: "/var/log/piper"
-  cache_dir: "/var/cache/piper"
-  spool_dir: "/var/spool/piper"
-  service_path: "/etc/systemd/system/piper.service"
-  logrotate_path: "/etc/logrotate.d/piper"
+  binary_path: "/usr/local/bin/bytefreezer-piper"
+  config_dir: "/etc/bytefreezer-piper"
+  config_path: "/etc/bytefreezer-piper/config.yaml"
+  log_dir: "/var/log/bytefreezer-piper"
+  cache_dir: "/var/cache/bytefreezer-piper"
+  spool_dir: "/var/spool/bytefreezer-piper"
+  service_path: "/etc/systemd/system/bytefreezer-piper.service"
+  logrotate_path: "/etc/logrotate.d/bytefreezer-piper"
 
 # Log rotation settings
 logrotate:
@@ -35,7 +35,7 @@ logrotate:
 # Application configuration
 config:
   app:
-    name: "piper"
+    name: "bytefreezer-piper"
     log_level: "info"
     deployment_type: "managed"
 
@@ -161,7 +161,7 @@ config:
 
 # Download configuration
 download:
-  url: "https://github.com/{{ github_repo }}/releases/{{ 'latest/download' if version == 'latest' else 'download/' + version }}/piper-linux-amd64.tar.gz"
+  url: "https://github.com/{{ github_repo }}/releases/{{ 'latest/download' if version == 'latest' else 'download/' + version }}/bytefreezer-piper-linux-amd64.tar.gz"
 
 # Docker image configuration
 docker:
