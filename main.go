@@ -208,6 +208,7 @@ func (svc *Server) Start(housekeepingFn func(), quitterFn func(time.Duration)) {
 		go func() {
 			<-svc.Services.HealthReporter.UninstallChan()
 			log.Warnf("Received uninstall directive from control plane — shutting down and self-removing")
+			svc.Services.HealthReporter.ReportUninstalling()
 			svc.Services.HealthReporter.Stop()
 			selfCleanup("bytefreezer-piper")
 			os.Exit(0)
