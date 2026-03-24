@@ -98,6 +98,4 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-require github.com/bytefreezer/goodies/control-client v0.1.0
-
-replace github.com/bytefreezer/goodies/control-client => ../goodies/control-client
+require github.com/bytefreezer/goodies/control-client v0.1.3
