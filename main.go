@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
+	controlclient "github.com/bytefreezer/goodies/control-client"
 	"github.com/bytefreezer/goodies/log"
 
 	"github.com/bytefreezer/piper/api"
@@ -146,6 +147,34 @@ func Run() error {
 				log.Errorf("Failed to update GeoIP databases: %v", err)
 			}
 		}
+	}
+
+	// Initialize change observer for fast config refresh
+	if cfg.ControlService.ControlURL != "" {
+		observerClient := controlclient.NewClient(controlclient.Config{
+			BaseURL:        cfg.ControlService.ControlURL,
+			APIKey:         cfg.ControlService.APIKey,
+			TimeoutSeconds: 10,
+		})
+		changeObserver := controlclient.NewChangeObserver(observerClient, cfg.ControlService.AccountID, 15*time.Second)
+		changeObserver.SetLogFunc(func(format string, args ...interface{}) {
+			log.Infof(format, args...)
+		})
+		changeObserver.OnChange(controlclient.ChangeCategoryDatasets, func() {
+			log.Info("Change detected: datasets — triggering config refresh")
+			if err := servicesInstance.PiperService.PerformHousekeeping(server.ctx); err != nil {
+				log.Errorf("Failed config refresh on change: %v", err)
+			}
+		})
+		changeObserver.OnChange(controlclient.ChangeCategoryTransformations, func() {
+			log.Info("Change detected: transformations — triggering config refresh")
+			if err := servicesInstance.PiperService.PerformHousekeeping(server.ctx); err != nil {
+				log.Errorf("Failed config refresh on change: %v", err)
+			}
+		})
+		changeObserver.Start()
+		defer changeObserver.Stop()
+		log.Info("Change observer started — polling every 15s for dataset/transformation changes")
 	}
 
 	// Start background services
